@@ -111,7 +111,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     #                        gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=worker_gpu_fraction))
     #sess = tf.Session(config=config)
     orchestrate_agent = OrchestrateAgent(node_input_dim, cluster_input_dim, hid_dims, output_dim, max_depth,
-                                         range(1, exec_cap + 1), eps=1e-6, act_fn = nn.LeakyReLU(0.2),optimizer=torch.optim.Adam)
+                                         range(1, exec_cap + 1), eps=1e-6, act_fn = nn.functional.leaky_relu,optimizer=torch.optim.Adam)
     exp = {'node_inputs': [], 'cluster_inputs': [], 'reward': [], 'wall_time': [], 'node_act_vec': [],
            'cluster_act_vec': []}
 

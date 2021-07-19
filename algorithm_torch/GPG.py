@@ -248,6 +248,9 @@ class OrchestrateAgent(Agent):
         
         #print(self.act_fn)
         #print(type(self.act_fn))
+        
+        print('shape: ', self.node_input_dim, self.hid_dims,
+            self.output_dim)
         # TODO: Relook at the follows again
         self.gcn = GraphCNN(
             self.node_input_dim, self.hid_dims,
@@ -373,9 +376,13 @@ class OrchestrateAgent(Agent):
         self.node_inputs, self.cluster_inputs = x
         
         self.optimizer.zero_grad()
-        print(self.gcn())
-        print(type(self.gcn))
+        #print(self.gcn)
+        #print(type(self.gcn))
+        #print(self.node_inputs.shape)
         self.gcn(self.node_inputs)
+        print(type(self.node_inputs), type( self.gcn.outputs))
+        self.gsn(torch.cat((torch.tensor(self.node_inputs), self.gcn.outputs), axis=1))
+        
         # Map gcn_outputs and raw_inputs to action probabilities
         self.node_act_probs, self.cluster_act_probs = self.orchestrate_network(
             self.node_inputs, self.gcn.outputs, self.cluster_inputs,
