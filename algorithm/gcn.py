@@ -28,9 +28,8 @@ class GraphCNN(object):
         self.act_fn = act_fn
         self.scope = scope
         
-        print('shape: ', self.input_dim, self.hid_dims,
-            self.output_dim)
-        a=b
+        #print('shape: ', self.input_dim, self.hid_dims,self.output_dim)
+        #a=b
         # initialize message passing transformation parameters
         self.prep_weights, self.prep_bias = \
             self.init(self.input_dim, self.hid_dims, self.output_dim)

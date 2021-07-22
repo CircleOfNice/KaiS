@@ -31,9 +31,7 @@ class GraphCNN(nn.Module):
         
         
         # Hidden Layers
-        #print('start :  ',input_dim, hid_dims, output_dim)
         for hid_dim in hid_dims:
-            #print('Hid Dim : ', curr_in_dim, hid_dim)
             
             weights.append(self.glorot([curr_in_dim, hid_dim]))
             bias.append(torch.zeros(hid_dim))
@@ -42,29 +40,15 @@ class GraphCNN(nn.Module):
         # Output layer
         weights.append(self.glorot([curr_in_dim, output_dim],))
         bias.append(torch.zeros([output_dim]))
-        '''
-        print('weights : ' , output_dim)
-        for l in range(len(weights)):
-            print(weights[l].shape)
-        
-        print('bias : ', )
-        for l in range(len(bias)):
-            print(bias[l].shape)
-            
-        '''
+
         return weights, bias
         
     def forward(self, x):
         x = torch.from_numpy(x)
         # Raise x into higher dimension
-        #print(self.prep_weights)
-        #for l in range(len(self.prep_weights)):
-        #    print(self.prep_weights[l].shape) 
             
         for l in range(len(self.prep_weights)):
-            #print(type(x), type(self.prep_weights[l]), x.shape, self.prep_weights[l].shape)
-            #print()
-            #print()
+
             x = torch.matmul(x.float(), self.prep_weights[l])
             x += self.prep_bias[l]
             x = self.act_fn(x)

@@ -10,7 +10,6 @@ from env.env_run import *
 def flatten(list):
     return [y for x in list for y in x]
     
-    
 def calculate_reward(master1, master2, cur_done, cur_undone):
     weight = 1.0
     all_task = [float(cur_done[0] + cur_undone[0]), float(cur_done[1] + cur_undone[1])]
@@ -320,8 +319,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 task_num2.append(len(master2.node_list[i].task_queue))
             s_grid = np.array([flatten(flatten([deploy_state, [task_num1], cpu_list1, mem_list1])),
                                flatten(flatten([deploy_state, [task_num2], cpu_list1, mem_list1]))])
-            
-            #print(s_grid.shape)
+
             # Dispatch decision
             act, valid_action_prob_mat, policy_state, action_choosen_mat, \
             curr_state_value, curr_neighbor_mask, next_state_ids = q_estimator.action(s_grid, ava_node, context,

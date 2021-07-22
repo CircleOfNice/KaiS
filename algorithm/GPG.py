@@ -213,7 +213,9 @@ class OrchestrateAgent(Agent):
 
         # Decays over time
         self.entropy_weight = tf.placeholder(tf.float32, ())
-
+        
+        #tf.print(self.node_act_probs, self.node_act_vec)
+        #a=b
         # Action probability
         self.selected_node_prob = tf.reduce_sum(tf.multiply(
             self.node_act_probs, self.node_act_vec),
@@ -309,9 +311,11 @@ class OrchestrateAgent(Agent):
             cluster_outputs = tf.reshape(cluster_outputs, [batch_size, -1])
             cluster_outputs = tf.reshape(
                 cluster_outputs, [batch_size, -1, len(self.executor_levels)])
-
+            print('check : ', cluster_outputs.shape)
             # Do softmax
             cluster_outputs = tf.nn.softmax(cluster_outputs, dim=-1)
+            print('check 2: ', cluster_outputs.shape, node_outputs.shape)
+            #a=b
             return node_outputs, cluster_outputs
 
     def apply_gradients(self, gradients, lr_rate):
@@ -345,6 +349,10 @@ class OrchestrateAgent(Agent):
         cluster_inputs = cluster_inputs[0]
         node_act_vec = node_act_vec[0]
         cluster_act_vec = cluster_act_vec[0]
+        
+        print('node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape')
+        print(node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape)
+        a=b
         entropy_weight = entropy_weight
         self.sess.run(self.act_opt, feed_dict={i: d for i, d in zip(
             [self.node_inputs] + [self.cluster_inputs] + [self.node_act_vec] + [
@@ -429,6 +437,12 @@ class OrchestrateAgent(Agent):
         node_inputs, cluster_inputs = self.translate_state(obs)
         node_act_probs, cluster_act_probs, node_acts, cluster_acts = \
             self.predict(node_inputs, cluster_inputs)
+        
+        print(node_act_probs) 
+        print()
+        print()
+        print(cluster_act_probs)
+        #a=b
         return node_acts, cluster_acts, \
                node_act_probs, cluster_act_probs, \
                node_inputs, cluster_inputs
@@ -479,3 +493,4 @@ class OrchestrateAgent(Agent):
             moving_executors.count(node),
             agent_exec_act, num_source_exec)
         return node, use_exec
+

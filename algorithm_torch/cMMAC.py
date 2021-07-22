@@ -24,7 +24,6 @@ class Value_Model(nn.Module):
 
     def forward(self, x):
         x = torch.from_numpy(x)
-        #print(type(x), x.shape)
         x = self.fc1(x.float())
         x = self.fc2(x)
         x = self.fc3(x)
@@ -49,18 +48,14 @@ class Policy_Model(nn.Module):
         x = self.fc3(x)
         x = self.fc4(x) 
         
-        #self.policy_train_op = tf.train.AdamOptimizer(self.loss_lr).minimize(self.policy_loss)
-        #print('x.shape : ',x.shape, x)
         return x 
         
 class Estimator:
     def __init__(self, action_dim, state_dim, n_valid_node, summaries_dir=None):
 
-        #self.sess = sess 
         self.n_valid_node = n_valid_node
         self.action_dim = action_dim
         self.state_dim = state_dim
-        #self.scope = scope
         
         # Initial value for losses
         self.actor_loss = 0
@@ -86,17 +81,13 @@ class Estimator:
         
     def sm_prob(self, policy_net_output, neighbor_mask):
         neighbor_mask = torch.from_numpy(neighbor_mask)
-        #print(policy_net_output, neighbor_mask)
         
         logits = policy_net_output +1 
         
-        #print(type(logits), type(neighbor_mask))
         valid_logits = logits * neighbor_mask
-        
-        #softmaxprob = nn.Softmax(torch.log(valid_logits + 1e-8))
+
         softmaxprob = nn.Softmax()
         softmaxprob = softmaxprob(torch.log(valid_logits + 1e-8))
-        #print(softmaxprob)
         return softmaxprob, logits, valid_logits
         
     def policy_net_loss(self, policy_net_output, neighbor_mask, tfadv ):
@@ -118,11 +109,8 @@ class Estimator:
         #return self.pm, self.pm_criterion
         
     def action(self, s, ava_node, context, epsilon):
-        #print('s.shape', s.shape)
         value_output = self.vm(s)#.flatten()
-        #print('value_output.shape', value_output.shape)
         value_output = value_output.flatten()
-        #print('value_output_new.shape', value_output.shape)
         action_tuple = []
         valid_prob = []
 
@@ -133,10 +121,8 @@ class Estimator:
         next_state_ids = []
         
         grid_ids = [x for x in range(self.n_valid_node)]
-        #print('grid_ids.shape', len(grid_ids))
         self.valid_action_mask = np.zeros((self.n_valid_node, self.action_dim))
-        
-        #print('self.valid_action_mask.shape', self.valid_action_mask.shape)
+
         
         for i in range(len(ava_node)):
             for j in ava_node[i]:
@@ -147,30 +133,20 @@ class Estimator:
         
         # compute policy probability.
         self.pm_out =self.pm(s)
-        #print('s.shape', s.shape)
-        #print(' self.pm_out.shape',  self.pm_out.shape)
+
         action_probs,_,_ = self.sm_prob( self.pm_out, curr_neighbor_mask) 
-        #print(' action_probs.shape',  len(action_probs), action_probs.shape)
-        #print()
-        #print()
-        #print(' action_probs : ',action_probs)
+
         curr_neighbor_mask_policy = []
         
         
         for idx, grid_valid_idx in enumerate(grid_ids):
             action_prob = action_probs[idx]
-            #print(' action_prob.shape',  action_prob.shape, idx)
-            #a=b
             # action probability for state value function
             action_prob = action_prob.detach().numpy()
             valid_prob.append(action_prob)
             if int(context[idx]) == 0:
                 continue
                 
-            #print(self.action_dim, int(context[idx]), action_prob.shape)
-            #print(action_prob / torch.sum(action_prob))
-            #print(torch.sum(action_prob))
-            #print(action_prob / np.sum(action_prob))
             
             curr_action_indices_temp = np.random.choice(self.action_dim, int(context[idx]),
                                                         p=action_prob / np.sum(action_prob))
@@ -192,8 +168,7 @@ class Estimator:
                     curr_state_value.append(value_output[idx])
                     next_state_ids.append(self.valid_neighbor_grid_id[grid_valid_idx][curr_action_idx])
                     curr_neighbor_mask_policy.append(curr_neighbor_mask[idx])
-        #print(type(valid_prob))
-        #print(valid_prob)
+
         return action_tuple, np.stack(valid_prob), \
                np.stack(policy_state), np.stack(action_choosen_mat), curr_state_value, \
                np.stack(curr_neighbor_mask_policy), next_state_ids
@@ -213,8 +188,7 @@ class Estimator:
         targets = []
         node_reward = node_reward.flatten()
         qvalue_next = self.vm(next_state).flatten()
-        
-        #print(type(node_reward) , type(qvalue_next))
+
         for idx in np.arange(self.n_valid_node):
             grid_prob = valid_prob[idx][self.valid_action_mask[idx] > 0]
             curr_grid_target = np.sum(

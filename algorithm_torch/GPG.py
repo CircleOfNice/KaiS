@@ -47,7 +47,8 @@ def expand_act_on_state(state, sub_acts):
     # Expand the state
     batch_size = state.shape[0]
     num_nodes = state.shape[1]
-    num_features = state.shape[2].value
+    num_features = state.shape[2]#.value
+    
     expand_dim = len(sub_acts)
 
     # Replicate the state
@@ -55,7 +56,7 @@ def expand_act_on_state(state, sub_acts):
     state = state.view([batch_size, num_nodes * expand_dim, num_features])
 
     # Prepare the appended actions
-    sub_acts = torch.FloatTensor(sub_acts, dtype=tf.float32)
+    sub_acts = torch.FloatTensor(sub_acts)
     sub_acts = sub_acts.view([1, 1, expand_dim])
     sub_acts = torch.tile(sub_acts, [1, 1, num_nodes])
     sub_acts = sub_acts.view([1, num_nodes * expand_dim, 1])
@@ -68,7 +69,7 @@ def expand_act_on_state(state, sub_acts):
 
 def act_offload_agent(orchestrate_agent, exp, done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state):
     obs = [done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state]
-    node, use_exec, exp = orchestrate_agent.invoke_model(obs)
+    node, use_exec, exp = invoke_model(orchestrate_agent, obs, exp)
     return node, use_exec, exp
 
 
@@ -115,8 +116,11 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv, entropy_weight):
         node_act_vec = exp['node_act_vec']
         cluster_act_vec = exp['cluster_act_vec']
         adv = batch_adv[ba_start: ba_end, :]
+        #print('cluster_act_vec : ', cluster_act_vec) 
+        #print('node_act_vec', node_act_vec)
+        #print('cluster_inputs', cluster_inputs)
         loss = orchestrate_agent.act_loss(
-            node_inputs, cluster_inputs, node_act_vec, cluster_act_vec, adv, entropy_weight)
+            node_inputs, cluster_inputs, node_act_vec, cluster_act_vec, adv)
     return loss
 
 
@@ -144,7 +148,8 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weig
     # Back the advantage
     batch_adv = all_cum_reward[0] - baselines[0]
     batch_adv = np.reshape(batch_adv, [len(batch_adv), 1])
-
+    #print('Inside train_orchestrate_agent')
+    #print('orchestrate_agent '
     # Compute gradients
     loss = compute_orchestrate_loss(
         orchestrate_agent, exp, batch_adv, entropy_weight)
@@ -158,9 +163,10 @@ class NodeNet(nn.Module):
         self.fc1 = fc(merge_node, node_inp_sizes[0], act=act)
         self.fc2 = fc(node_inp_sizes[0], node_inp_sizes[1], act=act)
         self.fc3 = fc(node_inp_sizes[1], node_inp_sizes[2], act=act)
-        self.fc4 = fc(node_inp_sizes[2], node_inp_sizes[3], act=None)
+        self.fc4 = fc(node_inp_sizes[2], node_inp_sizes[3])# act=None)
 
     def forward(self, x):
+        
         x = self.fc1(x)
         x = self.fc2(x)
         x = self.fc3(x)
@@ -174,7 +180,7 @@ class ClusterNet(nn.Module):
         self.fc1 = fc(expanded_state, cluster_inp_sizes[0], act=act)
         self.fc2 = fc(cluster_inp_sizes[0], cluster_inp_sizes[1], act=act)
         self.fc3 = fc(cluster_inp_sizes[1], cluster_inp_sizes[2], act=act)
-        self.fc4 = fc(cluster_inp_sizes[2], cluster_inp_sizes[3], act=None)
+        self.fc4 = fc(cluster_inp_sizes[2], cluster_inp_sizes[3])#, act=None)
 
     def forward(self, x):
         x = self.fc1(x)
@@ -186,7 +192,7 @@ class ClusterNet(nn.Module):
         
 class OCN(nn.Module):
     def __init__(self, merge_node_dim, expanded_state_dim, node_input_dim, 
-    cluster_input_dim, output_dim, expand_act_on_state,
+    cluster_input_dim, output_dim, expand_act_on_state, executor_levels, 
     node_inp_sizes = [32, 16, 8 ,1], cluster_inp_sizes = [32, 16, 8 ,1], act = nn.ReLU(), batch_size = 1):
         super().__init__()
         
@@ -196,35 +202,43 @@ class OCN(nn.Module):
         self.cluster_input_dim = cluster_input_dim
         self.output_dim = output_dim
         self.expand_act_on_state = expand_act_on_state
-        
+        self.batch_size = batch_size
+        self.executor_levels = executor_levels
         self.nodenet = NodeNet(merge_node_dim, node_inp_sizes = node_inp_sizes, act = nn.ReLU())
         self.clusterenet = ClusterNet(expanded_state_dim, cluster_inp_sizes = cluster_inp_sizes, act = nn.ReLU())
 
     def forward(self, x):
-        node_inputs, gcn_outputs, cluster_inputs = x
-        
-        node_inputs_reshape = node_inputs.view(batch_size, -1, self.node_input_dim)
-        cluster_inputs_reshape = cluster_inputs.view(batch_size, -1, self.cluster_inputs_dim)
-        gcn_outputs_reshape = gcn_outputs.view(batch_size, -1, self.output_dim)
+        node_inputs, cluster_inputs, gcn_outputs = x
+        node_inputs = torch.from_numpy(node_inputs).float()
+        cluster_inputs = torch.from_numpy(cluster_inputs).float()
+        #node_inputs = torch.from_numpy(node_inputs).float()
+        node_inputs_reshape = node_inputs.view(self.batch_size, -1, self.node_input_dim)
+        cluster_inputs_reshape = cluster_inputs.view(self.batch_size, -1, self.cluster_input_dim)
+        gcn_outputs_reshape = gcn_outputs.view(self.batch_size, -1, self.output_dim)
         
         
         merge_node = torch.cat((node_inputs_reshape, gcn_outputs_reshape), axis=2)
         
         node_outputs = self.nodenet(merge_node)
         
-        node_outputs = node_outputs.view(batch_size, -1)
+        #print('node_outputs before: ', node_outputs.shape)
         
-        node_outputs = nn.softmax(node_outputs, dim=-1)
+        node_outputs = node_outputs.view(self.batch_size, -1)
+        node_outputs = nn.functional.softmax(node_outputs)
+        
         merge_cluster = torch.cat([cluster_inputs_reshape, ], axis=2)
         expanded_state = self.expand_act_on_state(
                 merge_cluster, [l / 50.0 for l in self.executor_levels])
         cluster_outputs = self.clusterenet(expanded_state)
-         
-        cluster_outputs = cluster_outputs.view(batch_size, -1)
-        cluster_outputs = cluster_outputs.view(batch_size, -1, len(self.executor_levels))
+        
+            
+            
+        cluster_outputs = cluster_outputs.view(self.batch_size, -1)
+        cluster_outputs = cluster_outputs.view(self.batch_size, -1, len(self.executor_levels))
 
         # Do softmax
-        cluster_outputs = nn.softmax(cluster_outputs, dim=-1)
+        cluster_outputs = nn.functional.softmax(cluster_outputs)#, dim=-1)
+        #print('cluster_outputs, node_outputs : ', cluster_outputs.shape, node_outputs.shape)
         return node_outputs, cluster_outputs        
 
 
@@ -245,12 +259,6 @@ class OrchestrateAgent(Agent):
         self.eps = eps #=1e-6
         self.act_fn = act_fn
         
-        
-        #print(self.act_fn)
-        #print(type(self.act_fn))
-        
-        print('shape: ', self.node_input_dim, self.hid_dims,
-            self.output_dim)
         # TODO: Relook at the follows again
         self.gcn = GraphCNN(
             self.node_input_dim, self.hid_dims,
@@ -273,9 +281,9 @@ class OrchestrateAgent(Agent):
     #self.cluster_input_dim, self.output_dim, expand_act_on_state, merge_node_dim= 5, expanded_state_dim= 50,
     #node_inp_sizes = [32, 16, 8 ,1], cluster_inp_sizes = [32, 16, 8 ,1], act = act_fn, batch_size = batch_size)
     
-        self.ocn_net = OCN(5, 50, self.node_input_dim, 
-    self.cluster_input_dim, self.output_dim, expand_act_on_state,
-    node_inp_sizes = [32, 16, 8 ,1], cluster_inp_sizes = [32, 16, 8 ,1], act = nn.ReLU(), batch_size = 1)
+        self.ocn_net = OCN(32, 25, self.node_input_dim, 
+    self.cluster_input_dim, self.output_dim, expand_act_on_state, self.executor_levels,
+    node_inp_sizes = [32, 16, 8 ,1], cluster_inp_sizes = [32, 16, 8 ,1], act = nn.ReLU(), batch_size = batch_size)
         #self.optimizer(self.ocn_net)
         #return self.ocn_net
         
@@ -287,34 +295,58 @@ class OrchestrateAgent(Agent):
         torch.save(self.ocn_net, file_path)
         
     def act_loss(self, node_act_probs, node_act_vec, cluster_act_probs, cluster_act_vec, adv):
+        
+        node_act_probs = torch.tensor(node_act_probs)
+        node_act_vec = torch.tensor(node_act_vec)
+        
+        prod = torch.mul(
+            node_act_probs, node_act_vec)
+            
         # Action probability
-        self.selected_node_prob = torch.sum(torch.mul(
-            self.node_act_probs, self.node_act_vec),
-            dim=1, keep_dims=True)
-        self.selected_cluster_prob = torch.sum(tf.sum(torch.mul(
+        
+        print('cluster_act_probs : ', len(cluster_act_probs)) 
+        print()
+        print()
+        print('cluster_act_vec :', len(cluster_act_vec))
+        print()
+        print()
+        print(type(cluster_act_probs), type(cluster_act_vec))
+        print()
+        print()
+        cluster_act_probs, cluster_act_vec = torch.tensor(cluster_act_probs), torch.tensor(cluster_act_vec)
+        
+        print(type(cluster_act_probs), type(cluster_act_vec))
+        print()
+        print()
+        print(cluster_act_probs.shape, cluster_act_vec.shape)
+        selected_node_prob = torch.sum(prod,
+            dim=(1,), keepdim=True)
+        selected_cluster_prob = torch.sum(torch.sum(torch.mul(
             cluster_act_probs, cluster_act_vec),
-            reduction_indices=2), reduction_indices=1, keep_dims=True)
+            reduction_indices=2), reduction_indices=1, keepdim=True)
 
         # Orchestrate loss due to advantge
         self.adv_loss = tf.sum(torch.mul(
-            torch.log(self.selected_node_prob * self.selected_cluster_prob + \
+            torch.log(selected_node_prob * selected_cluster_prob + \
                    self.eps), -adv))
 
         # Node_entropy
         self.node_entropy = tf.sum(torch.mul(
-            self.node_act_probs, torch.log(self.node_act_probs + self.eps)))
+            self.node_act_probs, torch.log(node_act_probs + self.eps)))
 
         # Entropy loss
         self.entropy_loss = self.node_entropy  # + self.cluster_entropy
 
         # Normalize entropy
-        denom = (torch.log(tf.shape(self.node_act_probs)[1]) + \
+        denom = (torch.log(tf.shape(node_act_probs)[1]) + \
              torch.log(float(len(self.executor_levels))))
         denom = denom.type(torch.FloatTensor)
         self.entropy_loss /= denom
 
         # Define combined loss
         self.act_loss = self.adv_loss + self.entropy_weight * self.entropy_loss
+        
+        return self.loss
         
     def translate_state(self, obs):
         done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state = obs
@@ -373,21 +405,16 @@ class OrchestrateAgent(Agent):
 
     def predict(self, x):
         # here I have to define the functioning of net (baiscally init)
-        self.node_inputs, self.cluster_inputs = x
+        self.node_inputs, self.cluster_inputs, self.gcn.outputs = x
         
         self.optimizer.zero_grad()
-        #print(self.gcn)
-        #print(type(self.gcn))
-        #print(self.node_inputs.shape)
         self.gcn(self.node_inputs)
-        print(type(self.node_inputs), type( self.gcn.outputs))
         self.gsn(torch.cat((torch.tensor(self.node_inputs), self.gcn.outputs), axis=1))
         
         # Map gcn_outputs and raw_inputs to action probabilities
-        self.node_act_probs, self.cluster_act_probs = self.orchestrate_network(
-            self.node_inputs, self.gcn.outputs, self.cluster_inputs,
-            self.gsn.summaries[0], self.gsn.summaries[1], self.act_fn)
-
+        self.node_act_probs, self.cluster_act_probs = self.ocn_net((self.node_inputs, self.cluster_inputs, self.gcn.outputs) )#
+            #self.gsn.summaries[0], self.gsn.summaries[1], self.act_fn)
+        
         # Draw action based on the probability
         logits = torch.log(self.node_act_probs)
         noise = torch.rand(logits.shape)
@@ -399,10 +426,10 @@ class OrchestrateAgent(Agent):
         self.cluster_acts = torch.topk(logits - torch.log(-torch.log(noise)), k=3).indices
 
         # Define combined loss
-        self.act_loss =act_loss(self.node_act_probs, self.node_act_vec, self.cluster_act_probs, self.cluster_act_vec, self.adv) # get loss
+        #loss =act_loss(self.node_act_probs, self.node_act_vec, self.cluster_act_probs, self.cluster_act_vec, self.adv) # get loss
 
-        self.loss.backward()
-        self.optimizer.step()
+        #loss.backward()
+        #self.optimizer.step()
         
         return [self.node_act_probs, self.cluster_act_probs, self.node_acts, self.cluster_acts]    
         
@@ -426,15 +453,17 @@ class OrchestrateAgent(Agent):
         self.cluster_acts = torch.topk(logits - torch.log(-torch.log(noise)), k=3).indices
 
         # Define combined loss
-        self.act_loss =act_loss(self.node_act_probs, self.node_act_vec, self.cluster_act_probs, self.cluster_act_vec, self.adv) # get loss
-        self.act_loss.backward()
+        loss =self.act_loss(self.node_act_probs, self.node_act_vec, self.cluster_act_probs, self.cluster_act_vec, self.adv) # get loss
+        self.loss.backward()
         self.optimizer.step()
-        return [self.node_act_probs, self.cluster_act_probs, self.node_acts, self.cluster_acts, self.act_loss]
+        return [self.node_act_probs, self.cluster_act_probs, self.node_acts, self.cluster_acts]
     def invoke_model(self, obs):
         # Invoke learning model
         node_inputs, cluster_inputs = self.translate_state(obs)
+        self.gcn(node_inputs)
         node_act_probs, cluster_act_probs, node_acts, cluster_acts = \
-            self.predict((node_inputs, cluster_inputs))
+            self.predict((node_inputs, cluster_inputs, self.gcn.outputs))
+        
         return node_acts, cluster_acts, \
                node_act_probs, cluster_act_probs, \
                node_inputs, cluster_inputs    
