@@ -194,7 +194,10 @@ class OrchestrateAgent(Agent):
         self.node_act_probs, self.cluster_act_probs = self.orchestrate_network(
             self.node_inputs, self.gcn.outputs, self.cluster_inputs,
             self.gsn.summaries[0], self.gsn.summaries[1], self.act_fn)
-
+        print('Turned on self.node_act_probs.shape, self.cluster_act_probs.shape, self.gcn.outputs : ', self.node_act_probs.shape, self.cluster_act_probs.shape, self.gcn.outputs.shape)
+        
+        print()
+        print()
         # Draw action based on the probability
         logits = tf.log(self.node_act_probs)
         noise = tf.random_uniform(tf.shape(logits))
@@ -214,7 +217,9 @@ class OrchestrateAgent(Agent):
         # Decays over time
         self.entropy_weight = tf.placeholder(tf.float32, ())
         
-        #tf.print(self.node_act_probs, self.node_act_vec)
+        tf.print(self.node_act_probs, self.node_act_vec)
+        #print('node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape')
+        #print(node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape)
         #a=b
         # Action probability
         self.selected_node_prob = tf.reduce_sum(tf.multiply(
@@ -285,12 +290,12 @@ class OrchestrateAgent(Agent):
             gsn_global_summary, [batch_size, -1, self.output_dim])
         gsn_global_summ_extend_cluster = tf.tile(
             gsn_global_summ_reshape, [1, tf.shape(gsn_dag_summ_reshape)[1], 1])
-
+        
         with tf.variable_scope(self.scope):
             merge_node = tf.concat([
                 node_inputs_reshape, gcn_outputs_reshape
             ], axis=2)
-
+            
             node_hid_0 = tl.fully_connected(merge_node, 32, activation_fn=act_fn)
             node_hid_1 = tl.fully_connected(node_hid_0, 16, activation_fn=act_fn)
             node_hid_2 = tl.fully_connected(node_hid_1, 8, activation_fn=act_fn)
@@ -352,7 +357,7 @@ class OrchestrateAgent(Agent):
         
         print('node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape')
         print(node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape)
-        a=b
+        
         entropy_weight = entropy_weight
         self.sess.run(self.act_opt, feed_dict={i: d for i, d in zip(
             [self.node_inputs] + [self.cluster_inputs] + [self.node_act_vec] + [
@@ -365,6 +370,7 @@ class OrchestrateAgent(Agent):
                 self.cluster_act_vec] + [self.adv] + [self.entropy_weight],
             [node_inputs] + [cluster_inputs] + [node_act_vec] + [cluster_act_vec] + [
                 adv] + [entropy_weight])})
+        a=b
         return loss_
 
     def predict(self, node_inputs, cluster_inputs):
