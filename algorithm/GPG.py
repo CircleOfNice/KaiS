@@ -88,6 +88,12 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv, entropy_weight):
         node_act_vec = exp['node_act_vec']
         cluster_act_vec = exp['cluster_act_vec']
         adv = batch_adv[ba_start: ba_end, :]
+        
+        #node_inputs = np.array(node_inputs)
+        #print('node_inputs', node_inputs.shape)
+        #print('sotp')
+        
+        #m=k
         loss = orchestrate_agent.update_gradients(
             node_inputs, cluster_inputs, node_act_vec, cluster_act_vec, adv, entropy_weight)
     return loss
@@ -194,10 +200,10 @@ class OrchestrateAgent(Agent):
         self.node_act_probs, self.cluster_act_probs = self.orchestrate_network(
             self.node_inputs, self.gcn.outputs, self.cluster_inputs,
             self.gsn.summaries[0], self.gsn.summaries[1], self.act_fn)
-        print('Turned on self.node_act_probs.shape, self.cluster_act_probs.shape, self.gcn.outputs : ', self.node_act_probs.shape, self.cluster_act_probs.shape, self.gcn.outputs.shape)
+
+        print('self.node_inputs,  self.cluster_inputs :, ',self.node_inputs.shape,  self.cluster_inputs.shape )
+        print('self.node_act_probs.shape, cluster_act_probs.shape : ', self.node_act_probs.shape,  self.cluster_act_probs.shape)
         
-        print()
-        print()
         # Draw action based on the probability
         logits = tf.log(self.node_act_probs)
         noise = tf.random_uniform(tf.shape(logits))
@@ -208,27 +214,40 @@ class OrchestrateAgent(Agent):
         noise = tf.random_uniform(tf.shape(logits))
         self.cluster_acts = tf.nn.top_k(logits - tf.log(-tf.log(noise)), k=3).indices
 
+        print('self.node_acts,  self.cluster_acts :, ',self.node_acts.shape,  self.cluster_acts.shape )
+        
         # Selected action
         self.node_act_vec = tf.placeholder(tf.float32, [None, None])
         self.cluster_act_vec = tf.placeholder(tf.float32, [None, None, None])
+        print('self.node_act_probs,  self.node_act_vec :, ',self.node_act_probs.shape,  self.node_act_vec.shape )
+        
         # ASdvantage
         self.adv = tf.placeholder(tf.float32, [None, 1])
 
         # Decays over time
         self.entropy_weight = tf.placeholder(tf.float32, ())
         
-        tf.print(self.node_act_probs, self.node_act_vec)
-        #print('node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape')
-        #print(node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape)
-        #a=b
+        prod = tf.multiply(
+            self.node_act_probs, self.node_act_vec)
+        
+        print('prod.shape : ', prod.shape)
+        
+        
         # Action probability
-        self.selected_node_prob = tf.reduce_sum(tf.multiply(
-            self.node_act_probs, self.node_act_vec),
+        self.selected_node_prob = tf.reduce_sum(prod,
             reduction_indices=1, keep_dims=True)
+        
+        print('selected_node_prob :  ', self.selected_node_prob.shape)
+        #a=b
         self.selected_cluster_prob = tf.reduce_sum(tf.reduce_sum(tf.multiply(
             self.cluster_act_probs, self.cluster_act_vec),
             reduction_indices=2), reduction_indices=1, keep_dims=True)
 
+        print('self.selected_node_prob.shape, node_act_probs.shape, node_act_vec.shape : ', self.selected_node_prob.shape,  self.node_act_probs.shape, self.node_act_vec.shape)
+        #a=b
+        print('node_act_probs.shape, node_act_vec.shape) :', self.node_act_probs.shape, self.node_act_vec.shape)
+        print('self.cluster_act_probs, cluster_act_vec : ', self.cluster_act_probs.shape, self.cluster_act_vec.shape)
+        print('selected_cluster_prob.shape, selected_node_prob.shape : ', self.selected_cluster_prob.shape, self.selected_node_prob.shape)
         # Orchestrate loss due to advantge
         self.adv_loss = tf.reduce_sum(tf.multiply(
             tf.log(self.selected_node_prob * self.selected_cluster_prob + \
@@ -316,10 +335,9 @@ class OrchestrateAgent(Agent):
             cluster_outputs = tf.reshape(cluster_outputs, [batch_size, -1])
             cluster_outputs = tf.reshape(
                 cluster_outputs, [batch_size, -1, len(self.executor_levels)])
-            print('check : ', cluster_outputs.shape)
+
             # Do softmax
             cluster_outputs = tf.nn.softmax(cluster_outputs, dim=-1)
-            print('check 2: ', cluster_outputs.shape, node_outputs.shape)
             #a=b
             return node_outputs, cluster_outputs
 
@@ -357,7 +375,7 @@ class OrchestrateAgent(Agent):
         
         print('node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape')
         print(node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape)
-        
+        a=b
         entropy_weight = entropy_weight
         self.sess.run(self.act_opt, feed_dict={i: d for i, d in zip(
             [self.node_inputs] + [self.cluster_inputs] + [self.node_act_vec] + [
@@ -443,11 +461,6 @@ class OrchestrateAgent(Agent):
         node_inputs, cluster_inputs = self.translate_state(obs)
         node_act_probs, cluster_act_probs, node_acts, cluster_acts = \
             self.predict(node_inputs, cluster_inputs)
-        
-        print(node_act_probs) 
-        print()
-        print()
-        print(cluster_act_probs)
         #a=b
         return node_acts, cluster_acts, \
                node_act_probs, cluster_act_probs, \

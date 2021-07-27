@@ -106,6 +106,7 @@ def get_piecewise_linear_fit_baseline(all_cum_rewards, all_wall_time):
 
 
 def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv, entropy_weight):
+    #print('Inside compute_orchestrate_loss')
     batch_points = 2
     loss = 0
     for b in range(batch_points - 1):
@@ -118,7 +119,10 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv, entropy_weight):
         cluster_act_vec = exp['cluster_act_vec']
         adv = batch_adv[ba_start: ba_end, :]
         #print('cluster_act_vec : ', cluster_act_vec) 
-        #print('node_act_vec', node_act_vec)
+        #node_inputs = np.array(node_inputs)
+        #print('node_inputs', node_inputs.shape)
+        #a=x
+        
         #print('cluster_inputs', cluster_inputs)
         loss = orchestrate_agent.act_loss(
             node_inputs, cluster_inputs, node_act_vec, cluster_act_vec, adv)
@@ -221,10 +225,10 @@ class OCN(nn.Module):
         
         
         merge_node = torch.cat((node_inputs_reshape, gcn_outputs_reshape), axis=2)
-        print('merge_node.shape : ', merge_node.shape)
+        #print('merge_node.shape : ', merge_node.shape)
         node_outputs = self.nodenet(merge_node)
         
-        print('node_outputs before: ', node_outputs.shape)
+        #print('node_outputs before: ', node_outputs.shape)
         
         node_outputs = node_outputs.view(self.batch_size, -1)
         node_outputs = nn.functional.softmax(node_outputs)
@@ -256,10 +260,10 @@ class OCN(nn.Module):
         
         
         merge_node = torch.cat((node_inputs_reshape, gcn_outputs_reshape), axis=2)
-        print('merge_node.shape : ', merge_node.shape)
+        #print('merge_node.shape : ', merge_node.shape)
         node_outputs = self.nodenet(merge_node)
         
-        print('node_outputs before: ', node_outputs.shape)
+        #print('node_outputs before: ', node_outputs.shape)
         
         node_outputs = node_outputs.view(self.batch_size, -1)
         node_outputs = nn.functional.softmax(node_outputs)
@@ -340,16 +344,19 @@ class OrchestrateAgent(Agent):
         self.node_inputs = np.asarray(node_inputs)
         self.cluster_inputs = np.asarray(cluster_inputs)
         
-        #self.optimizer.zero_grad()
-        
+       
+        #a=b
         self.gcn(self.node_inputs)
-        print('Act loss, torch.tensor(self.node_inputs).shape, self.cluster_inputs, self.gcn.outputs.shape  line 309:',torch.tensor(self.node_inputs).shape, self.cluster_inputs.shape, self.gcn.outputs.shape)
         #self.gsn(torch.cat((torch.tensor(self.node_inputs), self.gcn.outputs), axis=1))
         
         # Map gcn_outputs and raw_inputs to action probabilities
         self.node_act_probs, self.cluster_act_probs = self.ocn_net((self.node_inputs, self.cluster_inputs, self.gcn.outputs) )#
-            #self.gsn.summaries[0], self.gsn.summaries[1], self.act_fn)
-        print('self.node_act_probs.shape, self.cluster_act_probs.shape: ',self.node_act_probs.shape, self.cluster_act_probs.shape)
+        
+        print('self.node_inputs,  self.cluster_inputs :, ',self.node_inputs.shape,  self.cluster_inputs.shape )
+        print('self.node_act_probs.shape, cluster_act_probs.shape : ', self.node_act_probs.shape,  self.cluster_act_probs.shape)
+        
+        
+        
         # Draw action based on the probability
         logits = torch.log(self.node_act_probs)
         noise = torch.rand(logits.shape)
@@ -360,21 +367,37 @@ class OrchestrateAgent(Agent):
         noise = torch.rand(logits.shape)
         self.cluster_acts = torch.topk(logits - torch.log(-torch.log(noise)), k=3).indices
         
+        print('self.node_acts,  self.cluster_acts :, ',self.node_acts.shape,  self.cluster_acts.shape )
         
         node_act_probs = torch.tensor(self.node_act_probs)
         node_act_vec = torch.tensor(node_act_vec)
-        print('node_act_probs.shape, node_act_vec.shape) :', node_act_probs.shape, node_act_vec.shape)
+        print('self.node_act_probs,  self.node_act_vec :, ',self.node_act_probs.shape, node_act_vec.shape )
+        
+        #a=b
         prod = torch.mul(
             node_act_probs, node_act_vec)
-            
+        print('prod.shape : ', prod.shape)
+        
+          
         # Action probability
         cluster_act_probs, cluster_act_vec = torch.tensor(self.cluster_act_probs), torch.tensor(cluster_act_vec)
         
         selected_node_prob = torch.sum(prod,
             dim=(1,), keepdim=True)
-        selected_cluster_prob = torch.sum(torch.sum(torch.mul(
-            self.cluster_act_probs, cluster_act_vec),
-            reduction_indices=2), reduction_indices=1, keepdim=True)
+        
+        
+        print('selected_node_prob :  ', selected_node_prob.shape)
+        a=b
+        #print('self.selected_node_prob.shape, node_act_probs.shape, node_act_vec.shape : ', selected_node_prob.shape,  self.node_act_probs.shape, node_act_vec.shape)
+        #print('selected_node_prob.shape :  ' , selected_node_prob.shape)
+        #print('self.cluster_act_probs, cluster_act_vec : ', self.cluster_act_probs.shape, cluster_act_vec.shape)
+        
+        cluster_prod = torch.mul( self.cluster_act_probs, cluster_act_vec)
+        
+        
+        #print('cluster_prod.shape, cluster_prod.type : ', cluster_prod.shape, type(cluster_prod))
+        selected_cluster_prob = torch.sum(torch.sum(cluster_prod, dim=2), 
+                                          dim=1, keepdim=True)
 
         # Orchestrate loss due to advantge
         self.adv_loss = torch.sum(torch.mul(
@@ -458,7 +481,7 @@ class OrchestrateAgent(Agent):
         # here I have to define the functioning of net (baiscally init)
         #print('inside predict : ')
         self.node_inputs, self.cluster_inputs, self.gcn.outputs = x
-        print('predict side self.node_inputs, self.cluster_inputs, self.gcn.outputs :',self.node_inputs.shape, self.cluster_inputs.shape, self.gcn.outputs.shape)
+        #print('predict side self.node_inputs, self.cluster_inputs, self.gcn.outputs :',self.node_inputs.shape, self.cluster_inputs.shape, self.gcn.outputs.shape)
         
         #print('torch.tensor(self.node_inputs).shape, self.gcn.outputs.shape :',torch.tensor(self.node_inputs).shape, self.cluster_inputs.shape, self.gcn.outputs.shape)
         self.optimizer.zero_grad()
@@ -484,9 +507,9 @@ class OrchestrateAgent(Agent):
 
         #loss.backward()
         #self.optimizer.step()
-        print('Inside predict self.node_act_probs, self.cluster_act_probs, self.node_acts, self.cluster_acts :',self.node_act_probs.shape, self.cluster_act_probs.shape, self.node_acts.shape, self.cluster_acts.shape)
+        #print('Inside predict self.node_act_probs, self.cluster_act_probs, self.node_acts, self.cluster_acts :',self.node_act_probs.shape, self.cluster_act_probs.shape, self.node_acts.shape, self.cluster_acts.shape)
         return [self.node_act_probs, self.cluster_act_probs, self.node_acts, self.cluster_acts]    
-        
+    '''    
     def optimize_net(self, x):
         # here I have to define the functioning of net (baiscally init)
         self.node_inputs, self.cluster_inputs, self.node_act_vec, self.cluster_act_vec, self.adv, self.entropy_weight  = x
@@ -510,7 +533,7 @@ class OrchestrateAgent(Agent):
         loss =self.act_loss(self.node_act_probs, self.node_act_vec, self.cluster_act_probs, self.cluster_act_vec, self.adv) # get loss
         self.loss.backward()
         self.optimizer.step()
-        return [self.node_act_probs, self.cluster_act_probs, self.node_acts, self.cluster_acts]
+        return [self.node_act_probs, self.cluster_act_probs, self.node_acts, self.cluster_acts]'''
     def invoke_model(self, obs):
         # Invoke learning model
         node_inputs, cluster_inputs = self.translate_state(obs)
