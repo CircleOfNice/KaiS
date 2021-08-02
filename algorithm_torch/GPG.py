@@ -119,11 +119,26 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv, entropy_weight):
         cluster_act_vec = exp['cluster_act_vec']
         adv = batch_adv[ba_start: ba_end, :]
         #print('cluster_act_vec : ', cluster_act_vec) 
-        #node_inputs = np.array(node_inputs)
-        #print('node_inputs', node_inputs.shape)
+        print()
+        print()
+        print()
+        print('compute_orchestrate_loss :')
+        node_inputs = np.array(node_inputs)
+        print('node_inputs', node_inputs.shape)
+        cluster_inputs = np.array(cluster_inputs)
+        
+        print('cluster_inputs', cluster_inputs.shape)
+        node_act_vec = np.array(node_act_vec)
+        print('node_act_vec', node_act_vec.shape)
+        cluster_act_vec = np.array(cluster_act_vec)
+        print('cluster_act_vec', cluster_act_vec.shape)
+        print()
+        print()
+        print()
         #a=x
         
         #print('cluster_inputs', cluster_inputs)
+        
         loss = orchestrate_agent.act_loss(
             node_inputs, cluster_inputs, node_act_vec, cluster_act_vec, adv)
     return loss
@@ -155,6 +170,9 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weig
     batch_adv = np.reshape(batch_adv, [len(batch_adv), 1])
     #print('Inside train_orchestrate_agent')
     #print('orchestrate_agent ')
+    orchestrate_agent.entropy_weight = entropy_weight
+    #print('Orchestrate Weight : ', entropy_weight)
+    #a=b
     # Compute gradients
     loss = compute_orchestrate_loss(
         orchestrate_agent, exp, batch_adv, entropy_weight)
@@ -215,7 +233,8 @@ class OCN(nn.Module):
 
     def predict(self, x):
         node_inputs, cluster_inputs, gcn_outputs = x
-        #self.batch_size = node_inputs.shape[0]
+        self.batch_size = 1
+        #print('cluster_inputs.shape : ', cluster_inputs.shape)
         node_inputs = torch.from_numpy(node_inputs).float()
         cluster_inputs = torch.from_numpy(cluster_inputs).float()
         #node_inputs = torch.from_numpy(node_inputs).float()
@@ -231,21 +250,30 @@ class OCN(nn.Module):
         #print('node_outputs before: ', node_outputs.shape)
         
         node_outputs = node_outputs.view(self.batch_size, -1)
-        node_outputs = nn.functional.softmax(node_outputs)
+        node_outputs = nn.functional.softmax(node_outputs, -1)
         
         merge_cluster = torch.cat([cluster_inputs_reshape, ], axis=2)
+        
+        #print('merge_cluster.shape : ', merge_cluster.shape)
         expanded_state = self.expand_act_on_state(
                 merge_cluster, [l / 50.0 for l in self.executor_levels])
         cluster_outputs = self.clusterenet(expanded_state)
         
             
-            
+        #print()
+        #print() 
+        #print('cluster_outputs.shape as is : ', cluster_outputs.shape)    
+        
         cluster_outputs = cluster_outputs.view(self.batch_size, -1)
         cluster_outputs = cluster_outputs.view(self.batch_size, -1, len(self.executor_levels))
 
+        #print()
+        #print() 
+        #print('cluster_outputs.shape after reshaping : ', cluster_outputs.shape)    
+        
         # Do softmax
         cluster_outputs = nn.functional.softmax(cluster_outputs)#, dim=-1)
-        #print('cluster_outputs, node_outputs : ', cluster_outputs.shape, node_outputs.shape)
+        #print('predict node_outputs, cluster_outputs : ', node_outputs.shape, cluster_outputs.shape)
         return node_outputs, cluster_outputs  
     
     def forward(self, x):
@@ -280,7 +308,9 @@ class OCN(nn.Module):
 
         # Do softmax
         cluster_outputs = nn.functional.softmax(cluster_outputs)#, dim=-1)
-        #print('cluster_outputs, node_outputs : ', cluster_outputs.shape, node_outputs.shape)
+        print()
+        print()
+        print('cluster_outputs.shape, node_outputs.shape : ', cluster_outputs.shape, node_outputs.shape)
         return node_outputs, cluster_outputs        
 
 
@@ -296,11 +326,12 @@ class OrchestrateAgent(Agent):
         self.cluster_input_dim = cluster_input_dim
         self.hid_dims = hid_dims
         self.output_dim = output_dim
+        #print('self.output_dim : ',self.output_dim)
         self.max_depth = max_depth
         self.executor_levels = executor_levels
         self.eps = eps #=1e-6
         self.act_fn = act_fn
-        
+        self.entropy_weight = 1
         # TODO: Relook at the follows again
         self.gcn = GraphCNN(
             self.node_input_dim, self.hid_dims,
@@ -344,83 +375,160 @@ class OrchestrateAgent(Agent):
         self.node_inputs = np.asarray(node_inputs)
         self.cluster_inputs = np.asarray(cluster_inputs)
         
+        node_act_vec = np.asarray(node_act_vec)
+        cluster_act_vec = np.asarray(cluster_act_vec)
+        print('Act loss node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape')
+        print(self.node_inputs.shape, self.cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape)
        
-        #a=b
+        
         self.gcn(self.node_inputs)
         #self.gsn(torch.cat((torch.tensor(self.node_inputs), self.gcn.outputs), axis=1))
         
         # Map gcn_outputs and raw_inputs to action probabilities
         self.node_act_probs, self.cluster_act_probs = self.ocn_net((self.node_inputs, self.cluster_inputs, self.gcn.outputs) )#
         
-        print('self.node_inputs,  self.cluster_inputs :, ',self.node_inputs.shape,  self.cluster_inputs.shape )
+        print()
         print('self.node_act_probs.shape, cluster_act_probs.shape : ', self.node_act_probs.shape,  self.cluster_act_probs.shape)
+        print()
+        print('self.gcn_outputs.shape : ', self.gcn.outputs.shape)
         
-        
-        
+        #a=b
         # Draw action based on the probability
         logits = torch.log(self.node_act_probs)
+        print()
+        print('logits.shape : ', logits.shape)
         noise = torch.rand(logits.shape)
+        print()
+        print('noise.shape : ', noise.shape)
         self.node_acts = torch.topk(logits - torch.log(-torch.log(noise)), k=3).indices
 
+        print()
+        print('self.node_acts.shape : ', self.node_acts.shape)
+        
         # Cluster_acts
         logits = torch.log(self.cluster_act_probs)
+        print()
+        print()
+        print('logits 2 .shape : ', logits.shape)
         noise = torch.rand(logits.shape)
+        print()
+        print()
+        print('noise 2.shape : ', noise.shape)
         self.cluster_acts = torch.topk(logits - torch.log(-torch.log(noise)), k=3).indices
+        
+        print()
+        print()
+        print('self.node_acts.shape : ', self.node_acts.shape)
         
         print('self.node_acts,  self.cluster_acts :, ',self.node_acts.shape,  self.cluster_acts.shape )
         
         node_act_probs = torch.tensor(self.node_act_probs)
         node_act_vec = torch.tensor(node_act_vec)
+        node_act_vec = torch.squeeze(node_act_vec)
         print('self.node_act_probs,  self.node_act_vec :, ',self.node_act_probs.shape, node_act_vec.shape )
         
         #a=b
-        prod = torch.mul(
+        node_prod = torch.mul(
             node_act_probs, node_act_vec)
-        print('prod.shape : ', prod.shape)
+        print()
+        print()
+        print('node_prod.shape : ', node_prod.shape)
         
           
         # Action probability
+        print('Before tensor shape self.cluster_act_probs, cluster_act_vec :', self.cluster_act_probs.shape, cluster_act_vec.shape)
         cluster_act_probs, cluster_act_vec = torch.tensor(self.cluster_act_probs), torch.tensor(cluster_act_vec)
-        
-        selected_node_prob = torch.sum(prod,
+        cluster_act_vec = torch.squeeze(cluster_act_vec, dim= 1)
+        selected_node_prob = torch.sum(node_prod,
             dim=(1,), keepdim=True)
-        
-        
+        print()
+        print()
         print('selected_node_prob :  ', selected_node_prob.shape)
-        a=b
+        #a=b
         #print('self.selected_node_prob.shape, node_act_probs.shape, node_act_vec.shape : ', selected_node_prob.shape,  self.node_act_probs.shape, node_act_vec.shape)
         #print('selected_node_prob.shape :  ' , selected_node_prob.shape)
-        #print('self.cluster_act_probs, cluster_act_vec : ', self.cluster_act_probs.shape, cluster_act_vec.shape)
+        print('After self.cluster_act_probs, cluster_act_vec : ', self.cluster_act_probs.shape, cluster_act_vec.shape)
+        #cluster_act_vec = torch.squeeze(cluster_act_vec, 1)
+        select_cluster_prod = torch.mul( self.cluster_act_probs, cluster_act_vec)
         
-        cluster_prod = torch.mul( self.cluster_act_probs, cluster_act_vec)
+        print()
+        print()
+        print('select_cluster_prod.shape, select_cluster_prod.type : ', select_cluster_prod.shape, type(select_cluster_prod))
+        
+        sum_cluster_1 = torch.sum(select_cluster_prod, dim=2)
+        
+        print()
+        print()
+        print('sum_cluster_1 :', sum_cluster_1.shape)
+        
+        selected_cluster_prob = torch.sum(sum_cluster_1, dim=1, keepdim=True)
+        print()
+        print()
+        print('selected_cluster_prob :', selected_cluster_prob.shape)
+
+        torch_log = torch.log(selected_node_prob * selected_cluster_prob + \
+                   self.eps)
+        
+        print()
+        print()
+        print('torch_log :', torch_log.shape)
+
+        adv = torch.tensor(adv)
+        print()
+        print()
+
+        print('adv : ', type(adv), adv.shape, adv)
         
         
-        #print('cluster_prod.shape, cluster_prod.type : ', cluster_prod.shape, type(cluster_prod))
-        selected_cluster_prob = torch.sum(torch.sum(cluster_prod, dim=2), 
-                                          dim=1, keepdim=True)
+        torch_log_adv_mul = torch.mul(torch_log, -adv)
+
+        print()
+        print()
+        print('torch_log_adv_mul :', torch_log_adv_mul.shape)
 
         # Orchestrate loss due to advantge
-        self.adv_loss = torch.sum(torch.mul(
-            torch.log(selected_node_prob * selected_cluster_prob + \
-                   self.eps), -adv))
-
+        self.adv_loss = torch.sum(torch_log_adv_mul)
+        print('')
+        print('self.adv_loss :', self.adv_loss.shape)
         # Node_entropy
-        self.node_entropy = torch.sum(torch.mul(
-            self.node_act_probs, torch.log(node_act_probs + self.eps)))
-
+        torch_log_entropy = torch.log(node_act_probs + self.eps)
+        print('')
+        print('')
+        print('torch_log_entropy :', torch_log_entropy.shape)
+        torch_mul_dimension = torch.mul(self.node_act_probs, torch_log_entropy)
+        print('')
+        print('')
+        print('torch_mul_dimension :', torch_mul_dimension.shape)
+        self.node_entropy = torch.sum(torch_mul_dimension)
+        print('')
+        print('')
+        print('self.node_entropy :', self.node_entropy.shape)
         # Entropy loss
         self.entropy_loss = self.node_entropy  # + self.cluster_entropy
 
         # Normalize entropy
-        denom = (torch.log(node_act_probs.shape[1]) + \
-             torch.log(float(len(self.executor_levels))))
+        len_ex = float(len(self.executor_levels))
+        len_ex = torch.tensor(len_ex)
+        node_act_probs_shape = torch.tensor(node_act_probs.shape[1])
+        print('len_ex :', len_ex)
+        torch_log_norm = torch.log(len_ex)
+        print('')
+        print('')
+        print('torch_log_norm :', torch_log_norm.shape)
+        denom = (torch.log(node_act_probs_shape) + \
+             torch_log_norm)
+        print('')
+        print('')
+        print('denom :', denom.shape)
+        
         denom = denom.type(torch.FloatTensor)
         self.entropy_loss /= denom
 
+        print('self.entropy_loss, self.entropy_loss.shape : ', self.entropy_loss, self.entropy_loss.shape )
         # Define combined loss
-        self.act_loss = self.adv_loss + self.entropy_weight * self.entropy_loss
+        self.act_loss_ = self.adv_loss + self.entropy_weight * self.entropy_loss
         
-        return self.loss
+        return self.act_loss_
         
     def translate_state(self, obs):
         done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state = obs

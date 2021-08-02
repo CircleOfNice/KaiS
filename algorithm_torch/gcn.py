@@ -11,7 +11,6 @@ class GraphCNN(nn.Module):
         self.output_dim = output_dim
         self.max_depth = max_depth
         self.act_fn = act_fn
-        
         # initialize message passing transformation parameters
         self.prep_weights, self.prep_bias = self.init(self.input_dim, self.hid_dims, self.output_dim)
         self.proc_weights, self.proc_bias = self.init(self.output_dim, self.hid_dims, self.output_dim)
@@ -44,7 +43,9 @@ class GraphCNN(nn.Module):
         return weights, bias
         
     def forward(self, x):
+        
         x = torch.from_numpy(x)
+        #print('input shape : ', x.shape)
         # Raise x into higher dimension
             
         for l in range(len(self.prep_weights)):
@@ -52,6 +53,7 @@ class GraphCNN(nn.Module):
             x = torch.matmul(x.float(), self.prep_weights[l])
             x += self.prep_bias[l]
             x = self.act_fn(x)
+            
         for d in range(self.max_depth):
             y = x
             # Process the features
@@ -67,5 +69,6 @@ class GraphCNN(nn.Module):
 
             # assemble neighboring information
             x = x + y
+            
         self.outputs = x
         return x

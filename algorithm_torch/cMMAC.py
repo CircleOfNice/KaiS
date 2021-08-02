@@ -70,11 +70,18 @@ class Estimator:
         
         
         # skipping tensorboard summaries_dir
-        
+    def squared_difference_loss(self, target, output):
+        loss = torch.sum(target**2 - output**2)
+        return loss    
+    
+    def set_lr(self, optimizer, lr):    
+        for params_group in optimizer.param_groups:
+            params_group['lr'] = lr
+            
     def _build_value_model(self):
         self.vm = Value_Model(self.state_dim, inp_sizes = [128, 64, 32])
         
-        self.vm_criterion = nn.MSELoss()
+        self.vm_criterion = self.squared_difference_loss
         self.vm_optimizer = optim.Adam(self.vm.parameters(), lr=0.001)
         
         #return self.vm, self.vm_criterion
@@ -90,15 +97,18 @@ class Estimator:
         softmaxprob = softmaxprob(torch.log(valid_logits + 1e-8))
         return softmaxprob, logits, valid_logits
         
-    def policy_net_loss(self, policy_net_output, neighbor_mask, tfadv ):
+    def policy_net_loss(self, policy_net_output, neighbor_mask, tfadv, ACTION):
         softmaxprob, logits, valid_logits = self.sm_prob(policy_net_output, neighbor_mask)
         logsoftmaxprob = nn.functional.log_softmax(softmaxprob)
-
+        #print(type(logsoftmaxprob), type(ACTION))
+        ACTION = torch.tensor(ACTION)
+        
+        tfadv = torch.tensor(tfadv)
         neglogprob = - logsoftmaxprob * ACTION
 
         self.actor_loss = torch.mean(torch.sum(neglogprob * tfadv, axis=1))
         self.entropy = - torch.mean(softmaxprob * logsoftmaxprob)
-        self.policy_loss = actor_loss - 0.01 * entropy
+        self.policy_loss = self.actor_loss - 0.01 * self.entropy
         
         return self.policy_loss 
         
@@ -146,7 +156,6 @@ class Estimator:
             valid_prob.append(action_prob)
             if int(context[idx]) == 0:
                 continue
-                
             
             curr_action_indices_temp = np.random.choice(self.action_dim, int(context[idx]),
                                                         p=action_prob / np.sum(action_prob))
@@ -196,12 +205,30 @@ class Estimator:
             targets.append(curr_grid_target)
 
         return np.array(targets).reshape([-1, 1])
-        
-        
-        
-# Don't see the point of initiallization , update_policy and update_value methods here
     
- 
+    
+            
+            
+# Don't see the point of initiallization , update_policy and update_value methods here
+# Well  now I do they are needed to optimize net
+    def update_value(self, s, y, learning_rate, global_step):
+        self.vm_optimizer.zero_grad()
+        value_output = self.vm(s)
+        y = torch.tensor(y)
+        loss = self.vm_criterion(y, value_output)
+        self.set_lr(self.vm_optimizer, learning_rate)
+        loss.backward()
+        self.vm_optimizer.step()
+    
+    
+    def update_policy(self, policy_state, advantage, action_choosen_mat, curr_neighbor_mask, learning_rate,
+                      global_step):
+        self.vm_optimizer.zero_grad()
+        policy_net_output = self.pm(policy_state)
+        loss = self.pm_criterion( policy_net_output, curr_neighbor_mask, advantage, action_choosen_mat)
+        loss.backward()
+        self.pm_optimizer.step()
+        
 class policyReplayMemory:
     def __init__(self, memory_size, batch_size):
         self.states = []
