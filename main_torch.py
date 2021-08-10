@@ -8,9 +8,29 @@ from env.platform import *
 from env.env_run import *
 
 def flatten(list):
+    """Function to serialize sublists inside a given list
+
+    Args:
+        list (list): [ A list of lists]
+
+    Returns:
+        [list]: [Serialized list ]
+    """    
     return [y for x in list for y in x]
     
 def calculate_reward(master1, master2, cur_done, cur_undone):
+    """[Function that returns Rewards given master nodes and the current tasks]
+
+    Args:
+        master1 ([Class]): [Master Node containing the cpu and memory values]
+        master2 ([Class]): [Master Node containing the cpu and memory values]
+        cur_done ([list]): [list containing two elements for tasks done on both master nodes]
+        cur_undone ([list]): [list containing two elements for tasks not done yet on both master nodes]
+
+    Returns:
+        reward [list]: [list of rewards for both master nodes]
+    """
+    #print('cur_done[0] + cur_undone[0] cur_done[1]  cur_undone[1]', cur_done[0] , cur_undone[0], cur_done[1] , cur_undone[1])
     weight = 1.0
     all_task = [float(cur_done[0] + cur_undone[0]), float(cur_done[1] + cur_undone[1])]
     fail_task = [float(cur_undone[0]), float(cur_undone[1])]
@@ -47,11 +67,29 @@ def calculate_reward(master1, master2, cur_done, cur_undone):
     
     
 def to_grid_rewards(node_reward):
+    
+    """[Serialises the given node reward]
+
+    Returns:
+        [list]: [serialised numpy array]
+    """
     return np.array(node_reward).reshape([-1, 1])
     
     
     
 def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
+    
+    """[Function to execute the KAIS Algorithm ]
+
+    Args:
+        RUN_TIMES ([int]): [Number of Episodes to run]
+        BREAK_POINT ([int]): [Time for each slot]
+        TRAIN_TIMES ([list]): [list containing two elements for tasks done on both master nodes]
+        CHO_CYCLE ([list]): (#TODO Not so sure but seems like time for smaller cycle for operation of edge nodes) It is orchestration cycle
+        
+    Returns:
+        [List]: [Throughput List (Achieved task/ total number of tasks)]
+    """
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
     vaild_node = 6  # Number of edge nodes available
@@ -62,10 +100,10 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     # Resource demand coefficients for different types of services
     service_coefficient = [0.8, 0.8, 0.9, 0.9, 1.0, 1.0, 1.1, 1.1, 1.2, 1.2, 1.3, 1.3, 1.4, 1.4]
     # Parameters related to DRL
-    epsilon = 0.5
-    gamma = 0.9
-    learning_rate = 1e-3
-    action_dim = 7
+    epsilon = 0.5 # Exploration coefficient
+    gamma = 0.9 # Discounting Coefficient
+    learning_rate = 1e-3 # Learning Rate
+    action_dim = 7 # Number of actions possibly edge nodes 6 plus one eAP
     state_dim = 88
     node_input_dim = 24
     cluster_input_dim = 24
@@ -77,8 +115,8 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     entropy_weight_min = 0.0001
     entropy_weight_decay = 1e-3
     # Parameters related to GPU
-    worker_num_gpu = 0
-    worker_gpu_fraction = 0.1
+    worker_num_gpu = 0 # Unused
+    worker_gpu_fraction = 0.1 # Unused
     #####################################################################
     ########### Init ###########
     record = []
@@ -96,7 +134,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     record_all_order_response_rate = []
     #sess = tf.Session()
     #tf.set_random_seed(1)
-    q_estimator = Estimator(action_dim, state_dim, 2, summaries_dir=log_dir)
+    q_estimator = Estimator(action_dim, state_dim, 2)#, summaries_dir=log_dir)
     #sess.run(tf.global_variables_initializer())
     replay = ReplayMemory(memory_size=1e+6, batch_size=int(3e+3))
     policy_replay = policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3))
@@ -272,10 +310,13 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 # Save data
                 if slot > 3 * CHO_CYCLE:
                     exp_tmp = exp
+                    print('exp_tmp :', exp_tmp.keys())
                     del exp_tmp['node_inputs'][-1]
                     del exp_tmp['cluster_inputs'][-1]
                     del exp_tmp['node_act_vec'][-1]
                     del exp_tmp['cluster_act_vec'][-1]
+                    
+                    #TODO propagate loss backward for optimisation
                     entropy_weight, loss = train_orchestrate_agent(orchestrate_agent, exp_tmp, entropy_weight,
                                                                    entropy_weight_min, entropy_weight_decay)
                     entropy_weight = decrease_var(entropy_weight,
@@ -296,7 +337,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             ava_node = []
 
             for i in range(len(curr_task)):
-                tmp_list = [6]  # Cloud computing
+                tmp_list = [6]  # Cloud computing # Why does it start at 6 it should be []?
                 for ii in range(len(deploy_state)):
                     if deploy_state[ii][curr_task[i][0]] == 1:
                         tmp_list.append(ii)
@@ -318,8 +359,25 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 mem_list2.append([master2.node_list[i].mem, master2.node_list[i].mem_max])
                 task_num2.append(len(master2.node_list[i].task_queue))
             s_grid = np.array([flatten(flatten([deploy_state, [task_num1], cpu_list1, mem_list1])),
-                               flatten(flatten([deploy_state, [task_num2], cpu_list1, mem_list1]))])
-
+                               flatten(flatten([deploy_state, [task_num2], cpu_list1, mem_list1]))]) # Fishy should it not be mem_list2 and cpu_list2
+            print('s_grid :', type(s_grid), s_grid.shape)
+            print('len(deploy_state), len(task_num1), len(cpu_list1), len(mem_list1) : ', len(deploy_state), len(task_num1), len(cpu_list1), len(mem_list1))
+            
+            print('\n')
+            print('\n')
+            print('deploy_state : ', deploy_state)
+            print('\n')
+            print('\n')
+            print('task_num1 : ', task_num1)
+            print('\n')
+            print('\n')
+            print('cpu_list1 : ', cpu_list1)
+            print('\n')
+            print('\n')
+            print('mem_list1 : ', mem_list1)
+            print('\n')
+            print('\n')
+            a=b
             # Dispatch decision
             act, valid_action_prob_mat, policy_state, action_choosen_mat, \
             curr_state_value, curr_neighbor_mask, next_state_ids = q_estimator.action(s_grid, ava_node, context,
@@ -466,9 +524,9 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             q_estimator.update_policy(batch_s, batch_r.reshape([-1, 1]), batch_a, batch_mask, learning_rate,
                                       global_step2)
             global_step2 += 1
-        saver.save(sess, "./model/model.ckpt")
-    saver.save(sess, "./model/model_before_testing.ckpt")
-    tf.reset_default_graph()
+        #saver.save(sess, "./model/model.ckpt")
+    #saver.save(sess, "./model/model_before_testing.ckpt")
+    #tf.reset_default_graph()
     time_str = str(time.time())
     with open("./result/" + time_str + ".json", "w") as f:
         json.dump(record, f)
