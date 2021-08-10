@@ -3,7 +3,17 @@ import torch.nn as nn
 import numpy as np 
 
 class GraphSNN(nn.Module):
+    """GraphCNN Class
+    """
     def __init__(self, input_dim, hid_dims, output_dim, act_fn):
+        """[summary]
+
+        Args:
+            input_dim ([int]): [Dimension of input dimensions]
+            hid_dims ([list]): [List of hidden dimension]
+            output_dim ([int]): [output dimension]
+            act_fn ([Pytorch Action]): [Activation Function]
+        """
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -19,10 +29,28 @@ class GraphSNN(nn.Module):
         # graph summarization operation
 
     def glorot(self, shape):
+        """[summary]
+
+        Args:
+            shape ([int]): [Shape required for initialization]
+
+        Returns:
+            [Pytorch Layer]: [Glorot initialization Layer]
+        """
         init = nn.init.xavier_uniform_(torch.empty(shape))
         return init
     
     def init(self, input_dim, hid_dims, output_dim):
+        """Initialization of layers
+
+        Args:
+            input_dim ([int]): [Input Dimension]
+            hid_dims ([list]): [Hidden Dimensions]
+            output_dim ([int]): [Output Dimensions]
+
+        Returns:
+            [lists]: [list of weights and biases]
+        """
         weights = []
         bias = []
         curr_in_dim = input_dim

@@ -482,7 +482,8 @@ class OrchestrateAgent(Agent):
             #print() 
             #print('cluster_outputs.shape after reshaping : ', cluster_outputs.shape)  
             # Do softmax
-            cluster_outputs = tf.nn.softmax(cluster_outputs, dim=-1)
+            tf_cluster_outputs = tf.Print(cluster_outputs, [cluster_outputs], 'self.cluster_acts tf_cluster_acts : ', summarize=50)
+            cluster_outputs = tf.nn.softmax(tf_cluster_outputs, dim=-1)
             #a=b
             #print()
             #print()

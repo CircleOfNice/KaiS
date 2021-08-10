@@ -7,6 +7,16 @@ from copy import deepcopy
 
 
 def fc(inp_dim, output_dim, act=nn.ReLU()):
+    """[Function to define a fully connected block]
+
+    Args:
+        inp_dim ([int]): [description]
+        output_dim ([int]): [description]
+        act ([Pytorch Activation layer type], optional): [Desired Activation Layer for the FC Unit]. Defaults to nn.ReLU().
+
+    Returns:
+        [type]: [description]
+    """
     linear = nn.Linear(inp_dim, output_dim)
     nn.init.xavier_uniform_(linear.weight)
     linear.bias.data.fill_(0)
@@ -15,7 +25,16 @@ def fc(inp_dim, output_dim, act=nn.ReLU()):
 
 
 class Value_Model(nn.Module):
+    """[Class for defining value model]
+    """
     def __init__(self, state_dim, inp_sizes = [128, 64, 32], act = nn.ReLU()):
+        """[Initialisation arguments for class]
+
+        Args:
+            state_dim ([int]): [Dimensions of the input state]
+            inp_sizes (list, optional): [Dimensions for hidden state]. Defaults to [128, 64, 32].
+            act ([Pytorch Activation layer type], optional): [Desired Activation function for different layers]. Defaults to nn.ReLU().
+        """
         super().__init__()
         self.fc1 = fc(state_dim, inp_sizes[0], act=act)
         self.fc2 = fc(inp_sizes[0], inp_sizes[1], act=act)
@@ -31,7 +50,17 @@ class Value_Model(nn.Module):
         return x
 
 class Policy_Model(nn.Module):
+    """[Class for defining Policy model]
+    """
     def __init__(self, state_dim, action_dim, inp_sizes = [128, 64, 32], act = nn.ReLU()):
+        """[Initialisation arguments for class]
+
+        Args:
+            state_dim ([int]): [Dimensions of the input state]
+            action_dim ([int]): [Dimensions of the output (actions)]
+            inp_sizes (list, optional): [Dimensions for hidden state]. Defaults to [128, 64, 32].
+            act ([Pytorch Activation layer type], optional): [Desired Activation function for different layers]. Defaults to nn.ReLU().
+        """
         super().__init__()
         self.policy_state = state_dim
         self.action_dim = action_dim
@@ -51,8 +80,17 @@ class Policy_Model(nn.Module):
         return x 
         
 class Estimator:
-    def __init__(self, action_dim, state_dim, n_valid_node, summaries_dir=None):
+    """[Class to Define the cMMAC model]
+    """
+    def __init__(self, action_dim, state_dim, n_valid_node):#, summaries_dir=None):
+        """[Initialisation arguments for class]
 
+        Args:
+            action_dim ([int]): [Dimensions of the output (actions)]
+            state_dim ([int]): [Dimensions of the input state]
+            
+            n_valid_node (int): [number of valid nodes]
+        """
         self.n_valid_node = n_valid_node
         self.action_dim = action_dim
         self.state_dim = state_dim
@@ -71,14 +109,31 @@ class Estimator:
         
         # skipping tensorboard summaries_dir
     def squared_difference_loss(self, target, output):
+        """Calculate squared difference loss
+
+        Args:
+            target ([float]): [Target Value]
+            output ([float]): [Output Value]
+
+        Returns:
+            [float]: [Calcultated squared_difference_loss]
+        """
         loss = torch.sum(target**2 - output**2)
         return loss    
     
     def set_lr(self, optimizer, lr):    
+        """Method to set the Learning rate of the given optimizer
+
+        Args:
+            optimizer ([Pytorch optimizer]): [Optimizer]
+            lr ([Float]): [Learning Rate]
+        """
         for params_group in optimizer.param_groups:
             params_group['lr'] = lr
             
     def _build_value_model(self):
+        """[Method to build the value model and assign its loss and optimizers]
+        """
         self.vm = Value_Model(self.state_dim, inp_sizes = [128, 64, 32])
         
         self.vm_criterion = self.squared_difference_loss
@@ -87,6 +142,15 @@ class Estimator:
         #return self.vm, self.vm_criterion
         
     def sm_prob(self, policy_net_output, neighbor_mask):
+        """[Method to apply policy filtering using neighbor mask and policy output]
+
+        Args:
+            policy_net_output ([Pytorch Tensor]): [Output of Policy Network]
+            neighbor_mask ([Numpy array]): [Mask to determine available network]
+
+        Returns:
+            [Pytorch Tensors]: [Torch Tensor respectively containing softmax probabilities, logits and valid_logits]
+        """
         neighbor_mask = torch.from_numpy(neighbor_mask)
         
         logits = policy_net_output +1 
@@ -98,9 +162,20 @@ class Estimator:
         return softmaxprob, logits, valid_logits
         
     def policy_net_loss(self, policy_net_output, neighbor_mask, tfadv, ACTION):
+        """[Method to calculate policy net loss]
+
+        Args:
+            policy_net_output ([Pytorch Tensor]): [Output of Policy Net]
+            neighbor_mask ([Numpy array]): [Neighbor mask denoting availability of nodes]
+            tfadv ([Numpy Array]): [difference between estmated Q value and the target Q value]
+            ACTION ([Numpy Array]): [Actions for the given batch]
+
+        Returns:
+            [Pytorch Tensor]: [description]
+        """
         softmaxprob, logits, valid_logits = self.sm_prob(policy_net_output, neighbor_mask)
         logsoftmaxprob = nn.functional.log_softmax(softmaxprob)
-        #print(type(logsoftmaxprob), type(ACTION))
+        #print(type(logsoftmaxprob), type(ACTION), type(tfadv), ACTION)
         ACTION = torch.tensor(ACTION)
         
         tfadv = torch.tensor(tfadv)
@@ -113,14 +188,36 @@ class Estimator:
         return self.policy_loss 
         
     def _build_policy(self):
+        """[Method to build the Policy model and assign its loss and optimizers]
+        """
+        
         self.pm = Policy_Model(self.state_dim, self.action_dim, inp_sizes = [128, 64, 32], act = nn.ReLU())
         self.pm_criterion = self.policy_net_loss
         self.pm_optimizer = optim.Adam(self.pm.parameters(), lr=0.001)
         #return self.pm, self.pm_criterion
         
     def action(self, s, ava_node, context, epsilon):
+        """
+
+        Args:
+            s ([Numpy Array]): [State Array]
+            ava_node ([list]): [Available Node]
+            context ([list]): [Context (not yet clear to me)]
+            epsilon ([float]): [DRL paramater but not used much]
+
+        Returns:
+            [Mostly tensors]: [action_tuple: Tuple of actions
+            valid_prob : Valid Probabilities
+            policy_state :  State of Policy 
+               action_choosen_mat : Matrix for the action chosen
+               curr_neighbor_mask_policy) : Neighbor masking policy
+               next_state_ids : Propagated states
+        """
+        
+        
         value_output = self.vm(s)#.flatten()
         value_output = value_output.flatten()
+        
         action_tuple = []
         valid_prob = []
 
@@ -183,7 +280,20 @@ class Estimator:
                np.stack(curr_neighbor_mask_policy), next_state_ids
     
     def compute_advantage(self, curr_state_value, next_state_ids, next_state, node_reward, gamma):
+        """[summary]
+
+        Args:
+            curr_state_value ([list]): [Q value for current state]
+            next_state_ids ([list]): [Next state ids]
+            next_state ([Numpy array]): [Next State Grid]
+            node_reward ([Numpy Array]): [Node Reward grid]
+            gamma ([float]): [Gamma variable for Bellman's equations]
+
+        Returns:
+            [list]: [list containing advantages]
+        """
         # compute advantage
+        
         advantage = []
         node_reward = node_reward.flatten()
         qvalue_next = self.vm(next_state).flatten()
@@ -193,7 +303,19 @@ class Estimator:
         return advantage
     
     def compute_targets(self, valid_prob, next_state, node_reward, gamma):
+        """[Method for computation of Targets]
+
+        Args:
+            valid_prob ([Numpy array]): [Valid probablility]
+            next_state ([Numpy array]): [next state matrix]
+            node_reward ([Numpy array]): [Reward for the node]
+            gamma ([float]): [gamma for computaion of bellman's equations]
+
+        Returns:
+            [Numpy Array]: [Numpy array containing targets]
+        """
         # compute targets
+        
         targets = []
         node_reward = node_reward.flatten()
         qvalue_next = self.vm(next_state).flatten()
@@ -212,6 +334,16 @@ class Estimator:
 # Don't see the point of initiallization , update_policy and update_value methods here
 # Well  now I do they are needed to optimize net
     def update_value(self, s, y, learning_rate, global_step):
+        """[Method to optimize the Value net]
+
+        Args:
+            s ([Numpy array]): [state]
+            y ([Numpy array]): [target]
+            learning_rate ([float]): [learning rate]
+            global_step ([int]): [Global step #TODO Have to review it what exactly it means]
+        """
+        
+        
         self.vm_optimizer.zero_grad()
         value_output = self.vm(s)
         y = torch.tensor(y)
@@ -223,6 +355,17 @@ class Estimator:
     
     def update_policy(self, policy_state, advantage, action_choosen_mat, curr_neighbor_mask, learning_rate,
                       global_step):
+        """[Optimize Policy net]
+
+        Args:
+            policy_state ([Numpy Array]): [State Policy]
+            advantage ([Numpy Array]): [Calcualted Advantage]
+            action_choosen_mat ([Numpy Array]): [Choose action matrix]
+            curr_neighbor_mask ([Numpy Array]): [Current Neighbor mask]
+            learning_rate ([float]): [Learning Rate]
+            global_step ([int]): [Global step #TODO Have to review it what exactly it means]
+        """
+        
         self.vm_optimizer.zero_grad()
         policy_net_output = self.pm(policy_state)
         loss = self.pm_criterion( policy_net_output, curr_neighbor_mask, advantage, action_choosen_mat)
@@ -230,7 +373,16 @@ class Estimator:
         self.pm_optimizer.step()
         
 class policyReplayMemory:
+    """Class for Replay Memory of Policy Network
+    """
     def __init__(self, memory_size, batch_size):
+        """[Initialisation Arguments]
+
+        Args:
+            memory_size ([int]): [Memory size to be allocated]
+            batch_size ([int]): [Batch Size]
+        """
+        
         self.states = []
         self.neighbor_mask = []
         self.actions = []
@@ -242,6 +394,15 @@ class policyReplayMemory:
 
     # Put data in policy replay memory
     def add(self, s, a, r, mask):
+        """Adds Experience to the object
+
+        Args:
+            s ([Numpy Array]): [State]
+            a ([Numpy Array]): [Action]
+            r ([list]): [reward]
+            mask ([Numpy Array]): [Mask]
+        """
+        
         if self.curr_lens == 0:
             self.states = s
             self.actions = a
@@ -265,6 +426,11 @@ class policyReplayMemory:
 
     # Take a batch of samples
     def sample(self):
+        """Returns a batch of experience
+
+        Returns:
+            [list]: [Batch of experience]
+        """
         if self.curr_lens <= self.batch_size:
             return [self.states, self.actions, np.array(self.rewards), self.neighbor_mask]
         indices = random.sample(list(range(0, self.curr_lens)), self.batch_size)
@@ -275,6 +441,8 @@ class policyReplayMemory:
         return [batch_s, batch_a, batch_r, batch_mask]
 
     def reset(self):
+        """reset the variables
+        """
         self.states = []
         self.actions = []
         self.rewards = []
@@ -283,7 +451,15 @@ class policyReplayMemory:
         
         
 class ReplayMemory:
+    """Class for replay memory
+    """
     def __init__(self, memory_size, batch_size):
+        """Replay Memory initialization
+
+        Args:
+            memory_size ([type]): [description]
+            batch_size ([type]): [description]
+        """
         self.states = []
         self.next_states = []
         self.actions = []
@@ -296,6 +472,15 @@ class ReplayMemory:
 
     # Put data in policy replay memory
     def add(self, s, a, r, next_s):
+        """[Add Experience]
+
+        Args:
+            s ([Numpy Array]): [State]
+            a ([Numpy Array]): [Action]
+            r ([Numpy Array]): [reward]
+            next_s ([Numpy Array]): [next State]
+        """
+        
         if self.curr_lens == 0:
             self.states = s
             self.actions = a
@@ -319,6 +504,11 @@ class ReplayMemory:
 
     # Take a batch of samples
     def sample(self):
+        """Returns a batch of experience
+
+        Returns:
+            [list]: [Batch of experience]
+        """
         if self.curr_lens <= self.batch_size:
             return [self.states, self.actions, self.rewards, self.next_states]
         indices = random.sample(list(range(0, self.curr_lens)), self.batch_size)
@@ -329,6 +519,8 @@ class ReplayMemory:
         return [batch_s, batch_a, batch_r, batch_mask]
 
     def reset(self):
+        """reset the variables
+        """
         self.states = []
         self.actions = []
         

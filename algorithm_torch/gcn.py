@@ -3,8 +3,19 @@ import torch
 import torch.nn as nn
 
 class GraphCNN(nn.Module):
+    """GraphCNN Class
+    """
     def __init__(self, input_dim, hid_dims, output_dim,
     max_depth, act_fn):
+        """[summary]
+
+        Args:
+            input_dim ([int]): [Dimension of input dimensions]
+            hid_dims ([list]): [List of hidden dimension]
+            output_dim ([int]): [output dimension]
+            max_depth ([int]): [Depth to which the features are needed to be aggregated. Though output_dim and max_depth are of same value]
+            act_fn ([Pytorch Action]): [Activation Function]
+        """
         super().__init__()
         self.input_dim = input_dim
         self.hid_dims = hid_dims
@@ -16,14 +27,34 @@ class GraphCNN(nn.Module):
         self.proc_weights, self.proc_bias = self.init(self.output_dim, self.hid_dims, self.output_dim)
         self.agg_weights, self.agg_bias = self.init(self.output_dim, self.hid_dims, self.output_dim)
         #self.outputs = self.forward()
+        print('GCN : ', input_dim, hid_dims, output_dim,
+    max_depth)
         
     
     def glorot(self, shape):
+        """[summary]
+
+        Args:
+            shape ([int]): [Shape required for initialization]
+
+        Returns:
+            [Pytorch Layer]: [Glorot initialization Layer]
+        """
         init = nn.init.xavier_uniform_(torch.empty(shape))
         return init
     
         
     def init(self, input_dim, hid_dims, output_dim):
+        """Initialization of layers
+
+        Args:
+            input_dim ([int]): [Input Dimension]
+            hid_dims ([list]): [Hidden Dimensions]
+            output_dim ([int]): [Output Dimensions]
+
+        Returns:
+            [lists]: [list of weights and biases]
+        """
         weights = []
         bias = []
         curr_in_dim = input_dim
