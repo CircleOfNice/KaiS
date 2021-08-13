@@ -1,3 +1,5 @@
+# GNN-based Learning for Service Orchestration
+
 import numpy as np
 import torch
 import torch.optim as optim
@@ -8,14 +10,15 @@ from algorithm_torch.gsn import GraphSNN
 
 
 def discount(x, gamma):
-    """[Calculated the discounted reward]
+    """Calculate the discounted cumulative reward
+        Cumulative Reward = r_t + gamma * r_t+1 + gamma ^2 * r_t+2 + ________
 
     Args:
-        x ([Numpy array]): [numpy array of rewards]
-        gamma ([float]): [Discount factor]
+        x (Numpy array): numpy array of rewards over time
+        gamma (float): Discount factor
 
     Returns:
-        [numpy array]: [Calculated Response]
+        numpy array: Calculated discounted reward
     """
     out = np.zeros(x.shape)
     out[-1] = x[-1]
@@ -25,15 +28,15 @@ def discount(x, gamma):
     return out
 
 def fc(inp_dim, output_dim, act=nn.ReLU()):
-    """[Fully connected Layer block]
+    """Fully Connected Layer block
 
     Args:
-        inp_dim ([int]): [Input Dimension for the given layer]
-        output_dim ([int]): [Input Dimension for the given layer]
-        act ([Pytorch Activation Layer], optional): [Pytorch Activation Layer]. Defaults to nn.ReLU().
+        inp_dim (int): Input Dimension for the given layer
+        output_dim (int): Input Dimension for the given layer
+        act (Pytorch Activation Layer, optional): Pytorch Activation Layer. Defaults to nn.ReLU().
 
     Returns:
-        [Sequential Model]: [A sequential model which can be used as layer in Functional model]
+        Sequential Model: A sequential model which can be used as layer in Functional model
     """
     linear = nn.Linear(inp_dim, output_dim)
     #nn.init.xavier_uniform_(linear.weight)
@@ -103,12 +106,16 @@ def expand_act_on_state(state, sub_acts):
     # Prepare the appended actions
     sub_acts = torch.FloatTensor(sub_acts)
     sub_acts = sub_acts.view([1, 1, expand_dim])
+    print('sub_acts 1:', sub_acts.shape, num_nodes)
     sub_acts = torch.tile(sub_acts, [1, 1, num_nodes])
+    print('sub_acts 2:', sub_acts.shape)
     sub_acts = sub_acts.view([1, num_nodes * expand_dim, 1])
+    print('sub_acts 3:', sub_acts.shape)
     sub_acts = torch.tile(sub_acts, [batch_size, 1, 1])
-
+    print('sub_acts 4:', sub_acts.shape)
     # Concatenate expanded state with sub-action features
     concat_state = torch.cat([state, sub_acts], axis=2)
+    print('sub_acts 5:', sub_acts.shape)
     #print('concat_state.shape : ', concat_state.shape)
     return concat_state
 
@@ -295,10 +302,18 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weig
     #print('orchestrate_agent ')
     orchestrate_agent.entropy_weight = entropy_weight
     #print('Orchestrate Weight : ', entropy_weight)
+    
     #a=b
     # Compute gradients
+    
+    # Actual training of Orchestrate Net
+    orchestrate_agent.optimizer.zero_grad()
     loss = compute_orchestrate_loss(
         orchestrate_agent, exp, batch_adv, entropy_weight)
+    loss.backward()
+    orchestrate_agent.optimizer.step()
+    
+    #print('Training Back orchestrate Agent')
     entropy_weight = decrease_var(entropy_weight,
                                   entropy_weight_min, entropy_weight_decay)
     return entropy_weight, loss

@@ -1,3 +1,5 @@
+# Coordinated Multi-Agent Actor-Critic (cMMAC)
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -7,15 +9,15 @@ from copy import deepcopy
 
 
 def fc(inp_dim, output_dim, act=nn.ReLU()):
-    """[Function to define a fully connected block]
+    """Function to define a fully connected block
 
     Args:
-        inp_dim ([int]): [description]
-        output_dim ([int]): [description]
+        inp_dim (int): Input dimension of the layer
+        output_dim ([int]): Output dimension of the layer
         act ([Pytorch Activation layer type], optional): [Desired Activation Layer for the FC Unit]. Defaults to nn.ReLU().
 
     Returns:
-        [type]: [description]
+        Sequential Model: Fully connected layer block
     """
     linear = nn.Linear(inp_dim, output_dim)
     nn.init.xavier_uniform_(linear.weight)
@@ -25,15 +27,15 @@ def fc(inp_dim, output_dim, act=nn.ReLU()):
 
 
 class Value_Model(nn.Module):
-    """[Class for defining value model]
+    """Class for defining the value model (Critic part) of the Actor critic Model
     """
     def __init__(self, state_dim, inp_sizes = [128, 64, 32], act = nn.ReLU()):
-        """[Initialisation arguments for class]
+        """Initialisation arguments for class
 
         Args:
-            state_dim ([int]): [Dimensions of the input state]
-            inp_sizes (list, optional): [Dimensions for hidden state]. Defaults to [128, 64, 32].
-            act ([Pytorch Activation layer type], optional): [Desired Activation function for different layers]. Defaults to nn.ReLU().
+            state_dim (int): Dimensions of the input state
+            inp_sizes (list, optional): Dimensions for hidden state. Defaults to [128, 64, 32].
+            act (Pytorch Activation layer type, optional): Desired Activation function for all layers. Defaults to nn.ReLU().
         """
         super().__init__()
         self.fc1 = fc(state_dim, inp_sizes[0], act=act)
@@ -50,16 +52,16 @@ class Value_Model(nn.Module):
         return x
 
 class Policy_Model(nn.Module):
-    """[Class for defining Policy model]
+    """Class for defining Policy model (Actor part) of the Actor Critic Model
     """
     def __init__(self, state_dim, action_dim, inp_sizes = [128, 64, 32], act = nn.ReLU()):
-        """[Initialisation arguments for class]
+        """Initialisation arguments for class
 
         Args:
-            state_dim ([int]): [Dimensions of the input state]
-            action_dim ([int]): [Dimensions of the output (actions)]
-            inp_sizes (list, optional): [Dimensions for hidden state]. Defaults to [128, 64, 32].
-            act ([Pytorch Activation layer type], optional): [Desired Activation function for different layers]. Defaults to nn.ReLU().
+            state_dim (int): Dimensions of the input state
+            action_dim (int): Dimensions of the output (actions)
+            inp_sizes (list, optional): Dimensions for hidden state. Defaults to [128, 64, 32].
+            act (Pytorch Activation layer type, optional): Desired Activation function for all layers. Defaults to nn.ReLU().
         """
         super().__init__()
         self.policy_state = state_dim
@@ -80,14 +82,14 @@ class Policy_Model(nn.Module):
         return x 
         
 class Estimator:
-    """[Class to Define the cMMAC model]
+    """Class to Define the cMMAC (Actor Critic) model
     """
     def __init__(self, action_dim, state_dim, n_valid_node):#, summaries_dir=None):
-        """[Initialisation arguments for class]
+        """Initialisation of arguments
 
         Args:
-            action_dim ([int]): [Dimensions of the output (actions)]
-            state_dim ([int]): [Dimensions of the input state]
+            action_dim (int): Dimensions of the output (actions)
+            state_dim (int): Dimensions of the input state
             
             n_valid_node (int): [number of valid nodes]
         """
@@ -95,6 +97,8 @@ class Estimator:
         self.action_dim = action_dim
         self.state_dim = state_dim
         
+        print('action_dim, state_dim, n_valid_node : ', action_dim, state_dim, n_valid_node)
+        #a=b
         # Initial value for losses
         self.actor_loss = 0
         self.value_loss = 0
@@ -142,7 +146,7 @@ class Estimator:
         #return self.vm, self.vm_criterion
         
     def sm_prob(self, policy_net_output, neighbor_mask):
-        """[Method to apply policy filtering using neighbor mask and policy output]
+        """[Method to apply policy filtering of edge nodes using neighbor mask and policy output]
 
         Args:
             policy_net_output ([Pytorch Tensor]): [Output of Policy Network]
@@ -201,7 +205,7 @@ class Estimator:
 
         Args:
             s ([Numpy Array]): [State Array]
-            ava_node ([list]): [Available Node]
+            ava_node ([list]): [currently deployed nodes] #[Confusing name it is the nodes which are currently deployed]
             context ([list]): [Context (not yet clear to me)]
             epsilon ([float]): [DRL paramater but not used much]
 
@@ -228,6 +232,8 @@ class Estimator:
         next_state_ids = []
         
         grid_ids = [x for x in range(self.n_valid_node)]
+        print(grid_ids)
+        
         self.valid_action_mask = np.zeros((self.n_valid_node, self.action_dim))
 
         
@@ -426,7 +432,7 @@ class policyReplayMemory:
 
     # Take a batch of samples
     def sample(self):
-        """Returns a batch of experience
+        """Sample a batch of experience
 
         Returns:
             [list]: [Batch of experience]

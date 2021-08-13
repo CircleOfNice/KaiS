@@ -19,7 +19,10 @@ def flatten(list):
     return [y for x in list for y in x]
     
 def calculate_reward(master1, master2, cur_done, cur_undone):
-    """[Function that returns Rewards given master nodes and the current tasks]
+    """
+    Tailored MARDL for Decentralised request dispatch - Reward : Improve the longterm throughput while ensuring the load balancing at the edge
+    
+    [Function that returns rewards from environment given master nodes and the current tasks]
 
     Args:
         master1 ([Class]): [Master Node containing the cpu and memory values]
@@ -62,17 +65,22 @@ def calculate_reward(master1, master2, cur_done, cur_undone):
 
     reward.append(math.exp(-task_fail_rate[0]) + weight * math.exp(-standard_list[0]))
     reward.append(math.exp(-task_fail_rate[1]) + weight * math.exp(-standard_list[1]))
+    # Immediate reward   e^(-lambda - weight_of_load_balancing *standard_deviation_of_cpu_memory)
+    
+    #TODO - There are two rewards but a single Q estimator. 
+    # Could it be the so called High value edge nodes (mentioned at page 6 of paper. Doesn't make much sense)?
     return reward
     
     
     
 def to_grid_rewards(node_reward):
     
-    """[Serialises the given node reward]
+    """[Serialises the given node rewards]
 
     Returns:
         [list]: [serialised numpy array]
     """
+    
     return np.array(node_reward).reshape([-1, 1])
     
     
@@ -83,9 +91,9 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 
     Args:
         RUN_TIMES ([int]): [Number of Episodes to run]
-        BREAK_POINT ([int]): [Time for each slot]
+        BREAK_POINT ([int]): [Time for each Episode Ending]
         TRAIN_TIMES ([list]): [list containing two elements for tasks done on both master nodes]
-        CHO_CYCLE ([list]): (#TODO Not so sure but seems like time for smaller cycle for operation of edge nodes) It is orchestration cycle
+        CHO_CYCLE ([list]): Orchestration cycle
         
     Returns:
         [List]: [Throughput List (Achieved task/ total number of tasks)]
@@ -103,7 +111,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     epsilon = 0.5 # Exploration coefficient
     gamma = 0.9 # Discounting Coefficient
     learning_rate = 1e-3 # Learning Rate
-    action_dim = 7 # Number of actions possibly edge nodes 6 plus one eAP
+    action_dim = 7 #TODO Number of actions possibly edge nodes 6 plus one eAP
     state_dim = 88
     node_input_dim = 24
     cluster_input_dim = 24
@@ -165,6 +173,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         context = [1, 1]
         ############ Set up according to your own needs  ###########
         # The parameters here are set only to support the operation of the program, and may not be consistent with the actual system
+        # At each edge node 1 denotes a kind of service which is running
         deploy_state = [[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
                         [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
                         [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1]]
@@ -360,6 +369,8 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 task_num2.append(len(master2.node_list[i].task_queue))
             s_grid = np.array([flatten(flatten([deploy_state, [task_num1], cpu_list1, mem_list1])),
                                flatten(flatten([deploy_state, [task_num2], cpu_list1, mem_list1]))]) # Fishy should it not be mem_list2 and cpu_list2
+            
+            '''
             print('s_grid :', type(s_grid), s_grid.shape)
             print('len(deploy_state), len(task_num1), len(cpu_list1), len(mem_list1) : ', len(deploy_state), len(task_num1), len(cpu_list1), len(mem_list1))
             
@@ -377,7 +388,21 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             print('mem_list1 : ', mem_list1)
             print('\n')
             print('\n')
-            a=b
+            
+            print('\n')
+            print('\n')
+            print('task_num2 : ', task_num2)
+            print('\n')
+            print('\n')
+            print('cpu_list2 : ', cpu_list2)
+            print('\n')
+            print('\n')
+            print('mem_list2 : ', mem_list2)
+            print('\n')
+            print('\n')
+            #a=b
+            '''
+            
             # Dispatch decision
             act, valid_action_prob_mat, policy_state, action_choosen_mat, \
             curr_state_value, curr_neighbor_mask, next_state_ids = q_estimator.action(s_grid, ava_node, context,
