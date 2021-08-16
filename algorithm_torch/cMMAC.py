@@ -91,13 +91,13 @@ class Estimator:
             action_dim (int): Dimensions of the output (actions)
             state_dim (int): Dimensions of the input state
             
-            n_valid_node (int): [number of valid nodes]
+            n_valid_node (int): [number of valid nodes # defined on page 6]
         """
         self.n_valid_node = n_valid_node
         self.action_dim = action_dim
         self.state_dim = state_dim
         
-        print('action_dim, state_dim, n_valid_node : ', action_dim, state_dim, n_valid_node)
+        #print('action_dim, state_dim, n_valid_node : ', action_dim, state_dim, n_valid_node)
         #a=b
         # Initial value for losses
         self.actor_loss = 0
@@ -232,7 +232,7 @@ class Estimator:
         next_state_ids = []
         
         grid_ids = [x for x in range(self.n_valid_node)]
-        print(grid_ids)
+        #print(grid_ids)
         
         self.valid_action_mask = np.zeros((self.n_valid_node, self.action_dim))
 
@@ -286,7 +286,7 @@ class Estimator:
                np.stack(curr_neighbor_mask_policy), next_state_ids
     
     def compute_advantage(self, curr_state_value, next_state_ids, next_state, node_reward, gamma):
-        """[summary]
+        """[Calculates difference between predicted Q value and ! Value target]
 
         Args:
             curr_state_value ([list]): [Q value for current state]
@@ -463,8 +463,8 @@ class ReplayMemory:
         """Replay Memory initialization
 
         Args:
-            memory_size ([type]): [description]
-            batch_size ([type]): [description]
+            memory_size ([int]): [length of the experience Replay object]
+            batch_size ([int]): [Sampling batch size]
         """
         self.states = []
         self.next_states = []

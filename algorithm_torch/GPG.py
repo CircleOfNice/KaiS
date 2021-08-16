@@ -18,7 +18,7 @@ def discount(x, gamma):
         gamma (float): Discount factor
 
     Returns:
-        numpy array: Calculated discounted reward
+        numpy array: Calculated cumulative discounted reward
     """
     out = np.zeros(x.shape)
     out[-1] = x[-1]
@@ -36,6 +36,7 @@ def fc(inp_dim, output_dim, act=nn.ReLU()):
         act (Pytorch Activation Layer, optional): Pytorch Activation Layer. Defaults to nn.ReLU().
 
     Returns:
+    
         Sequential Model: A sequential model which can be used as layer in Functional model
     """
     linear = nn.Linear(inp_dim, output_dim)
@@ -45,7 +46,7 @@ def fc(inp_dim, output_dim, act=nn.ReLU()):
     return fc_out 
 
 def invoke_model(orchestrate_agent, obs, exp):
-    """[Invoke model and return choice of nodes]
+    """[Invoke model (propagate the observation through the orchestration model) and return choice of nodes given the observation]
 
     Args:
         orchestrate_agent ([OrchestrateAgent Type]): [Instance of Orchestrate Agent]
@@ -53,7 +54,7 @@ def invoke_model(orchestrate_agent, obs, exp):
         exp ([dict]): [Experience]
 
     Returns:
-        [list, list , dictionary]: [chosen node, chosen server and the appended experience]
+        [list, list , dictionary]: [chosen node, chosen services and the appended experience]
     """
     
     
@@ -61,7 +62,8 @@ def invoke_model(orchestrate_agent, obs, exp):
         orchestrate_agent.invoke_model(obs)
     node_choice = [x for x in node_act[0]]
     server_choice = []
-    for x in cluster_act[0][0]:
+
+    for x in cluster_act[0][0]: # Server choice here is chosen services
         if x >= 12:
             server_choice.append(x - 11)
         else:
@@ -80,7 +82,8 @@ def invoke_model(orchestrate_agent, obs, exp):
     
 def expand_act_on_state(state, sub_acts):
     """Function to concatenate states with sub_acts with mutliple repetition over the tiling range (24)
-    (#TODO exactly why it is being done does not make much sense)
+    # Repeated state is appended with a vector of values havings different weightage likely to activate different actions for different state
+    
 
     Args:
         state ([Pytorch Tensor]): [State Matrix]
@@ -116,6 +119,7 @@ def expand_act_on_state(state, sub_acts):
     # Concatenate expanded state with sub-action features
     concat_state = torch.cat([state, sub_acts], axis=2)
     print('sub_acts 5:', sub_acts.shape)
+    print('concat_state :', concat_state.shape, 'state :', state.shape)
     #print('concat_state.shape : ', concat_state.shape)
     return concat_state
 
@@ -133,7 +137,7 @@ def act_offload_agent(orchestrate_agent, exp, done_tasks, undone_tasks, curr_tas
         deploy_state ([list]): [List of lists containing the deployment of nodes]
 
     Returns:
-        [node, use_exec, exp]: [chosen node, chosen server and the appended experience]
+        [node, use_exec, exp]: [chosen node, chosen service and the appended experience]
     """
     #print('act offload agent : ', type(done_tasks), type(undone_tasks), type(curr_tasks_in_queue), type(deploy_state))
     obs = [done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state]
@@ -146,11 +150,11 @@ def get_piecewise_linear_fit_baseline(all_cum_rewards, all_wall_time):
     """Generate a piecewise linear fit
 
     Args:
-        all_cum_rewards ([list]): [Cumulative Rewards]
+        all_cum_rewards ([list]): [All Cumulative Rewards]
         all_wall_time ([list]): [Time]
 
     Returns:
-        [type]: [description]
+        [baselines]: [returns a list of piecewise linear data extrapolation]
     """
     print('type : ', type(all_cum_rewards), type(all_wall_time))
     assert len(all_cum_rewards) == len(all_wall_time)
@@ -180,6 +184,11 @@ def get_piecewise_linear_fit_baseline(all_cum_rewards, all_wall_time):
     for wall_time in all_wall_time:
         baseline = np.array([baseline_values[t] for t in wall_time])
         baselines.append(baseline)
+        
+    #print('baselines :', baselines)
+    
+    #print('all_cum_rewards :', all_cum_rewards)
+    #a=b
     return baselines
 
 
@@ -236,6 +245,8 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv, entropy_weight):
         
         loss = orchestrate_agent.act_loss(
             node_inputs, cluster_inputs, node_act_vec, cluster_act_vec, adv)
+    print('loss : ' ,type(loss), loss)
+    a=b
     return loss
 
 
@@ -259,6 +270,7 @@ def decrease_var(var, min_var, decay_rate):
 
 
 def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weight_min, entropy_weight_decay):
+    
     """[Train the orchestration agent]
 
     Args:
@@ -269,7 +281,7 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weig
         entropy_weight_decay ([type]): [Entropy Weight Decay rate]
 
     Returns:
-        [type]: [description]
+        [Tensors]: [Entropy weight and calculated loss]
     """
     all_cum_reward = []
     all_rewards = exp['reward']
@@ -310,12 +322,15 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weig
     orchestrate_agent.optimizer.zero_grad()
     loss = compute_orchestrate_loss(
         orchestrate_agent, exp, batch_adv, entropy_weight)
+    #print('loss entropy :', loss)
     loss.backward()
     orchestrate_agent.optimizer.step()
     
     #print('Training Back orchestrate Agent')
     entropy_weight = decrease_var(entropy_weight,
                                   entropy_weight_min, entropy_weight_decay)
+    #print('entropy_weight, loss', type(entropy_weight), type(loss), loss, entropy_weight)
+    #a=b
     return entropy_weight, loss
 
 class NodeNet(nn.Module):
@@ -405,9 +420,22 @@ class OCN(nn.Module):
         self.clusterenet = ClusterNet(expanded_state_dim, cluster_inp_sizes = self.cluster_inp_sizes, act = nn.ReLU())
 
     def propagate(self, x):
+        """Common function to propagate the input through the OCN network
+
+        Args:
+            x ([tuple ]): [Tuple containing node inputs, cluster inputs and outputs of GCN Network]
+
+        Returns:
+            [tuple]: [Tuple containing node outputs, cluster outputs]
+        """
+        
         node_inputs, cluster_inputs, gcn_outputs = x
+        print('node_inputs, cluster_inputs, gcn_outputs : ', type(node_inputs), type(cluster_inputs), type(gcn_outputs))
+        #a=b 
         node_inputs = torch.from_numpy(node_inputs).float()
         cluster_inputs = torch.from_numpy(cluster_inputs).float()
+        print('node_inputs, cluster_inputs : ',node_inputs.shape, cluster_inputs.shape)
+        #a=b
         #node_inputs = torch.from_numpy(node_inputs).float()
         node_inputs_reshape = node_inputs.view(self.batch_size, -1, self.node_input_dim)
         cluster_inputs_reshape = cluster_inputs.view(self.batch_size, -1, self.cluster_input_dim)
@@ -428,6 +456,7 @@ class OCN(nn.Module):
                 merge_cluster, [l / 50.0 for l in self.executor_levels])
         cluster_outputs = self.clusterenet(expanded_state)
         
+        
             
             
         cluster_outputs = cluster_outputs.view(self.batch_size, -1)
@@ -435,10 +464,18 @@ class OCN(nn.Module):
 
         # Do softmax
         cluster_outputs = nn.functional.softmax(cluster_outputs)#, dim=-1)
+        print('cluster_outputs : ', cluster_outputs)
         return node_outputs, cluster_outputs
         
     def predict(self, x):
-        
+        """ Function to predict the output given inputs
+
+        Args:
+            x ([tuple ]): [Tuple containing node inputs, cluster inputs and outputs of GCN Network]
+
+        Returns:
+            [tuple]: [Tuple containing node outputs, cluster outputs]
+        """
         self.batch_size = 1
         node_outputs, cluster_outputs = self.propagate(x)
         #print('inside predict', node_outputs.shape)
@@ -536,11 +573,11 @@ class OrchestrateAgent(Agent):
         """act_loss
 
         Args:
-            node_inputs ([Numpy array]): [description]
-            cluster_inputs ([Numpy array]): [description]
-            node_act_vec ([Numpy array]): [description]
-            cluster_act_vec ([Numpy array]): [description]
-            adv ([Numpy array]): [description]
+            node_inputs ([Numpy array]): [Node inputs]
+            cluster_inputs ([Numpy array]): [Cluster inputs]
+            node_act_vec ([Numpy array]): [Node Activation Vectors]
+            cluster_act_vec ([Numpy array]): [Cluster Activation Vectors]
+            adv ([Numpy array]): [Calcualted advantage (difference between Q value predicted and Q value targets)]
 
         Returns:
             [Tensor]: [Calculated Loss]
@@ -557,8 +594,9 @@ class OrchestrateAgent(Agent):
         print('Act loss node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape')
         print(self.node_inputs.shape, self.cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape)
         #print(type(node_inputs), type(cluster_inputs), type(node_act_vec), type(cluster_act_vec), type(adv))
-       
-        
+        print('node_act_vec :', node_act_vec)
+        print('cluster_act_vec :', cluster_act_vec)
+        a=b        
         self.gcn(self.node_inputs)
         #self.gsn(torch.cat((torch.tensor(self.node_inputs), self.gcn.outputs), axis=1))
         
@@ -739,58 +777,6 @@ class OrchestrateAgent(Agent):
         #))
         return node_inputs, cluster_inputs
     
-    def get_valid_masks(self, cluster_states, frontier_nodes,
-                        source_cluster, num_source_exec, exec_map, action_map):
-        """[Funtion to find out the proper masks for both Cluster Net and Node Net]
-        #TODO - Seems not to be used anywhere
-        Args:
-            cluster_states ([type]): [description]
-            frontier_nodes ([type]): [description]
-            source_cluster ([type]): [description]
-            num_source_exec ([type]): [description]
-            exec_map ([type]): [description]
-            action_map ([type]): [description]
-
-        Returns:
-            [type]: [description]
-        """
-        print()
-        print()
-        print('get_valid_masks :', type(cluster_states), type(frontier_nodes),
-                        type(source_cluster), type(num_source_exec), type(exec_map), type(action_map))
-        print()
-        print()
-        cluster_valid_mask = \
-            np.zeros([1, len(cluster_states) * len(self.executor_levels)])
-        cluster_valid = {}
-        base = 0
-        for cluster_state in cluster_states:
-            if cluster_state is source_cluster:
-                least_exec_amount = \
-                    exec_map[cluster_state] - num_source_exec + 1
-            else:
-                least_exec_amount = exec_map[cluster_state] + 1
-            assert least_exec_amount > 0
-            assert least_exec_amount <= self.executor_levels[-1] + 1
-            # Find the index
-            exec_level_idx = bisect.bisect_left(
-                self.executor_levels, least_exec_amount)
-            if exec_level_idx >= len(self.executor_levels):
-                cluster_valid[cluster_state] = False
-            else:
-                cluster_valid[cluster_state] = True
-            for l in range(exec_level_idx, len(self.executor_levels)):
-                cluster_valid_mask[0, base + l] = 1
-            base += self.executor_levels[-1]
-        total_num_nodes = int(np.sum(
-            cluster_state.num_nodes for cluster_state in cluster_states))
-        node_valid_mask = np.zeros([1, total_num_nodes])
-        for node in frontier_nodes:
-            if cluster_valid[node.cluster_state]:
-                act = action_map.inverse_map[node]
-                node_valid_mask[0, act] = 1
-
-        return node_valid_mask, cluster_valid_mask
 
     def predict(self, x):
         """Function to make predictions
@@ -832,31 +818,7 @@ class OrchestrateAgent(Agent):
         #self.optimizer.step()
         #print('Inside predict self.node_act_probs, self.cluster_act_probs, self.node_acts, self.cluster_acts :',self.node_act_probs.shape, self.cluster_act_probs.shape, self.node_acts.shape, self.cluster_acts.shape)
         return [self.node_act_probs, self.cluster_act_probs, self.node_acts, self.cluster_acts]    
-    '''    
-    def optimize_net(self, x):
-        # here I have to define the functioning of net (baiscally init)
-        self.node_inputs, self.cluster_inputs, self.node_act_vec, self.cluster_act_vec, self.adv, self.entropy_weight  = x
-        self.optimizer.zero_grad()
-        # Map gcn_outputs and raw_inputs to action probabilities
-        self.node_act_probs, self.cluster_act_probs = self.orchestrate_network(
-            self.node_inputs, self.gcn.outputs, self.cluster_inputs,
-            self.gsn.summaries[0], self.gsn.summaries[1], self.act_fn)
 
-        # Draw action based on the probability
-        logits = torch.log(self.node_act_probs)
-        noise = torch.rand(logits.shape)
-        self.node_acts = torch.topk(logits - torch.log(-torch.log(noise)), k=3).indices
-
-        # Cluster_acts
-        logits = torch.log(self.cluster_act_probs)
-        noise = torch.rand(logits.shape)
-        self.cluster_acts = torch.topk(logits - torch.log(-torch.log(noise)), k=3).indices
-
-        # Define combined loss
-        loss =self.act_loss(self.node_act_probs, self.node_act_vec, self.cluster_act_probs, self.cluster_act_vec, self.adv) # get loss
-        self.loss.backward()
-        self.optimizer.step()
-        return [self.node_act_probs, self.cluster_act_probs, self.node_acts, self.cluster_acts]'''
     def invoke_model(self, obs):
         """[Propagates the model inputs]
 
@@ -876,59 +838,3 @@ class OrchestrateAgent(Agent):
                node_act_probs, cluster_act_probs, \
                node_inputs, cluster_inputs    
                
-               
-    def get_action(self, obs):
-        """[Get the action from input states]
-        #TODO does not seems to be used
-        Args:
-            obs ([type]): [description]
-
-        Returns:
-            [type]: [description]
-        """
-        # Parse observation
-        cluster_states, source_cluster, num_source_exec, \
-        frontier_nodes, executor_limits, \
-        exec_commit, moving_executors, action_map = obs
-        if len(frontier_nodes) == 0:
-            return None, num_source_exec
-
-        print('Before invoking check')
-        # Invoking the learning model
-        node_act, cluster_act, \
-        node_act_probs, cluster_act_probs, \
-        node_inputs, cluster_inputs, \
-        node_valid_mask, cluster_valid_mask, \
-        gcn_mats, gcn_masks, summ_mats, \
-        running_states_mat, state_summ_backward_map, \
-        exec_map, cluster_states_changed = self.invoke_model(obs)
-
-        if sum(node_valid_mask[0, :]) == 0:
-            return None, num_source_exec
-
-        # Should be valid
-        assert node_valid_mask[0, node_act[0]] == 1
-
-        # Parse node action
-        node = action_map[node_act[0]]
-        cluster_idx = cluster_states.index(node.cluster_state)
-
-        # Should be valid
-        assert cluster_valid_mask[0, cluster_act[0, cluster_idx] +
-                                  len(self.executor_levels) * cluster_idx] == 1
-        if node.cluster_state is source_cluster:
-            agent_exec_act = self.executor_levels[
-                                 cluster_act[0, cluster_idx]] - \
-                             exec_map[node.cluster_state] + \
-                             num_source_exec
-        else:
-            agent_exec_act = self.executor_levels[
-                                 cluster_act[0, cluster_idx]] - exec_map[node.cluster_state]
-
-        # Parse  action
-        use_exec = min(
-            node.num_tasks - node.next_task_idx -
-            exec_commit.node_commit[node] -
-            moving_executors.count(node),
-            agent_exec_act, num_source_exec)
-        return node, use_exec
