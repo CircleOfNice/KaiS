@@ -38,7 +38,12 @@ class Master:
         self.done_kind = done_kind
         self.undone_kind = undone_kind
 
-
+    def update_done(self,done):
+        self.done = self.done + done
+        
+    def update_undone(self, undone):
+        self.undone = self.undone + undone
+        
 class Docker:
     """[This class serves as framework for definition of Docker containers with properties such as 
     cpu processing, memory, Time since availability, Service kind,  task being done( generally [-1])]

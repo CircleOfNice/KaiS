@@ -112,45 +112,47 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     gamma = 0.9 # Discounting Coefficient
     learning_rate = 1e-3 # Learning Rate
     action_dim = 7 #TODO Number of actions possibly edge nodes 6 plus one eAP
-    state_dim = 88
-    node_input_dim = 24
-    cluster_input_dim = 24
-    hid_dims = [16, 8]
-    output_dim = 8
-    max_depth = 8
-    entropy_weight_init = 1
-    exec_cap = 24
-    entropy_weight_min = 0.0001
-    entropy_weight_decay = 1e-3
+    state_dim = 88 #Dimension of state for cMMAC (flattened Deployed state, task num, cpu_list, min_list)
+    
+    node_input_dim = 24 # Input dimension of Node part of the Orchestration Net
+    cluster_input_dim = 24 # Input dimension for Cluster part of the Orchestration Net
+    hid_dims = [16, 8] # hidden dimensions of the Graph Neural Networks
+    output_dim = 8 # Output dimension of Graph Neural Networks
+    max_depth = 8 # The Depth for aggregation of Graph Neural Networks
+    entropy_weight_init = 1 # Initial Entropy weight for weight scaling of orchestration loss
+    exec_cap = 24 # Execution capacity (#TODO Not so sure yet)
+    entropy_weight_min = 0.0001 # Minimum allowed entropy weight
+    entropy_weight_decay = 1e-3 # Entropy weight decay rate
     # Parameters related to GPU
     worker_num_gpu = 0 # Unused
     worker_gpu_fraction = 0.1 # Unused
     #####################################################################
     ########### Init ###########
-    record = []
-    throughput_list = []
-    sum_rewards = []
-    achieve_num = []
-    achieve_num_sum = []
-    fail_num = []
-    deploy_reward = []
-    current_time = str(time.time())
+    record = [] # list used to dump all the eAPS, tasks in queue, done tasks and undone tasks etcs
+    throughput_list = [] # list of the progress of task done / total number of tasks
+    sum_rewards = [] # Used to store average rewards in the list 
+    achieve_num = [] # List to contain the currently tasks done in the requirement space  
+    achieve_num_sum = [] # Not used anywhere
+    fail_num = [] # Number of tasks failed to meet the requirement
+    deploy_reward = [] # List of sum of immediate rewards to be stored in experience
+    current_time = str(time.time()) # Current time
     log_dir = "./log/{}/".format(current_time)
-    all_rewards = []
-    order_response_rate_episode = []
-    episode_rewards = []
-    record_all_order_response_rate = []
+    all_rewards = [] # List to accumulate all rewards 
+    order_response_rate_episode = [] # List to monitor the average throughput rate
+    episode_rewards = [] # Accumulated reward over episodes
+    record_all_order_response_rate = [] # List to record all the throughput rate througout episodes
     #sess = tf.Session()
     #tf.set_random_seed(1)
-    q_estimator = Estimator(action_dim, state_dim, 2)#, summaries_dir=log_dir)
+    high_value_nodes  = 2 # High Value edge node #Page 6 of paper defines the usage of two high value edge_nodes as experiment
+    q_estimator = Estimator(action_dim, state_dim, high_value_nodes) # Definition of cMMAc Agent
     #sess.run(tf.global_variables_initializer())
-    replay = ReplayMemory(memory_size=1e+6, batch_size=int(3e+3))
-    policy_replay = policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3))
+    replay = ReplayMemory(memory_size=1e+6, batch_size=int(3e+3)) # experience Replay for value network for cMMMac Agent
+    policy_replay = policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3)) #experience Replay for Policy network for cMMMac Agent
     #saver = tf.compat.v1.train.Saver()
     global_step1 = 0
     global_step2 = 0
-    all_task1 = get_all_task('./data/Task_1.csv')
-    all_task2 = get_all_task('./data/Task_2.csv')
+    all_task1 = get_all_task('./data/Task_1.csv')# processed data [type_list, start_time, end_time, cpu_list, mem_list]
+    all_task2 = get_all_task('./data/Task_2.csv')# processed data
 
     #config = tf.ConfigProto(device_count={'GPU': worker_num_gpu},
     #                        gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=worker_gpu_fraction))
@@ -319,7 +321,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 # Save data
                 if slot > 3 * CHO_CYCLE:
                     exp_tmp = exp
-                    print('exp_tmp :', exp_tmp.keys())
+                    #print('exp_tmp :', exp_tmp.keys())
                     del exp_tmp['node_inputs'][-1]
                     del exp_tmp['cluster_inputs'][-1]
                     del exp_tmp['node_act_vec'][-1]
@@ -346,7 +348,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             ava_node = []
 
             for i in range(len(curr_task)):
-                tmp_list = [6]  # Cloud computing # Why does it start at 6 it should be []?
+                tmp_list = [6]  # Cloud is always available
                 for ii in range(len(deploy_state)):
                     if deploy_state[ii][curr_task[i][0]] == 1:
                         tmp_list.append(ii)
@@ -428,20 +430,26 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                                                                                    cur_time)
                 for j in undone_kind:
                     master1.undone_kind[j] = master1.undone_kind[j] + 1
-                master1.undone = master1.undone + undone[0]
-                master2.undone = master2.undone + undone[1]
-
+                #master1.undone = master1.undone + undone[0]
+                #master2.undone = master2.undone + undone[1]
+                master1.update_undone(undone[0])
+                master2.update_undone(undone[1])
+                
                 master2.node_list[i].task_queue, undone, undone_kind = check_queue(master2.node_list[i].task_queue,
                                                                                    cur_time)
                 for j in undone_kind:
                     master2.undone_kind[j] = master2.undone_kind[j] + 1
-                master1.undone = master1.undone + undone[0]
-                master2.undone = master2.undone + undone[1]
+                #master1.undone = master1.undone + undone[0]
+                #master2.undone = master2.undone + undone[1]
+                master1.update_undone(undone[0])
+                master2.update_undone(undone[1])
+                
 
             cloud.task_queue, undone, undone_kind = check_queue(cloud.task_queue, cur_time)
-            master1.undone = master1.undone + undone[0]
-            master2.undone = master2.undone + undone[1]
-
+            #master1.undone = master1.undone + undone[0]
+            #master2.undone = master2.undone + undone[1]
+            master1.update_undone(undone[0])
+            master2.update_undone(undone[1])
             # Update state of dockers in every node
             for i in range(3):
                 master1.node_list[i], undone, done, done_kind, undone_kind = update_docker(master1.node_list[i],
@@ -451,10 +459,16 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                     master1.done_kind[done_kind[j]] = master1.done_kind[done_kind[j]] + 1
                 for j in range(len(undone_kind)):
                     master1.undone_kind[undone_kind[j]] = master1.undone_kind[undone_kind[j]] + 1
-                master1.undone = master1.undone + undone[0]
-                master2.undone = master2.undone + undone[1]
-                master1.done = master1.done + done[0]
-                master2.done = master2.done + done[1]
+                    
+                #master1.undone = master1.undone + undone[0]
+                #master2.undone = master2.undone + undone[1]
+                
+                master1.update_undone(undone[0])
+                master2.update_undone(undone[1])
+                master1.update_done(done[0])
+                master2.update_done(done[1])
+                #master1.done = master1.done + done[0]
+                #master2.done = master2.done + done[1]
 
                 master2.node_list[i], undone, done, done_kind, undone_kind = update_docker(master2.node_list[i],
                                                                                            cur_time,
@@ -463,17 +477,29 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                     master1.done_kind[done_kind[j]] = master1.done_kind[done_kind[j]] + 1
                 for j in range(len(undone_kind)):
                     master1.undone_kind[undone_kind[j]] = master1.undone_kind[undone_kind[j]] + 1
-                master1.undone = master1.undone + undone[0]
-                master2.undone = master2.undone + undone[1]
-                master1.done = master1.done + done[0]
-                master2.done = master2.done + done[1]
+                #master1.undone = master1.undone + undone[0]
+                #master2.undone = master2.undone + undone[1]
+                #master1.done = master1.done + done[0]
+                #master2.done = master2.done + done[1]
+                
+                master1.update_undone(undone[0])
+                master2.update_undone(undone[1])
+                master1.update_done(done[0])
+                master2.update_done(done[1])
 
             cloud, undone, done, done_kind, undone_kind = update_docker(cloud, cur_time, service_coefficient, POD_CPU)
-            master1.undone = master1.undone + undone[0]
-            master2.undone = master2.undone + undone[1]
-            master1.done = master1.done + done[0]
-            master2.done = master2.done + done[1]
+            
+            
+            #master1.undone = master1.undone + undone[0]
+            #master2.undone = master2.undone + undone[1]
+            #master1.done = master1.done + done[0]
+            #master2.done = master2.done + done[1]
 
+            master1.update_undone(undone[0])
+            master2.update_undone(undone[1])
+            master1.update_done(done[0])
+            master2.update_done(done[1])
+                
             cur_done = [master1.done - pre_done[0], master2.done - pre_done[1]]
             cur_undone = [master1.undone - pre_undone[0], master2.undone - pre_undone[1]]
 

@@ -109,17 +109,17 @@ def expand_act_on_state(state, sub_acts):
     # Prepare the appended actions
     sub_acts = torch.FloatTensor(sub_acts)
     sub_acts = sub_acts.view([1, 1, expand_dim])
-    print('sub_acts 1:', sub_acts.shape, num_nodes)
+    #print('sub_acts 1:', sub_acts.shape, num_nodes)
     sub_acts = torch.tile(sub_acts, [1, 1, num_nodes])
-    print('sub_acts 2:', sub_acts.shape)
+    #print('sub_acts 2:', sub_acts.shape)
     sub_acts = sub_acts.view([1, num_nodes * expand_dim, 1])
-    print('sub_acts 3:', sub_acts.shape)
+    #print('sub_acts 3:', sub_acts.shape)
     sub_acts = torch.tile(sub_acts, [batch_size, 1, 1])
-    print('sub_acts 4:', sub_acts.shape)
+    #print('sub_acts 4:', sub_acts.shape)
     # Concatenate expanded state with sub-action features
     concat_state = torch.cat([state, sub_acts], axis=2)
-    print('sub_acts 5:', sub_acts.shape)
-    print('concat_state :', concat_state.shape, 'state :', state.shape)
+    #print('sub_acts 5:', sub_acts.shape)
+    #print('concat_state :', concat_state.shape, 'state :', state.shape)
     #print('concat_state.shape : ', concat_state.shape)
     return concat_state
 
@@ -156,7 +156,7 @@ def get_piecewise_linear_fit_baseline(all_cum_rewards, all_wall_time):
     Returns:
         [baselines]: [returns a list of piecewise linear data extrapolation]
     """
-    print('type : ', type(all_cum_rewards), type(all_wall_time))
+    #print('type : ', type(all_cum_rewards), type(all_wall_time))
     assert len(all_cum_rewards) == len(all_wall_time)
     # All time
     unique_wall_time = np.unique(np.hstack(all_wall_time))
@@ -192,6 +192,7 @@ def get_piecewise_linear_fit_baseline(all_cum_rewards, all_wall_time):
     return baselines
 
 
+'''
 def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv, entropy_weight):
     """[Computation of orchestration loss]
 
@@ -202,7 +203,7 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv, entropy_weight):
         entropy_weight ([int]): [Entropy weight]
 
     Returns:
-        [type]: [description]
+        [Tensor]: [Computed Loss]
     """
     #print('Inside compute_orchestrate_loss')
     #print('Batch advantage :', type(batch_adv), entropy_weight)
@@ -210,6 +211,7 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv, entropy_weight):
     loss = 0
     batch_adv = np.array(batch_adv)
     print('batch_adv : ', batch_adv.shape)
+    #a=b
     for b in range(batch_points - 1):
         ba_start = 0
         ba_end = -1
@@ -245,8 +247,67 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv, entropy_weight):
         
         loss = orchestrate_agent.act_loss(
             node_inputs, cluster_inputs, node_act_vec, cluster_act_vec, adv)
+    
     print('loss : ' ,type(loss), loss)
-    a=b
+    #a=k
+    return loss
+'''
+
+def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv, entropy_weight):
+    """[Computation of orchestration loss]
+
+    Args:
+        orchestrate_agent ([Orchestrate Agent Class]): [Orchestrate Agent]
+        exp ([dictionary]): [Experience]
+        batch_adv ([numpy array]): [difference between qvalue target and q value predicted]
+        entropy_weight ([int]): [Entropy weight]
+
+    Returns:
+        [Tensor]: [Computed Loss]
+    """
+    #print('Inside compute_orchestrate_loss')
+    #print('Batch advantage :', type(batch_adv), entropy_weight)
+    loss = 0
+    batch_adv = np.array(batch_adv)
+    #print('batch_adv : ', batch_adv.shape)
+
+    #ba_start = 0
+    #ba_end = -1
+    # Use a piece of experience
+    node_inputs = exp['node_inputs']
+    cluster_inputs = exp['cluster_inputs']
+    node_act_vec = exp['node_act_vec']
+    cluster_act_vec = exp['cluster_act_vec']
+    adv = batch_adv#[ba_start: ba_end, :]
+    #print('batch_adv : ', batch_adv)
+    #print('cluster_act_vec : ', cluster_act_vec) 
+    #print()
+    #print()
+    #print()
+    #print('compute_orchestrate_loss :')
+    node_inputs = np.array(node_inputs)
+    #print('node_inputs', node_inputs.shape)
+    cluster_inputs = np.array(cluster_inputs)
+    
+    #print('cluster_inputs', cluster_inputs.shape)
+    node_act_vec = np.array(node_act_vec)
+    #print('node_act_vec', node_act_vec.shape)
+    cluster_act_vec = np.array(cluster_act_vec)
+    #print('cluster_act_vec', cluster_act_vec.shape)
+    #print('adv', adv.shape)
+    
+    #print()
+    #print()
+    #print()
+    #a=x
+    
+    #print('cluster_inputs', cluster_inputs)
+    
+    loss = orchestrate_agent.act_loss(
+        node_inputs, cluster_inputs, node_act_vec, cluster_act_vec, adv)
+    
+    #print('loss : ' ,type(loss), loss)
+    #a=k
     return loss
 
 
@@ -268,7 +329,7 @@ def decrease_var(var, min_var, decay_rate):
         var = min_var
     return var
 
-
+'''
 def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weight_min, entropy_weight_decay):
     
     """[Train the orchestration agent]
@@ -316,6 +377,58 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weig
     #print('Orchestrate Weight : ', entropy_weight)
     
     #a=b
+    # Compute gradients
+    
+    # Actual training of Orchestrate Net
+    orchestrate_agent.optimizer.zero_grad()
+    loss = compute_orchestrate_loss(
+        orchestrate_agent, exp, batch_adv, entropy_weight)
+    #print('loss entropy :', loss)
+    loss.backward()
+    orchestrate_agent.optimizer.step()
+    
+    #print('Training Back orchestrate Agent')
+    entropy_weight = decrease_var(entropy_weight,
+                                  entropy_weight_min, entropy_weight_decay)
+    #print('entropy_weight, loss', type(entropy_weight), type(loss), loss, entropy_weight)
+    #a=b
+    return entropy_weight, loss
+'''
+
+def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weight_min, entropy_weight_decay):
+    
+    """[Train the orchestration agent]
+
+    Args:
+        orchestrate_agent ([Orchestrate Agent Class]): [Orchestrate Agent]
+        exp ([dictionary]): [Experience]
+        entropy_weight ([float]): [Entropy weight]
+        entropy_weight_min ([float]): [Minimum Entropy Weight]
+        entropy_weight_decay ([type]): [Entropy Weight Decay rate]
+
+    Returns:
+        [Tensors]: [Entropy weight and calculated loss]
+    """
+    all_cum_reward = []
+    all_rewards = exp['reward']
+    batch_time = exp['wall_time']
+    
+    #print('all_rewards : ', all_rewards)
+    #print('batch_time : ', batch_time)
+    #all_times = batch_time[1:]
+    #sub_times = batch_time[:-1]
+    #all_diff_times = np.array(all_times) - np.array(sub_times)
+    rewards = np.array([r for (r, t) in zip(all_rewards, batch_time)])
+    cum_reward = discount(rewards, 1)
+    all_cum_reward.append(cum_reward)
+    orchestrate_agent.entropy_weight = entropy_weight
+    
+    # Compute baseline
+    baselines = get_piecewise_linear_fit_baseline(all_cum_reward, [batch_time])
+    # Back the advantage
+    batch_adv = all_cum_reward[0] - baselines[0]
+    batch_adv = np.reshape(batch_adv, [len(batch_adv), 1])
+    orchestrate_agent.entropy_weight = entropy_weight
     # Compute gradients
     
     # Actual training of Orchestrate Net
@@ -430,11 +543,11 @@ class OCN(nn.Module):
         """
         
         node_inputs, cluster_inputs, gcn_outputs = x
-        print('node_inputs, cluster_inputs, gcn_outputs : ', type(node_inputs), type(cluster_inputs), type(gcn_outputs))
+        #print('node_inputs, cluster_inputs, gcn_outputs : ', type(node_inputs), type(cluster_inputs), type(gcn_outputs))
         #a=b 
         node_inputs = torch.from_numpy(node_inputs).float()
         cluster_inputs = torch.from_numpy(cluster_inputs).float()
-        print('node_inputs, cluster_inputs : ',node_inputs.shape, cluster_inputs.shape)
+        #print('node_inputs, cluster_inputs : ',node_inputs.shape, cluster_inputs.shape)
         #a=b
         #node_inputs = torch.from_numpy(node_inputs).float()
         node_inputs_reshape = node_inputs.view(self.batch_size, -1, self.node_input_dim)
@@ -464,7 +577,7 @@ class OCN(nn.Module):
 
         # Do softmax
         cluster_outputs = nn.functional.softmax(cluster_outputs)#, dim=-1)
-        print('cluster_outputs : ', cluster_outputs)
+        #print('cluster_outputs : ', cluster_outputs)
         return node_outputs, cluster_outputs
         
     def predict(self, x):
@@ -511,8 +624,8 @@ class OrchestrateAgent(Agent):
             act_fn ([Pytorch Activation function]): [Pytorch Activation ]
             optimizer ([Pytorch Optimizer]): [Pytorch Optimizer]
         """
-        print(type(node_input_dim), type(cluster_input_dim), type(hid_dims), type(output_dim),
-                 type(max_depth), type(executor_levels), type(eps), type(act_fn),type(optimizer))
+        #print(type(node_input_dim), type(cluster_input_dim), type(hid_dims), type(output_dim),
+        #         type(max_depth), type(executor_levels), type(eps), type(act_fn),type(optimizer))
         Agent.__init__(self)
         self.node_input_dim = node_input_dim
         self.cluster_input_dim = cluster_input_dim
@@ -591,134 +704,137 @@ class OrchestrateAgent(Agent):
         
         node_act_vec = np.asarray(node_act_vec)
         cluster_act_vec = np.asarray(cluster_act_vec)
-        print('Act loss node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape')
-        print(self.node_inputs.shape, self.cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape)
+        #print('Act loss node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape')
+        #print(self.node_inputs.shape, self.cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape)
         #print(type(node_inputs), type(cluster_inputs), type(node_act_vec), type(cluster_act_vec), type(adv))
-        print('node_act_vec :', node_act_vec)
-        print('cluster_act_vec :', cluster_act_vec)
-        a=b        
+        #print('node_act_vec :', node_act_vec)
+        #print('cluster_act_vec :', cluster_act_vec)
+        #a=b        
         self.gcn(self.node_inputs)
         #self.gsn(torch.cat((torch.tensor(self.node_inputs), self.gcn.outputs), axis=1))
         
         # Map gcn_outputs and raw_inputs to action probabilities
         self.node_act_probs, self.cluster_act_probs = self.ocn_net((self.node_inputs, self.cluster_inputs, self.gcn.outputs) )#
         
-        print()
-        print('self.node_act_probs.shape, cluster_act_probs.shape : ', self.node_act_probs.shape,  self.cluster_act_probs.shape)
-        print()
-        print('self.gcn_outputs.shape : ', self.gcn.outputs.shape)
+        #print()
+        #print('self.node_act_probs.shape, cluster_act_probs.shape : ', self.node_act_probs.shape,  self.cluster_act_probs.shape)
+        #print()
+        #print('self.gcn_outputs.shape : ', self.gcn.outputs.shape)
         
         #a=b
         # Draw action based on the probability
         logits = torch.log(self.node_act_probs)
-        print()
-        print('logits.shape : ', logits.shape)
+        #print()
+        #print('logits.shape : ', logits.shape)
         noise = torch.rand(logits.shape)
-        print()
-        print('noise.shape : ', noise.shape)
+        #print()
+        #print('noise.shape : ', noise.shape)
         self.node_acts = torch.topk(logits - torch.log(-torch.log(noise)), k=3).indices
 
-        print()
-        print('self.node_acts.shape : ', self.node_acts.shape)
+        #print()
+        #print('self.node_acts.shape : ', self.node_acts.shape)
         
         # Cluster_acts
         logits = torch.log(self.cluster_act_probs)
-        print()
-        print()
-        print('logits 2 .shape : ', logits.shape)
+        #print()
+        #print()
+        #print('logits 2 .shape : ', logits.shape)
         noise = torch.rand(logits.shape)
-        print()
-        print()
-        print('noise 2.shape : ', noise.shape)
+        #print()
+        #print()
+        #print('noise 2.shape : ', noise.shape)
         self.cluster_acts = torch.topk(logits - torch.log(-torch.log(noise)), k=3).indices
         
-        print()
-        print()
-        print('self.node_acts.shape : ', self.node_acts.shape)
+        #print()
+        #print()
+        #print('self.node_acts.shape : ', self.node_acts.shape)
         
-        print('self.node_acts,  self.cluster_acts :, ',self.node_acts.shape,  self.cluster_acts.shape )
+        #print('self.node_acts,  self.cluster_acts :, ',self.node_acts.shape,  self.cluster_acts.shape )
         
         node_act_probs = torch.tensor(self.node_act_probs)
         node_act_vec = torch.tensor(node_act_vec)
         node_act_vec = torch.squeeze(node_act_vec)
-        print('self.node_act_probs,  self.node_act_vec :, ',self.node_act_probs.shape, node_act_vec.shape )
+        #print('self.node_act_probs,  self.node_act_vec :, ',self.node_act_probs.shape, node_act_vec.shape )
         
         #a=b
         node_prod = torch.mul(
             node_act_probs, node_act_vec)
-        print()
-        print()
-        print('node_prod.shape : ', node_prod.shape)
+        #print()
+        #print()
+        #
+        # print('node_prod.shape : ', node_prod.shape)
         
           
         # Action probability
-        print('Before tensor shape self.cluster_act_probs, cluster_act_vec :', self.cluster_act_probs.shape, cluster_act_vec.shape)
+        #print('Before tensor shape self.cluster_act_probs, cluster_act_vec :', self.cluster_act_probs.shape, cluster_act_vec.shape)
         cluster_act_probs, cluster_act_vec = torch.tensor(self.cluster_act_probs), torch.tensor(cluster_act_vec)
         cluster_act_vec = torch.squeeze(cluster_act_vec, dim= 1)
         selected_node_prob = torch.sum(node_prod,
             dim=(1,), keepdim=True)
-        print()
-        print()
-        print('selected_node_prob :  ', selected_node_prob.shape)
+        #print()
+        #print()
+        #print('selected_node_prob :  ', selected_node_prob.shape)
         #a=b
         #print('self.selected_node_prob.shape, node_act_probs.shape, node_act_vec.shape : ', selected_node_prob.shape,  self.node_act_probs.shape, node_act_vec.shape)
         #print('selected_node_prob.shape :  ' , selected_node_prob.shape)
-        print('After self.cluster_act_probs, cluster_act_vec : ', self.cluster_act_probs.shape, cluster_act_vec.shape)
+        #print('After self.cluster_act_probs, cluster_act_vec : ', self.cluster_act_probs.shape, cluster_act_vec.shape)
         #cluster_act_vec = torch.squeeze(cluster_act_vec, 1)
         select_cluster_prod = torch.mul( self.cluster_act_probs, cluster_act_vec)
         
-        print()
-        print()
-        print('select_cluster_prod.shape, select_cluster_prod.type : ', select_cluster_prod.shape, type(select_cluster_prod))
+        #print()
+        #print()
+        #print('select_cluster_prod.shape, select_cluster_prod.type : ', select_cluster_prod.shape, type(select_cluster_prod))
         
         sum_cluster_1 = torch.sum(select_cluster_prod, dim=2)
         
-        print()
-        print()
-        print('sum_cluster_1 :', sum_cluster_1.shape)
+        #print()
+        #print()
+        #print('sum_cluster_1 :', sum_cluster_1.shape)
         
         selected_cluster_prob = torch.sum(sum_cluster_1, dim=1, keepdim=True)
-        print()
-        print()
-        print('selected_cluster_prob :', selected_cluster_prob.shape)
+        #print()
+        #print()
+        #print('selected_cluster_prob :', selected_cluster_prob.shape)
 
         torch_log = torch.log(selected_node_prob * selected_cluster_prob + \
                    self.eps)
         
-        print()
-        print()
-        print('torch_log :', torch_log.shape)
+        
+        #print()
+        #print()
+        #print('torch_log :', torch_log.shape)
 
         adv = torch.tensor(adv)
-        print()
-        print()
+        #print()
+        #print()
 
-        print('adv : ', type(adv), adv.shape, adv)
+        #print('adv : ', type(adv), adv.shape, adv)
         
         
         torch_log_adv_mul = torch.mul(torch_log, -adv)
 
-        print()
-        print()
-        print('torch_log_adv_mul :', torch_log_adv_mul.shape)
+        #print()
+        #print()
+        #print('torch_log_adv_mul :', torch_log_adv_mul.shape)
 
         # Orchestrate loss due to advantge
         self.adv_loss = torch.sum(torch_log_adv_mul)
-        print('')
-        print('self.adv_loss :', self.adv_loss.shape)
+        #print('')
+        #print('self.adv_loss :', self.adv_loss.shape)
         # Node_entropy
         torch_log_entropy = torch.log(node_act_probs + self.eps)
-        print('')
-        print('')
-        print('torch_log_entropy :', torch_log_entropy.shape)
+        #print('')
+        #print('')
+        #
+        # print('torch_log_entropy :', torch_log_entropy.shape)
         torch_mul_dimension = torch.mul(self.node_act_probs, torch_log_entropy)
-        print('')
-        print('')
-        print('torch_mul_dimension :', torch_mul_dimension.shape)
+        #print('')
+        #print('')
+        #print('torch_mul_dimension :', torch_mul_dimension.shape)
         self.node_entropy = torch.sum(torch_mul_dimension)
-        print('')
-        print('')
-        print('self.node_entropy :', self.node_entropy.shape)
+        #print('')
+        #print('')
+        #print('self.node_entropy :', self.node_entropy.shape)
         # Entropy loss
         self.entropy_loss = self.node_entropy  # + self.cluster_entropy
 
@@ -726,21 +842,21 @@ class OrchestrateAgent(Agent):
         len_ex = float(len(self.executor_levels))
         len_ex = torch.tensor(len_ex)
         node_act_probs_shape = torch.tensor(node_act_probs.shape[1])
-        print('len_ex :', len_ex)
+        #print('len_ex :', len_ex)
         torch_log_norm = torch.log(len_ex)
-        print('')
-        print('')
-        print('torch_log_norm :', torch_log_norm.shape)
+        #print('')
+        #print('')
+        #print('torch_log_norm :', torch_log_norm.shape)
         denom = (torch.log(node_act_probs_shape) + \
              torch_log_norm)
-        print('')
-        print('')
-        print('denom :', denom.shape)
+        #print('')
+        #print('')
+        #print('denom :', denom.shape)
         
         denom = denom.type(torch.FloatTensor)
         self.entropy_loss /= denom
 
-        print('self.entropy_loss, self.entropy_loss.shape : ', self.entropy_loss, self.entropy_loss.shape )
+        #print('self.entropy_loss, self.entropy_loss.shape : ', self.entropy_loss, self.entropy_loss.shape )
         # Define combined loss
         self.act_loss_ = self.adv_loss + self.entropy_weight * self.entropy_loss
         #print(type(self.act_loss_))
