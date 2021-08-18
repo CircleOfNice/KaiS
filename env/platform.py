@@ -44,6 +44,18 @@ class Master:
     def update_undone(self, undone):
         self.undone = self.undone + undone
         
+    def add_to_node_attribute(self, node_list_idx, attribute, value):
+        #print('Before : ', getattr(self.node_list[node_list_idx], attribute))
+        updated_value = getattr(self.node_list[node_list_idx], attribute) + value
+        setattr(self.node_list[node_list_idx], attribute, value)
+        
+        #print(getattr(self.node_list[node_list_idx], attribute))
+        
+    def append_docker_to_node_service_list(self, node_list_idx, docker_cont):
+        #print(self.node_list[node_list_idx].service_list)
+        self.node_list[node_list_idx].service_list.append(docker_cont)
+        #print(self.node_list[node_list_idx].service_list)
+        #a=b
 class Docker:
     """[This class serves as framework for definition of Docker containers with properties such as 
     cpu processing, memory, Time since availability, Service kind,  task being done( generally [-1])]

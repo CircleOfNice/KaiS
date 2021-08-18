@@ -257,6 +257,8 @@ class Estimator:
             # action probability for state value function
             action_prob = action_prob.detach().numpy()
             valid_prob.append(action_prob)
+            
+            # To prevent breaking of the code given the context is set to 0
             if int(context[idx]) == 0:
                 continue
             
