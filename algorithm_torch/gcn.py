@@ -26,9 +26,7 @@ class GraphCNN(nn.Module):
         self.prep_weights, self.prep_bias = self.init(self.input_dim, self.hid_dims, self.output_dim)
         self.proc_weights, self.proc_bias = self.init(self.output_dim, self.hid_dims, self.output_dim)
         self.agg_weights, self.agg_bias = self.init(self.output_dim, self.hid_dims, self.output_dim)
-        #self.outputs = self.forward()
-        print('GCN : ', input_dim, hid_dims, output_dim,
-    max_depth)
+
         
     
     def glorot(self, shape):

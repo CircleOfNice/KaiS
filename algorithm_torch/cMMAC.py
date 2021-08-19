@@ -206,7 +206,7 @@ class Estimator:
         Args:
             s ([Numpy Array]): [State Array]
             ava_node ([list]): [currently deployed nodes] #[Confusing name it is the nodes which are currently deployed]
-            context ([list]): [Context (not yet clear to me)]
+            context ([list]): [Context is basically a flag]
             epsilon ([float]): [DRL paramater but not used much]
 
         Returns:
@@ -232,7 +232,6 @@ class Estimator:
         next_state_ids = []
         
         grid_ids = [x for x in range(self.n_valid_node)]
-        #print(grid_ids)
         
         self.valid_action_mask = np.zeros((self.n_valid_node, self.action_dim))
 
