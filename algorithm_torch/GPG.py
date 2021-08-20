@@ -40,8 +40,6 @@ def fc(inp_dim, output_dim, act=nn.ReLU()):
         Sequential Model: A sequential model which can be used as layer in Functional model
     """
     linear = nn.Linear(inp_dim, output_dim)
-    #nn.init.xavier_uniform_(linear.weight)
-    #linear.bias.data.fill_(0)
     fc_out = nn.Sequential(linear, act)
     return fc_out 
 
@@ -114,7 +112,7 @@ def expand_act_on_state(state, sub_acts):
     return concat_state
 
 def act_offload_agent(orchestrate_agent, exp, done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state):
-    """Action choice using the invocation of Orchestrate Agent model
+    """Action choice using the invocation (propagation through) of Orchestrate Agent model
     
     
 

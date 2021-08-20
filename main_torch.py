@@ -7,6 +7,8 @@ from algorithm_torch.GPG import *
 from env.platform import *
 from env.env_run import *
 
+import pickle
+
 def flatten(list):
     """Function to serialize sublists inside a given list
 
@@ -85,16 +87,16 @@ def to_grid_rewards(node_reward):
     
 
 def get_state_characteristics(MAX_TESK_TYPE, master1, master2, num_edge_nodes_per_eAP):
-    """Get all the update
+    """Get lists of tasks that are done, undone and current task in queue
 
     Args:
-        MAX_TESK_TYPE ([type]): [description]
-        master1 ([type]): [description]
-        master2 ([type]): [description]
-        num_edge_nodes_per_eAP ([type]): [description]
+        MAX_TESK_TYPE ([int]): Maximum types of tasks
+        master1 ([Master Object]): [Edge Access Point 1]
+        master2 ([Master Object]): [Edge Access Point 2]
+        num_edge_nodes_per_eAP ([type]): [Number of edge nodes under an edge access point]
 
     Returns:
-        [type]: [description]
+        [lists]: [lists of number of done, undone and current tasks in queue]
     """
     done_tasks = []
     undone_tasks = []
@@ -104,7 +106,6 @@ def get_state_characteristics(MAX_TESK_TYPE, master1, master2, num_edge_nodes_pe
         done_tasks.append(float(master1.done_kind[i] + master2.done_kind[i]))
         undone_tasks.append(float(master1.undone_kind[i] + master2.undone_kind[i]))
         
-    # 
     for i in range(num_edge_nodes_per_eAP):
         tmp = [0.0] * MAX_TESK_TYPE
         for j in range(len(master1.node_list[i].task_queue)):
@@ -118,7 +119,14 @@ def get_state_characteristics(MAX_TESK_TYPE, master1, master2, num_edge_nodes_pe
     return done_tasks, undone_tasks, curr_tasks_in_queue
 
 def remove_docker_from_master_node(master, change_node_idx, service_index, deploy_state):
-    
+    """Function to remove appropriate docker container from a given EAP (master node)
+
+    Args:
+        master ([Master Object]): [eAP Object]
+        change_node_idx ([int]): [index of Edge Node]
+        service_index ([int]): [Service indexes needed to be changed]
+        deploy_state ([list]): [list of lists representing the deployed serices at each edge point]
+    """
     docker_idx = 0
     while docker_idx < len(master.node_list[change_node_idx].service_list):
         if docker_idx >= len(master.node_list[change_node_idx].service_list):
@@ -136,6 +144,18 @@ def remove_docker_from_master_node(master, change_node_idx, service_index, deplo
 
 
 def deploy_new_docker(master, POD_MEM, POD_CPU, cur_time, change_node_idx, service_coefficient, service_index, deploy_state):
+    """Function to deploy new docker containers
+
+    Args:
+        master ([Master Object]): [eAP Object]
+        POD_MEM ([type]): [Memory Resources required for a POD]
+        POD_CPU ([type]): [Computation Resources required ]
+        cur_time ([time]): [Current time]
+        change_node_idx ([int]):[index of Edge Node]
+        service_coefficient ([type]): [description]
+        service_index ([type]): [Service indexes needed to be changed]
+        deploy_state ([list]): [list of lists representing the deployed serices at each edge point]
+    """
     docker = Docker(POD_MEM * service_coefficient[service_index],
                                                 POD_CPU * service_coefficient[service_index],
                                                 cur_time, service_index, [-1])
@@ -148,13 +168,31 @@ def deploy_new_docker(master, POD_MEM, POD_CPU, cur_time, change_node_idx, servi
     
     
 def get_current_task(master):
+    """Get Current task from the task queue
+
+    Args:
+        master ([Master Object]): [eAP object]
+
+    Returns:
+        [list]: [list containing the current task]
+    """
     task = [-1]
     if len(master.task_queue) != 0:
         task = master.task_queue[0]
         del master.task_queue[0]
+    
     return task
             
 def state_inside_eAP(master, num_edge_nodes_per_eAP):
+    """Get the state inside the given the edge nodes per eAP
+
+    Args:
+        master ([Master Object]): [eAP object]
+        num_edge_nodes_per_eAP ([int]): [Number of edge nodes in eAP]
+
+    Returns:
+        [list]: [CPU , memory and tasks in queue]
+    """
     cpu_list = []
     mem_list  = []
     task_num  = [len(master.task_queue)]
@@ -230,14 +268,12 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     #saver = tf.compat.v1.train.Saver()
     global_step1 = 0
     global_step2 = 0
-    all_task1 = get_all_task('./data/Task_1.csv')# processed data [type_list, start_time, end_time, cpu_list, mem_list]
-    all_task2 = get_all_task('./data/Task_2.csv')# processed data
+    all_task1 = get_all_task('./data/Task_1.csv')# processed data [type_list, start_time, end_time, cpu_list, mem_list] fed to eAP 1
+    all_task2 = get_all_task('./data/Task_2.csv')# processed data fed to eAP 2
 
     num_edge_nodes_per_eAP =3
     cluster_action_value = 6
-    #config = tf.ConfigProto(device_count={'GPU': worker_num_gpu},
-    #                        gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=worker_gpu_fraction))
-    #sess = tf.Session(config=config)
+
     orchestrate_agent = OrchestrateAgent(node_input_dim, cluster_input_dim, hid_dims, output_dim, max_depth,
                                          range(1, exec_cap + 1), eps=1e-6, act_fn = nn.functional.leaky_relu,optimizer=torch.optim.Adam)
     exp = {'node_inputs': [], 'cluster_inputs': [], 'reward': [], 'wall_time': [], 'node_act_vec': [],
@@ -545,17 +581,22 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             global_step2 += 1
 
     time_str = str(time.time())
-    with open("./result/" + time_str + ".json", "w") as f:
-        json.dump(record, f)
+    with open("./result/torch_out_time" + time_str + ".obj", "wb") as f:
+        pickle.dump(record, f)
+        
+    with open("./result/torch_out_time" + time_str + ".obj", 'rb') as fp:
+        record = pickle.load(fp)
+    #print(record)
     return throughput_list
     
     
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 500
-    TASK_NUM = 5000
-    TRAIN_TIMES = 50
-    CHO_CYCLE = 1000
+    RUN_TIMES = 500 # Number of Episodes to run
+    TASK_NUM = 5000 # Time for each Episode Ending
+    TRAIN_TIMES = 50 # list containing two elements for tasks done on both master nodes
+    CHO_CYCLE = 1000 # Orchestration cycle
+
     ##############################################################
     execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE)

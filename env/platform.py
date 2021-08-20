@@ -46,7 +46,7 @@ class Master:
         
     def add_to_node_attribute(self, node_list_idx, attribute, value):
         updated_value = getattr(self.node_list[node_list_idx], attribute) + value
-        setattr(self.node_list[node_list_idx], attribute, value)
+        setattr(self.node_list[node_list_idx], attribute, updated_value)
         
     def append_docker_to_node_service_list(self, node_list_idx, docker_cont):
         self.node_list[node_list_idx].service_list.append(docker_cont)
