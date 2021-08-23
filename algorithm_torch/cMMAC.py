@@ -84,21 +84,20 @@ class Policy_Model(nn.Module):
 class Estimator:
     """Class to Define the cMMAC (Actor Critic) model
     """
-    def __init__(self, action_dim, state_dim, n_valid_node):#, summaries_dir=None):
+    def __init__(self, action_dim, state_dim, number_of_master_nodes):#, summaries_dir=None):
         """Initialisation of arguments
 
         Args:
             action_dim (int): Dimensions of the output (actions)
             state_dim (int): Dimensions of the input state
             
-            n_valid_node (int): [number of valid nodes # defined on page 6]
+            number_of_master_nodes (int): [number of eAPs]
         """
-        self.n_valid_node = n_valid_node
+        self.number_of_master_nodes = number_of_master_nodes
         self.action_dim = action_dim
         self.state_dim = state_dim
         
-        #print('action_dim, state_dim, n_valid_node : ', action_dim, state_dim, n_valid_node)
-        #a=b
+
         # Initial value for losses
         self.actor_loss = 0
         self.value_loss = 0
@@ -231,11 +230,10 @@ class Estimator:
         curr_state_value = []
         next_state_ids = []
         
-        grid_ids = [x for x in range(self.n_valid_node)]
+        grid_ids = [x for x in range(self.number_of_master_nodes)]
         
-        self.valid_action_mask = np.zeros((self.n_valid_node, self.action_dim))
+        self.valid_action_mask = np.zeros((self.number_of_master_nodes, self.action_dim))
 
-        
         for i in range(len(ava_node)):
             for j in ava_node[i]:
                 self.valid_action_mask[i][j] = 1
@@ -327,8 +325,9 @@ class Estimator:
         node_reward = node_reward.flatten()
         qvalue_next = self.vm(next_state).flatten()
 
-        for idx in np.arange(self.n_valid_node):
+        for idx in np.arange(self.number_of_master_nodes):
             grid_prob = valid_prob[idx][self.valid_action_mask[idx] > 0]
+            
             curr_grid_target = np.sum(
                 grid_prob * (sum(node_reward) + gamma * sum(qvalue_next.detach().numpy())))
             targets.append(curr_grid_target)
@@ -347,7 +346,7 @@ class Estimator:
             s ([Numpy array]): [state]
             y ([Numpy array]): [target]
             learning_rate ([float]): [learning rate]
-            global_step ([int]): [Global step #TODO Have to review it what exactly it means]
+            global_step ([int]): [Global step # Orchestration Time]
         """
         
         
@@ -370,7 +369,7 @@ class Estimator:
             action_choosen_mat ([Numpy Array]): [Choose action matrix]
             curr_neighbor_mask ([Numpy Array]): [Current Neighbor mask]
             learning_rate ([float]): [Learning Rate]
-            global_step ([int]): [Global step #TODO Have to review it what exactly it means]
+            global_step ([int]): [Global step #Orchestration Time]
         """
         
         self.vm_optimizer.zero_grad()

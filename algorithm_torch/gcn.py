@@ -28,7 +28,6 @@ class GraphCNN(nn.Module):
         self.agg_weights, self.agg_bias = self.init(self.output_dim, self.hid_dims, self.output_dim)
 
         
-    
     def glorot(self, shape):
         """[summary]
 
@@ -74,7 +73,6 @@ class GraphCNN(nn.Module):
     def forward(self, x):
         
         x = torch.from_numpy(x)
-        #print('input shape : ', x.shape)
         # Raise x into higher dimension
             
         for l in range(len(self.prep_weights)):

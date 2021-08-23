@@ -35,7 +35,7 @@ def calculate_reward(master1, master2, cur_done, cur_undone, num_edge_nodes_per_
     Returns:
         reward [list]: [list of rewards for both master nodes]
     """
-    #print('cur_done[0] + cur_undone[0] cur_done[1]  cur_undone[1]', cur_done[0] , cur_undone[0], cur_done[1] , cur_undone[1])
+    
     weight = 1.0
     all_task = [float(cur_done[0] + cur_undone[0]), float(cur_done[1] + cur_undone[1])]
     fail_task = [float(cur_undone[0]), float(cur_undone[1])]
@@ -69,8 +69,7 @@ def calculate_reward(master1, master2, cur_done, cur_undone, num_edge_nodes_per_
     reward.append(math.exp(-task_fail_rate[1]) + weight * math.exp(-standard_list[1]))
     # Immediate reward   e^(-lambda - weight_of_load_balancing *standard_deviation_of_cpu_memory)
     
-    #TODO - There are two rewards but a single Q estimator. 
-    # Could it be the so called High value edge nodes (mentioned at page 6 of paper. Doesn't make much sense)?
+    # Two rewards for each eAP
     return reward
     
     
@@ -231,8 +230,15 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     action_dim = 7 #Number of actions possibly edge nodes 6 plus Cluster
     state_dim = 88 #Dimension of state for cMMAC (flattened Deployed state, task num, cpu_list, min_list)
     
-    node_input_dim = 24 # Input dimension of Node part of the Orchestration Net
+    node_input_dim = 24 # Input dimension of Node part of the Orchestration Net 
     cluster_input_dim = 24 # Input dimension for Cluster part of the Orchestration Net
+    
+    # notes on input dimensions
+    # node_inputs[i, :12] = curr_tasks_in_queue[i, :12]
+    #        node_inputs[i, 12:] = deploy_state[i, :12]
+    #    cluster_inputs[0, :12] = done_tasks[:12]
+    #    cluster_inputs[0, 12:] = undone_tasks[:12] 
+    
     hid_dims = [16, 8] # hidden dimensions of the Graph Neural Networks
     output_dim = 8 # Output dimension of Graph Neural Networks
     max_depth = 8 # The Depth for aggregation of Graph Neural Networks
@@ -260,8 +266,8 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     record_all_order_response_rate = [] # List to record all the throughput rate througout episodes
     #sess = tf.Session()
     #tf.set_random_seed(1)
-    high_value_nodes  = 2 # High Value edge node #Page 6 of paper defines the usage of two high value edge_nodes as experiment
-    q_estimator = Estimator(action_dim, state_dim, high_value_nodes) # Definition of cMMAc Agent
+    number_of_master_nodes  = 2 # number of eAPs # Only in this case whole thing makes sense
+    q_estimator = Estimator(action_dim, state_dim, number_of_master_nodes) # Definition of cMMAc Agent
     #sess.run(tf.global_variables_initializer())
     replay = ReplayMemory(memory_size=1e+6, batch_size=int(3e+3)) # experience Replay for value network for cMMMac Agent
     policy_replay = policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3)) #experience Replay for Policy network for cMMMac Agent
@@ -275,7 +281,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     cluster_action_value = 6
 
     orchestrate_agent = OrchestrateAgent(node_input_dim, cluster_input_dim, hid_dims, output_dim, max_depth,
-                                         range(1, exec_cap + 1), eps=1e-6, act_fn = nn.functional.leaky_relu,optimizer=torch.optim.Adam)
+                                         range(1, exec_cap + 1), MAX_TESK_TYPE, eps=1e-6, act_fn = nn.functional.leaky_relu,optimizer=torch.optim.Adam)
     exp = {'node_inputs': [], 'cluster_inputs': [], 'reward': [], 'wall_time': [], 'node_act_vec': [],
            'cluster_act_vec': []}
 
@@ -287,9 +293,9 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         entropy_weight = entropy_weight_init
         order_response_rates = []
 
-        pre_done = [0, 0]
-        pre_undone = [0, 0]
-        context = [1, 1]
+        pre_done = [0, 0] # list to track tasks done previously
+        pre_undone = [0, 0] # list to track tasks undone (not done) previously
+        context = [1, 1] # Flag
         ############ Set up according to your own needs  ###########
         # The parameters here are set only to support the operation of the program, and may not be consistent with the actual system
         # At each edge node 1 denotes a kind of service which is running

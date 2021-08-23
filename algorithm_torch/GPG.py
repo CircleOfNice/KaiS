@@ -24,7 +24,6 @@ def discount(x, gamma):
     out[-1] = x[-1]
     for i in reversed(range(len(x) - 1)):
         out[i] = x[i] + gamma * out[i + 1]
-        #print('out : ', out, type(out))
     return out
 
 def fc(inp_dim, output_dim, act=nn.ReLU()):
@@ -77,7 +76,7 @@ def invoke_model(orchestrate_agent, obs, exp):
     return node_choice, server_choice, exp
     
 def expand_act_on_state(state, sub_acts):
-    """Function to concatenate states with sub_acts with mutliple repetition over the tiling range (24)
+    """Function to concatenate states with sub_acts with multiple repetition over the tiling range (24)
     # Repeated state is appended with a vector of values havings different weightage likely to activate different actions for different state
     
     Args:
@@ -222,7 +221,7 @@ def decrease_var(var, min_var, decay_rate):
     Returns:
         [var]: [Variable with reduced value]
     """
-    #print('Var :',var, decay_rate, min_var)
+
     if var - decay_rate >= min_var:
         var -= decay_rate
     else:
@@ -255,17 +254,15 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weig
     
     # Compute baseline
     baselines = get_piecewise_linear_fit_baseline(all_cum_reward, [batch_time])
-    # Back the advantage
+    # Calculate the advantage
     batch_adv = all_cum_reward[0] - baselines[0]
     batch_adv = np.reshape(batch_adv, [len(batch_adv), 1])
     orchestrate_agent.entropy_weight = entropy_weight
-    # Compute gradients
     
     # Actual training of Orchestrate Net
     orchestrate_agent.optimizer.zero_grad()
     loss = compute_orchestrate_loss(
         orchestrate_agent, exp, batch_adv, entropy_weight)
-    #print('loss entropy :', loss)
     loss.backward()
     orchestrate_agent.optimizer.step()
     entropy_weight = decrease_var(entropy_weight,
@@ -305,7 +302,7 @@ class ClusterNet(nn.Module):
         """Initialisation
 
         Args:
-            expanded_state ([int]): [Input dimensions]
+            expanded_state ([int]): [Input dimensions] # cluster merged reshape input shape + executor levels shape 24
             cluster_inp_sizes (list, optional): [Hidden Dimensions]. Defaults to [32, 16, 8 ,1].
             act ([Python Activation Layer], optional): [Python Activation Layer]. Defaults to nn.ReLU().
         """
@@ -332,8 +329,8 @@ class OCN(nn.Module):
         """Creation of the cumulative 
 
         Args:
-            merge_node_dim ([int]): [Input Dimension for Node Net]
-            expanded_state_dim ([int]): [Input Dimension for Cluster Net]
+            merge_node_dim ([int]): [Input Dimension for Node Net] # node_inputs_reshape.shape + gcn_outputs_reshape.shape (along axis 2)
+            expanded_state_dim ([int]): [Input Dimension for Cluster Net] # node_inputs_reshaped.shape + executor levels length (along axis 2)
             node_input_dim ([int]): [Reshape Node Inputs Dimension ]
             cluster_input_dim ([int]): [Reshape Cluster Inputs Dimension ]
             output_dim ([int]): [Output Dimensions of Graph Neural Networks]
@@ -376,7 +373,6 @@ class OCN(nn.Module):
         node_inputs_reshape = node_inputs.view(self.batch_size, -1, self.node_input_dim)
         cluster_inputs_reshape = cluster_inputs.view(self.batch_size, -1, self.cluster_input_dim)
         gcn_outputs_reshape = gcn_outputs.view(self.batch_size, -1, self.output_dim)
-        
         
         merge_node = torch.cat((node_inputs_reshape, gcn_outputs_reshape), axis=2)
         node_outputs = self.nodenet(merge_node)
@@ -423,7 +419,7 @@ class Agent(object):
         
 class OrchestrateAgent(Agent):
     def __init__(self, node_input_dim, cluster_input_dim, hid_dims, output_dim,
-                 max_depth, executor_levels, eps, act_fn,optimizer):
+                 max_depth, executor_levels, MAX_TESK_TYPE, eps, act_fn,optimizer):
         """Orchestration Agent initialisation
 
         Args:
@@ -443,12 +439,17 @@ class OrchestrateAgent(Agent):
         self.hid_dims = hid_dims
         self.output_dim = output_dim
 
+
+
+
         self.max_depth = max_depth
+        self.merge_node_dim_ = 24+ 8 # node_inputs_reshape.shape + gcn_outputs_reshape.shape (along axis 2)
+        self.expanded_state_dim_ = 1 + 24 # node_inputs_reshaped.shape + executor levels range (along axis 2)
         self.executor_levels = executor_levels
         self.eps = eps #=1e-6
         self.act_fn = act_fn
         self.entropy_weight = 1
-
+        self.MAX_TESK_TYPE = MAX_TESK_TYPE
         self.gcn = GraphCNN(
             self.node_input_dim, self.hid_dims,
             self.output_dim, self.max_depth, self.act_fn)
@@ -467,7 +468,7 @@ class OrchestrateAgent(Agent):
         """
         batch_size = 1
     
-        self.ocn_net = OCN(32, 25, self.node_input_dim, 
+        self.ocn_net = OCN(self.merge_node_dim_, self.expanded_state_dim_, self.node_input_dim, 
     self.cluster_input_dim, self.output_dim, expand_act_on_state, self.executor_levels,
     node_inp_sizes = [32, 16, 8 ,1], cluster_inp_sizes = [32, 16, 8 ,1], act = nn.ReLU(), batch_size = batch_size)
     
@@ -498,7 +499,7 @@ class OrchestrateAgent(Agent):
         
         node_act_vec = np.asarray(node_act_vec)
         cluster_act_vec = np.asarray(cluster_act_vec)
-      
+
         self.gcn(self.node_inputs)
         
         # Map gcn_outputs and raw_inputs to action probabilities
@@ -558,7 +559,6 @@ class OrchestrateAgent(Agent):
         len_ex = float(len(self.executor_levels))
         len_ex = torch.tensor(len_ex)
         node_act_probs_shape = torch.tensor(node_act_probs.shape[1])
-        #print('len_ex :', len_ex)
         torch_log_norm = torch.log(len_ex)
 
         denom = (torch.log(node_act_probs_shape) + \
@@ -573,7 +573,7 @@ class OrchestrateAgent(Agent):
         return self.act_loss_
         
     def translate_state(self, obs):
-        """Translates the state 
+        """Translates the state (from observation environment returns Node and cluster inputs)
 
         Args:
             obs ([list]): [Observation of environment]
@@ -595,10 +595,10 @@ class OrchestrateAgent(Agent):
         cluster_inputs = np.zeros([1, self.cluster_input_dim])
 
         for i in range(len(node_inputs)):
-            node_inputs[i, :12] = curr_tasks_in_queue[i, :12]
-            node_inputs[i, 12:] = deploy_state[i, :12]
-        cluster_inputs[0, :12] = done_tasks[:12]
-        cluster_inputs[0, 12:] = undone_tasks[:12]
+            node_inputs[i, :self.MAX_TESK_TYPE] = curr_tasks_in_queue[i, :self.MAX_TESK_TYPE]
+            node_inputs[i, self.MAX_TESK_TYPE:] = deploy_state[i, :self.MAX_TESK_TYPE]
+        cluster_inputs[0, :self.MAX_TESK_TYPE] = done_tasks[:self.MAX_TESK_TYPE]
+        cluster_inputs[0, self.MAX_TESK_TYPE:] = undone_tasks[:self.MAX_TESK_TYPE]
         
         #))
         return node_inputs, cluster_inputs
