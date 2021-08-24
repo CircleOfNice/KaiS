@@ -1,9 +1,11 @@
+# Simple Graph Network for embedding purposes # Redundant as not being used in code
+
 import torch
 import torch.nn as nn
 import numpy as np 
 
 class GraphSNN(nn.Module):
-    """GraphCNN Class
+    """GraphSNN Class
     """
     def __init__(self, input_dim, hid_dims, output_dim, act_fn):
         """[summary]

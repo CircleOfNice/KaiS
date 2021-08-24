@@ -1,3 +1,5 @@
+# Graph Convolution Network for embedding purposes
+
 import numpy as np
 import torch
 import torch.nn as nn

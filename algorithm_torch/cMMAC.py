@@ -84,7 +84,7 @@ class Policy_Model(nn.Module):
 class Estimator:
     """Class to Define the cMMAC (Actor Critic) model
     """
-    def __init__(self, action_dim, state_dim, number_of_master_nodes):#, summaries_dir=None):
+    def __init__(self, action_dim, state_dim, number_of_master_nodes):
         """Initialisation of arguments
 
         Args:

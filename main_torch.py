@@ -235,9 +235,9 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     
     # notes on input dimensions
     # node_inputs[i, :12] = curr_tasks_in_queue[i, :12]
-    #        node_inputs[i, 12:] = deploy_state[i, :12]
-    #    cluster_inputs[0, :12] = done_tasks[:12]
-    #    cluster_inputs[0, 12:] = undone_tasks[:12] 
+    # node_inputs[i, 12:] = deploy_state[i, :12]
+    # cluster_inputs[0, :12] = done_tasks[:12]
+    # cluster_inputs[0, 12:] = undone_tasks[:12] 
     
     hid_dims = [16, 8] # hidden dimensions of the Graph Neural Networks
     output_dim = 8 # Output dimension of Graph Neural Networks
@@ -366,7 +366,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 
                 change_node, change_service, exp = act_offload_agent(orchestrate_agent, exp, done_tasks,
                                                                      undone_tasks, curr_tasks_in_queue,
-                                                                     deploy_state_float)
+                                                                     deploy_state_float, MAX_TESK_TYPE)
 
                 # Execute orchestration
                 for i in range(len(change_node)):
