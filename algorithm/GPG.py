@@ -83,11 +83,35 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv, entropy_weight):
         ba_start = 0
         ba_end = -1
         # Use a piece of experience
+        print()
+        print()
+        print()
+        print('compute_orchestrate_loss :')
         node_inputs = exp['node_inputs']
         cluster_inputs = exp['cluster_inputs']
         node_act_vec = exp['node_act_vec']
         cluster_act_vec = exp['cluster_act_vec']
         adv = batch_adv[ba_start: ba_end, :]
+        
+        node_inputs = np.array(node_inputs)
+        print('node_inputs', node_inputs.shape)
+        cluster_inputs = np.array(cluster_inputs)
+        
+        print('cluster_inputs', cluster_inputs.shape)
+        node_act_vec = np.array(node_act_vec)
+        #
+        # print('node_act_vec', node_act_vec.shape)
+        cluster_act_vec = np.array(cluster_act_vec)
+        #print('cluster_act_vec', cluster_act_vec.shape)
+        print('cluster_inputs', cluster_inputs.shape)
+        node_act_vec = np.array(node_act_vec)
+        print('node_act_vec', node_act_vec.shape)
+        cluster_act_vec = np.array(cluster_act_vec)
+        print('cluster_act_vec', cluster_act_vec.shape)
+        print()
+        print()
+        print()
+        #m=k
         loss = orchestrate_agent.update_gradients(
             node_inputs, cluster_inputs, node_act_vec, cluster_act_vec, adv, entropy_weight)
     return loss
@@ -189,58 +213,191 @@ class OrchestrateAgent(Agent):
             tf.concat([self.node_inputs, self.gcn.outputs], axis=1),
             self.node_input_dim + self.output_dim, self.hid_dims,
             self.output_dim, self.act_fn, self.scope)
-
+        self.summary_n = 50
         # Map gcn_outputs and raw_inputs to action probabilities
         self.node_act_probs, self.cluster_act_probs = self.orchestrate_network(
             self.node_inputs, self.gcn.outputs, self.cluster_inputs,
             self.gsn.summaries[0], self.gsn.summaries[1], self.act_fn)
 
+        print('self.node_inputs,  self.cluster_inputs :, ',self.node_inputs.shape,  self.cluster_inputs.shape )
+        
+        print()
+        print()
+        print('self.node_act_probs.shape, cluster_act_probs.shape : ', self.node_act_probs.shape,  self.cluster_act_probs.shape)
+        
         # Draw action based on the probability
-        logits = tf.log(self.node_act_probs)
-        noise = tf.random_uniform(tf.shape(logits))
-        self.node_acts = tf.nn.top_k(logits - tf.log(-tf.log(noise)), k=3).indices
+        tf_node_act_probs = tf.Print(self.node_act_probs, [self.node_act_probs], 'self.node_act_probs : ', summarize=self.summary_n)
+        
+        logits = tf.log(tf_node_act_probs)
+        
+        tf_logits = tf.Print(logits, [logits], '1 logits  tf_logits: ', summarize=self.summary_n)
+        print()
+        print('logits.shape : ', logits.shape)
+        noise = tf.random_uniform(tf.shape(tf_logits))
+        
+        tf_noise = tf.Print(noise, [noise], '1 noise tf_noise: ', summarize=self.summary_n)
+        print()
+        print('noise.shape : ', noise.shape)
+        self.node_acts = tf.nn.top_k(logits - tf.log(-tf.log(tf_noise)), k=3).indices
 
+        print()
+        print('self.node_acts.shape : ', self.node_acts.shape)
+        
+        self.tf_node_acts = tf.Print(self.node_acts, [self.node_acts], 'self.tf_node_acts, self.node_acts : ', summarize=self.summary_n)
+        
         # Cluster_acts
+        
+        tf_cluster_act_probs = tf.Print(self.cluster_act_probs, [self.cluster_act_probs], 'self.cluster_act_probs : ', summarize=self.summary_n)
         logits = tf.log(self.cluster_act_probs)
-        noise = tf.random_uniform(tf.shape(logits))
-        self.cluster_acts = tf.nn.top_k(logits - tf.log(-tf.log(noise)), k=3).indices
-
+        print()
+        print()
+        print('logits.shape : ', logits.shape)
+        
+        tf_logits_2 = tf.Print(logits, [logits], '2 logits tf_logits_2 : ', summarize=self.summary_n)
+        noise_2 = tf.random_uniform(tf.shape(tf_logits_2))
+        print()
+        print()
+        print('noise.shape : ', noise_2.shape)
+        
+        tf_noise_2 = tf.Print(noise_2, [noise_2], '2 noise tf_noise_2 : ', summarize=self.summary_n)
+        self.cluster_acts = tf.nn.top_k(logits - tf.log(-tf.log(tf_noise_2)), k=3).indices
+        
+        self.tf_cluster_acts = tf.Print(self.cluster_acts, [self.cluster_acts], 'self.cluster_acts tf_cluster_acts : ', summarize=self.summary_n)
+        print()
+        print()
+        print('self.cluster_acts.shape : ', self.cluster_acts.shape)
+        
+        #print('self.node_acts,  self.cluster_acts :, ',self.node_acts.shape,  self.cluster_acts.shape )
+        
         # Selected action
         self.node_act_vec = tf.placeholder(tf.float32, [None, None])
         self.cluster_act_vec = tf.placeholder(tf.float32, [None, None, None])
+        print('self.node_act_probs,  self.node_act_vec :, ',tf_node_act_probs.shape,  self.node_act_vec.shape )
+        
+        tf_node_act_vec = tf.Print(self.node_act_vec, [self.node_act_vec], 'self.node_act_vec tf_node_act_vec : ', summarize=self.summary_n)
+        #print('self.node_act_vec : ', self.node_act_vec.get_shape())
         # ASdvantage
         self.adv = tf.placeholder(tf.float32, [None, 1])
 
         # Decays over time
         self.entropy_weight = tf.placeholder(tf.float32, ())
-
+        
+        node_prod = tf.multiply(
+            tf_node_act_probs, tf_node_act_vec)#self.node_act_vec)
+        print()
+        print()
+        print('prod.shape : ', node_prod.shape)
+        
+        tf_node_prod = tf.Print(node_prod, [node_prod], 'node_prod tf_node_prod: ', summarize=self.summary_n)
         # Action probability
-        self.selected_node_prob = tf.reduce_sum(tf.multiply(
-            self.node_act_probs, self.node_act_vec),
+        self.selected_node_prob = tf.reduce_sum(tf_node_prod,
             reduction_indices=1, keep_dims=True)
-        self.selected_cluster_prob = tf.reduce_sum(tf.reduce_sum(tf.multiply(
-            self.cluster_act_probs, self.cluster_act_vec),
-            reduction_indices=2), reduction_indices=1, keep_dims=True)
-
+        
+        tf_selected_node_prob = tf.Print(self.selected_node_prob, [self.selected_node_prob], 'self.selected_node_prob tf_selected_node_prob: ', summarize=self.summary_n)
+        print()
+        print()
+        print('selected_node_prob :  ', self.selected_node_prob.shape)
+        #a=b
+        
+        print('self.cluster_act_probs, cluster_act_vec : ', self.cluster_act_probs.shape, self.cluster_act_vec.shape)
+        select_cluster_prod = tf.multiply(
+            tf_cluster_act_probs, self.cluster_act_vec)
+        print('')
+        print('')
+        print('select_cluster_prod :', select_cluster_prod.shape)
+        
+        
+        tf_select_cluster_prod = tf.Print(select_cluster_prod, [select_cluster_prod], 'select_cluster_prod tf_select_cluster_prod : ', summarize=self.summary_n)
+        
+        sum_cluster_1 = tf.reduce_sum(tf_select_cluster_prod,
+            reduction_indices=2)
+        
+        print()
+        print()
+        print('sum_cluster_1 :', sum_cluster_1.shape)
+        tf_sum_cluster_1 = tf.Print(sum_cluster_1, [sum_cluster_1], 'sum_cluster_1 tf_sum_cluster_1 : ', summarize=self.summary_n)
+        
+        self.selected_cluster_prob = tf.reduce_sum(tf_sum_cluster_1, reduction_indices=1, keep_dims=True)
+        print()
+        print()
+        print('self.selected_cluster_prob :', self.selected_cluster_prob.shape)
+        
+        tf_selected_cluster_prob = tf.Print(self.selected_cluster_prob , [self.selected_cluster_prob ], 'self.selected_cluster_prob tf_selected_cluster_prob : ', summarize=self.summary_n)
+        #print('self.selected_node_prob.shape, node_act_probs.shape, node_act_vec.shape : ', self.selected_node_prob.shape,  self.node_act_probs.shape, self.node_act_vec.shape)
+        #a=b
+        #print('node_act_probs.shape, node_act_vec.shape) :', self.node_act_probs.shape, self.node_act_vec.shape)
+        #print('self.cluster_act_probs, cluster_act_vec : ', self.cluster_act_probs.shape, self.cluster_act_vec.shape)
+        #print('selected_cluster_prob.shape, selected_node_prob.shape : ', self.selected_cluster_prob.shape, self.selected_node_prob.shape)
         # Orchestrate loss due to advantge
-        self.adv_loss = tf.reduce_sum(tf.multiply(
-            tf.log(self.selected_node_prob * self.selected_cluster_prob + \
-                   self.eps), -self.adv))
+        
+        
+        torch_log = tf.log(tf_selected_node_prob * tf_selected_cluster_prob + \
+                   self.eps)
+        tf_torch_log = tf.Print(torch_log, [torch_log], 'torch_log tf_torch_log : ', summarize=self.summary_n)
+        print()
+        print()
+        print('torch_log :', torch_log.shape)
+        tf_adv = tf.Print(self.adv, [self.adv], 'self.adv tf_adv: ', summarize=self.summary_n)
+        torch_log_adv_mul = tf.multiply(tf_torch_log, -tf_adv)
+
+        print()
+        print()
+        print('torch_log_adv_mul :', torch_log_adv_mul.shape)
+        tf_torch_log_adv_mul = tf.Print(torch_log_adv_mul, [torch_log_adv_mul], 'torch_log_adv_mul tf_torch_log_adv_mul: ', summarize=self.summary_n)
+        
+        self.adv_loss = tf.reduce_sum(tf_torch_log_adv_mul)
+
+        print('')
+        print('self.adv_loss :', self.adv_loss.shape)
+        
+        tf_adv_loss = tf.Print(self.adv_loss, [self.adv_loss], 'self.adv_loss tf_adv_loss: ', summarize=self.summary_n)
 
         # Node_entropy
-        self.node_entropy = tf.reduce_sum(tf.multiply(
-            self.node_act_probs, tf.log(self.node_act_probs + self.eps)))
+        torch_log_entropy = tf.log(tf_node_act_probs + self.eps)
+        print('')
+        print('')
+        print('torch_log_entropy :', torch_log_entropy.shape)
+        
+        tf_torch_log_entropy = tf.Print(torch_log_entropy, [torch_log_entropy], 'torch_log_entropy tf_torch_log_entropy: ', summarize=self.summary_n)
+        
+        torch_mul_dimension = tf.multiply(
+            tf_node_act_probs, tf_torch_log_entropy)
 
+        print('')
+        print('')
+        print('torch_mul_dimension :', torch_mul_dimension.shape)
+        tf_torch_mul_dimension = tf.Print(torch_mul_dimension, [torch_mul_dimension], 'self.torch_mul_dimension tf_torch_mul_dimension : ', summarize=self.summary_n)
+        
+        
+        self.node_entropy = tf.reduce_sum(tf_torch_mul_dimension)
+        print('')
+        print('')
+        print('self.node_entropy :', self.node_entropy.shape)
+        
+        tf_node_entropy= tf.Print(self.node_entropy , [self.node_entropy ], 'self.node_entropy tf_node_entropy : ', summarize=self.summary_n)
         # Entropy loss
-        self.entropy_loss = self.node_entropy  # + self.cluster_entropy
+        self.entropy_loss = tf_node_entropy  # + self.cluster_entropy
 
         # Normalize entropy
-        self.entropy_loss /= \
-            (tf.log(tf.cast(tf.shape(self.node_act_probs)[1], tf.float32)) + \
-             tf.log(float(len(self.executor_levels))))
-
+        
+        torch_log_norm = tf.log(float(len(self.executor_levels)))
+        print('')
+        print('')
+        print('torch_log_norm :', torch_log_norm.shape)
+        
+        tf_torch_log_norm=  tf.Print(torch_log_norm , [torch_log_norm], 'torch_log_norm  tf_torch_log_norm : ', summarize=self.summary_n)
+        
+        denom = (tf.log(tf.cast(tf.shape(tf_node_act_probs)[1], tf.float32)) +tf_torch_log_norm)
+        
+        tf_denom=  tf.Print(denom , [denom], 'denom  : ', summarize=20)
+        
+        self.entropy_loss /= tf_denom
+            #(tf.log(tf.cast(tf.shape(self.node_act_probs)[1], tf.float32)) + \
+            # tf.log(float(len(self.executor_levels))))
+        tf_entropy_loss = tf.Print(self.entropy_loss, [self.entropy_loss], 'self.entropy_loss tf_entropy_loss : ', summarize=self.summary_n)
+            
         # Define combined loss
-        self.act_loss = self.adv_loss + self.entropy_weight * self.entropy_loss
+        self.act_loss = tf_adv_loss + self.entropy_weight * tf_entropy_loss
 
         # Get training parameters
         self.params = tf.get_collection(
@@ -269,7 +426,7 @@ class OrchestrateAgent(Agent):
 
     def orchestrate_network(self, node_inputs, gcn_outputs, cluster_inputs,
                             gsn_dag_summary, gsn_global_summary, act_fn):
-
+        
         batch_size = 1
         node_inputs_reshape = tf.reshape(
             node_inputs, [batch_size, -1, self.node_input_dim])
@@ -283,35 +440,54 @@ class OrchestrateAgent(Agent):
             gsn_global_summary, [batch_size, -1, self.output_dim])
         gsn_global_summ_extend_cluster = tf.tile(
             gsn_global_summ_reshape, [1, tf.shape(gsn_dag_summ_reshape)[1], 1])
-
+        
         with tf.variable_scope(self.scope):
             merge_node = tf.concat([
                 node_inputs_reshape, gcn_outputs_reshape
             ], axis=2)
-
+            
             node_hid_0 = tl.fully_connected(merge_node, 32, activation_fn=act_fn)
             node_hid_1 = tl.fully_connected(node_hid_0, 16, activation_fn=act_fn)
             node_hid_2 = tl.fully_connected(node_hid_1, 8, activation_fn=act_fn)
             node_outputs = tl.fully_connected(node_hid_2, 1, activation_fn=None)
-
+            #print()
+            #print() 
+            #print('node_outputs before: ', node_outputs.shape)
             # Reshape the output dimension
             node_outputs = tf.reshape(node_outputs, [batch_size, -1])
 
             # Do softmax
             node_outputs = tf.nn.softmax(node_outputs, dim=-1)
             merge_cluster = tf.concat([cluster_inputs_reshape, ], axis=2)
+            #print()
+            #print() 
+            #print('merge_cluster.shape ', merge_cluster.shape)
             expanded_state = expand_act_on_state(
                 merge_cluster, [l / 50.0 for l in self.executor_levels])
             cluster_hid_0 = tl.fully_connected(expanded_state, 32, activation_fn=act_fn)
             cluster_hid_1 = tl.fully_connected(cluster_hid_0, 16, activation_fn=act_fn)
             cluster_hid_2 = tl.fully_connected(cluster_hid_1, 8, activation_fn=act_fn)
             cluster_outputs = tl.fully_connected(cluster_hid_2, 1, activation_fn=None)
+            
+            #print()
+            #print() 
+            #print('cluster_outputs.shape as is', cluster_outputs.shape)
+            
             cluster_outputs = tf.reshape(cluster_outputs, [batch_size, -1])
             cluster_outputs = tf.reshape(
                 cluster_outputs, [batch_size, -1, len(self.executor_levels)])
 
+            
+            #print()
+            #print() 
+            #print('cluster_outputs.shape after reshaping : ', cluster_outputs.shape)  
             # Do softmax
-            cluster_outputs = tf.nn.softmax(cluster_outputs, dim=-1)
+            tf_cluster_outputs = tf.Print(cluster_outputs, [cluster_outputs], 'self.cluster_acts tf_cluster_acts : ', summarize=50)
+            cluster_outputs = tf.nn.softmax(tf_cluster_outputs, dim=-1)
+            #a=b
+            #print()
+            #print()
+            print('node_outputs.shape, cluster_outputs.shape : ',node_outputs.shape, cluster_outputs.shape)
             return node_outputs, cluster_outputs
 
     def apply_gradients(self, gradients, lr_rate):
@@ -345,6 +521,10 @@ class OrchestrateAgent(Agent):
         cluster_inputs = cluster_inputs[0]
         node_act_vec = node_act_vec[0]
         cluster_act_vec = cluster_act_vec[0]
+        
+        print('update gradients node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape')
+        print(node_inputs.shape, cluster_inputs.shape, node_act_vec.shape, cluster_act_vec.shape)
+        #a=b
         entropy_weight = entropy_weight
         self.sess.run(self.act_opt, feed_dict={i: d for i, d in zip(
             [self.node_inputs] + [self.cluster_inputs] + [self.node_act_vec] + [
@@ -357,10 +537,19 @@ class OrchestrateAgent(Agent):
                 self.cluster_act_vec] + [self.adv] + [self.entropy_weight],
             [node_inputs] + [cluster_inputs] + [node_act_vec] + [cluster_act_vec] + [
                 adv] + [entropy_weight])})
+        
+        #tvars = tf.trainable_variables()
+        #tvars_vals = self.sess.run(tvars)
+
+        #for var, val in zip(tvars, tvars_vals):
+        #
+        # print(var.name, val.shape)  # Prints the name of the variable alongside its value.
+        #tf.print(' after update self.cluster_act_probs, cluster_act_vec : ', self.cluster_act_probs.shape, self.cluster_act_vec.shape)
+        #a=b
         return loss_
 
     def predict(self, node_inputs, cluster_inputs):
-        return self.sess.run([self.node_act_probs, self.cluster_act_probs, self.node_acts, self.cluster_acts],
+        return self.sess.run([self.node_act_probs, self.cluster_act_probs, self.tf_node_acts, self.tf_cluster_acts],
                              feed_dict={i: d for i, d in zip([self.node_inputs] + [self.cluster_inputs],
                                                              [node_inputs] + [cluster_inputs])})
 
@@ -429,6 +618,7 @@ class OrchestrateAgent(Agent):
         node_inputs, cluster_inputs = self.translate_state(obs)
         node_act_probs, cluster_act_probs, node_acts, cluster_acts = \
             self.predict(node_inputs, cluster_inputs)
+        #a=b
         return node_acts, cluster_acts, \
                node_act_probs, cluster_act_probs, \
                node_inputs, cluster_inputs
@@ -479,3 +669,4 @@ class OrchestrateAgent(Agent):
             moving_executors.count(node),
             agent_exec_act, num_source_exec)
         return node, use_exec
+

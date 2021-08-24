@@ -2,6 +2,14 @@ import csv
 
 
 def get_all_task(path):
+    """Get Processed data from the file given in path
+
+    Args:
+        path ([str]): [path to the file]
+
+    Returns:
+        [list]: [lists containing type of task , start time & end time of tasks, cpu and memory]
+    """
     type_list = []
     start_time = []
     end_time = []
@@ -29,6 +37,15 @@ def get_all_task(path):
 
 
 def put_task(task_queue, task):
+    """Puts tasks on the task queue
+
+    Args:
+        task_queue ([list]): [list of queued tasks ]
+        task ([type]): [task to be put on the task_queue]
+
+    Returns:
+        [list]: [list of queued tasks ]]
+    """
     for i in range(len(task_queue) - 1):
         j = len(task_queue) - i - 1
         task_queue[j] = task_queue[j - 1]
@@ -37,6 +54,16 @@ def put_task(task_queue, task):
 
 
 def update_task_queue(master, cur_time, master_id):
+    """[summary]
+
+    Args:
+        master ([Master Object]): [eAP object]
+        cur_time ([int]): [Current time]
+        master_id ([int]): [number of the eAP object]
+
+    Returns:
+        ([Master Object]): [eAP object]
+    """
     # clean task for overtime
     i = 0
     while len(master.task_queue) > i:
@@ -67,6 +94,15 @@ def update_task_queue(master, cur_time, master_id):
 
 
 def check_queue(task_queue, cur_time):
+    """[Check the queue for tasks in queue]
+
+    Args:
+        task_queue ([list]): [list containing the queue]
+        cur_time ([int]): [current time]
+
+    Returns:
+        [list]: [tasks in the queue, tasks undone(not done), there type(kind)]
+    """
     task_queue = sorted(task_queue, key=lambda x: (x[2], x[1]))
     undone = [0, 0]
     undone_kind = []
@@ -87,6 +123,17 @@ def check_queue(task_queue, cur_time):
 
 
 def update_docker(node, cur_time, service_coefficient, POD_CPU):
+    """[Update the docker given the node]
+
+    Args:
+        node ([Node Object]): [Edge node]
+        cur_time ([int]): [current time]
+        service_coefficient ([float]): [number identifying intensity (demand ) of the tasks]
+        POD_CPU ([float]): [CPU resources required to make a POD]
+
+    Returns:
+        [list]: [Edge node, undone and done task lists with list of tasks that are done and undone]
+    """
     done = [0, 0]
     undone = [0, 0]
     done_kind = []
