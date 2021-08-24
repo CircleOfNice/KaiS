@@ -44,27 +44,28 @@ def fc(inp_dim, output_dim, act=nn.ReLU()):
 
 def invoke_model(orchestrate_agent, obs, exp):
     """[Invoke model (propagate the observation through the orchestration model) and return choice of nodes given the observation]
-
+    TODO: please add a few more sentences to explain this function
+    
     Args:
         orchestrate_agent ([OrchestrateAgent Type]): [Instance of Orchestrate Agent]
-        obs ([list]): [Observations containning done tasks, undone tasks, current tasks in queue, deploy state]
+        obs ([list]): [Observations containing done tasks, undone tasks, current tasks in queue, deploy state]
         exp ([dict]): [Experience]
 
     Returns:
         [list, list , dictionary]: [chosen node, chosen services and the appended experience]
     """
-    
+    # TODO: what does this line?
     node_act, cluster_act, node_act_probs, cluster_act_probs, node_inputs, cluster_inputs = \
         orchestrate_agent.invoke_model(obs)
-    node_choice = [x for x in node_act[0]]
+    node_choice = [x for x in node_act[0]]  # TODO: what is this? and server_choice?
     server_choice = []
 
     for x in cluster_act[0][0]: # Server choice here is chosen services
-        if x >= 12:
+        if x >= 12:  # TODO: why 12?
             server_choice.append(x - 11)
         else:
             server_choice.append(x - 12)
-    node_act_vec = np.ones(node_act_probs.shape)
+    node_act_vec = np.ones(node_act_probs.shape)  # TODO: what is this?
     # For storing cluster index
     cluster_act_vec = np.ones(cluster_act_probs.shape)
 
@@ -78,10 +79,11 @@ def invoke_model(orchestrate_agent, obs, exp):
 def expand_act_on_state(state, sub_acts):
     """Function to concatenate states with sub_acts with multiple repetition over the tiling range (24)
     # Repeated state is appended with a vector of values havings different weightage likely to activate different actions for different state
+    TODO: I do not really get this explanation...
     
     Args:
         state ([Pytorch Tensor]): [State Matrix]
-        sub_acts ([list]): [list for tiling operation]
+        sub_acts ([list]): [list for tiling operation TODO: what are sub_acts (sub-actions)?]
 
     Returns:
         [Pytorch Tensor]: [Concatenated State Tensor]
@@ -113,7 +115,9 @@ def expand_act_on_state(state, sub_acts):
 def act_offload_agent(orchestrate_agent, exp, done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state):
     """Action choice using the invocation (propagation through) of Orchestrate Agent model
     
+    Calls invoke_model(orchestrate_agent, obs, exp) from above
     
+    TODO: once invoke_model is explained better, you can copy this explanation down here.
 
     Args:
         orchestrate_agent ([OrchestrateAgent Type]): [Instance of Orchestrate Agent]
@@ -133,11 +137,12 @@ def act_offload_agent(orchestrate_agent, exp, done_tasks, undone_tasks, curr_tas
 
 
 def get_piecewise_linear_fit_baseline(all_cum_rewards, all_wall_time):
-    """Generate a piecewise linear fit
-
+    """Generate a piecewise linear fit between...? TODO ... and why?
+    TODO: I (Daniel) do not get this function at the moment
+    
     Args:
-        all_cum_rewards ([list]): [All Cumulative Rewards]
-        all_wall_time ([list]): [Time]
+        all_cum_rewards ([list]): [All Cumulative Rewards] TODO: in what order (is oldest reward the first or last value in list?)?
+        all_wall_time ([list]): [Time]  # TODO time from what? is it a list of floats or other objects?
 
     Returns:
         [baselines]: [returns a list of piecewise linear data extrapolation]
@@ -151,6 +156,7 @@ def get_piecewise_linear_fit_baseline(all_cum_rewards, all_wall_time):
     for t in unique_wall_time:
         baseline = 0
         for i in range(len(all_wall_time)):
+            # Locate the insertion point for t in all_wall_time[i] to maintain sorted order. 
             idx = bisect.bisect_left(all_wall_time[i], t)
             if idx == 0:
                 baseline += all_cum_rewards[i][idx]
@@ -175,33 +181,33 @@ def get_piecewise_linear_fit_baseline(all_cum_rewards, all_wall_time):
 
 
 def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv, entropy_weight):
-    """[Computation of orchestration loss]
+    """[Computation of orchestration loss TODO: for experience? for complete experience or only a part of it? what exactly is experience?]
 
+    Calls orchestrate_agent.act_loss()
+    
     Args:
         orchestrate_agent ([Orchestrate Agent Class]): [Orchestrate Agent]
         exp ([dictionary]): [Experience]
         batch_adv ([numpy array]): [difference between qvalue target and q value predicted]
-        entropy_weight ([int]): [Entropy weight]
+        entropy_weight ([int]): [Entropy weight  TODO: does not seem to be used in this function]
 
     Returns:
-        [Tensor]: [Computed Loss]
+        [Tensor]: [Computed Loss calculated by orchestrate_agent.act_loss()]
     """
     loss = 0
     batch_adv = np.array(batch_adv)
-    # Use a piece of experience
+    
+    # Use a piece of experience  TODO: really a piece? which piece?
     node_inputs = exp['node_inputs']
     cluster_inputs = exp['cluster_inputs']
     node_act_vec = exp['node_act_vec']
     cluster_act_vec = exp['cluster_act_vec']
     adv = batch_adv
 
+    # convert to numpy arrays
     node_inputs = np.array(node_inputs)
-
     cluster_inputs = np.array(cluster_inputs)
-    
-
     node_act_vec = np.array(node_act_vec)
-
     cluster_act_vec = np.array(cluster_act_vec)
     
     loss = orchestrate_agent.act_loss(
@@ -269,6 +275,7 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weig
                                   entropy_weight_min, entropy_weight_decay)
     return entropy_weight, loss
 
+# TODO: please move class in its own file
 class NodeNet(nn.Module):
     """Node part of the orchestrate neural network
     """
@@ -295,6 +302,7 @@ class NodeNet(nn.Module):
 
         return node_outputs
 
+# TODO: please move class in its own file
 class ClusterNet(nn.Module):
     """Cluster part of the orchestrate neural network
     """
@@ -319,7 +327,8 @@ class ClusterNet(nn.Module):
         cluster_outputs = self.fc4(x)
 
         return cluster_outputs
-        
+      
+# TODO: please move class in its own file        
 class OCN(nn.Module):
     """Class for definition for Orchestration Network
     """
@@ -411,12 +420,13 @@ class OCN(nn.Module):
         node_outputs, cluster_outputs = self.propagate(x)
         return node_outputs, cluster_outputs        
 
-
+# TODO: please move class in its own file
 class Agent(object):
     # Abstraction class (Not really)
     def __init__(self):
         pass
         
+# TODO: please move class in its own file
 class OrchestrateAgent(Agent):
     def __init__(self, node_input_dim, cluster_input_dim, hid_dims, output_dim,
                  max_depth, executor_levels, MAX_TESK_TYPE, eps, act_fn,optimizer):
