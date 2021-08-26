@@ -6,7 +6,9 @@ import torch.optim as optim
 import torch.nn as nn
 import bisect
 from algorithm_torch.gcn import GraphCNN
-from algorithm_torch.orchestration_building_blocks import *
+from algorithm_torch.Orchestration_Agent import *
+from algorithm_torch.ReplayMemory import ReplayMemory
+from algorithm_torch.policyReplayMemory import policyReplayMemory
 
 def discount(x, gamma):
     """Calculate the discounted cumulative reward
@@ -68,9 +70,6 @@ def invoke_model(orchestrate_agent, obs, exp, MAX_TESK_TYPE):
 
 def act_offload_agent(orchestrate_agent, exp, done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state, MAX_TESK_TYPE):
     """Chooses action using the invocation (propagation through) of Orchestrate Agent model
-    
-    
-
     Args:
         orchestrate_agent ([OrchestrateAgent Type]): [Instance of Orchestrate Agent]
         exp ([dictionary]): [Experience dictionary]

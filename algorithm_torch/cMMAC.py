@@ -4,83 +4,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import random, os
 from copy import deepcopy
+from algorithm_torch.CMMAC_Policy_Model import *
+from algorithm_torch.CMMAC_Value_Model import *
+from algorithm_torch.ReplayMemory import *
 
-
-def fc(inp_dim, output_dim, act=nn.ReLU()):
-    """Function to define a fully connected block
-
-    Args:
-        inp_dim (int): Input dimension of the layer
-        output_dim ([int]): Output dimension of the layer
-        act ([Pytorch Activation layer type], optional): [Desired Activation Layer for the FC Unit]. Defaults to nn.ReLU().
-
-    Returns:
-        Sequential Model: Fully connected layer block
-    """
-    linear = nn.Linear(inp_dim, output_dim)
-    nn.init.xavier_uniform_(linear.weight)
-    linear.bias.data.fill_(0)
-    fc_out = nn.Sequential(linear, act)
-    return fc_out 
-
-
-class Value_Model(nn.Module):
-    """Class for defining the value model (Critic part) of the Actor critic Model
-    """
-    def __init__(self, state_dim, inp_sizes = [128, 64, 32], act = nn.ReLU()):
-        """Initialisation arguments for class
-
-        Args:
-            state_dim (int): Dimensions of the input state
-            inp_sizes (list, optional): Dimensions for hidden state. Defaults to [128, 64, 32].
-            act (Pytorch Activation layer type, optional): Desired Activation function for all layers. Defaults to nn.ReLU().
-        """
-        super().__init__()
-        self.fc1 = fc(state_dim, inp_sizes[0], act=act)
-        self.fc2 = fc(inp_sizes[0], inp_sizes[1], act=act)
-        self.fc3 = fc(inp_sizes[1], inp_sizes[2], act=act)
-        self.fc4 = fc(inp_sizes[2], 1, act=act)
-
-    def forward(self, x):
-        x = torch.from_numpy(x)
-        x = self.fc1(x.float())
-        x = self.fc2(x)
-        x = self.fc3(x)
-        x = self.fc4(x)
-        return x
-
-class Policy_Model(nn.Module):
-    """Class for defining Policy model (Actor part) of the Actor Critic Model
-    """
-    def __init__(self, state_dim, action_dim, inp_sizes = [128, 64, 32], act = nn.ReLU()):
-        """Initialisation arguments for class
-
-        Args:
-            state_dim (int): Dimensions of the input state
-            action_dim (int): Dimensions of the output (actions)
-            inp_sizes (list, optional): Dimensions for hidden state. Defaults to [128, 64, 32].
-            act (Pytorch Activation layer type, optional): Desired Activation function for all layers. Defaults to nn.ReLU().
-        """
-        super().__init__()
-        self.policy_state = state_dim
-        self.action_dim = action_dim
-        self.fc1 = fc(self.policy_state, inp_sizes[0], act=act)
-        self.fc2 = fc(inp_sizes[0], inp_sizes[1], act=act)
-        self.fc3 = fc(inp_sizes[1], inp_sizes[2], act=act)
-        self.fc4 = fc(inp_sizes[2], self.action_dim, act=act)
-
-    def forward(self, x):
-        x = torch.from_numpy(x)
-        
-        x = self.fc1(x.float())
-        x = self.fc2(x)
-        x = self.fc3(x)
-        x = self.fc4(x) 
-        
-        return x 
-        
 class Estimator:
     """Class to Define the cMMAC (Actor Critic) model
     """
@@ -96,8 +24,6 @@ class Estimator:
         self.number_of_master_nodes = number_of_master_nodes
         self.action_dim = action_dim
         self.state_dim = state_dim
-        
-
         # Initial value for losses
         self.actor_loss = 0
         self.value_loss = 0
@@ -108,9 +34,7 @@ class Estimator:
         self.loss = self.actor_loss + .5 * self.value_loss - 10 * self.entropy
         
         self.neighbors_list = [[0, 1, 2, 3, 4, 5, 6], [0, 1, 2, 3, 4, 5, 6]]
-        
-        
-        # skipping tensorboard summaries_dir
+
     def squared_difference_loss(self, target, output):
         """Calculate squared difference loss
 
@@ -141,8 +65,6 @@ class Estimator:
         
         self.vm_criterion = self.squared_difference_loss
         self.vm_optimizer = optim.Adam(self.vm.parameters(), lr=0.001)
-        
-        #return self.vm, self.vm_criterion
         
     def sm_prob(self, policy_net_output, neighbor_mask):
         """[Method to apply policy filtering of edge nodes using neighbor mask and policy output]
@@ -178,7 +100,6 @@ class Estimator:
         """
         softmaxprob, logits, valid_logits = self.sm_prob(policy_net_output, neighbor_mask)
         logsoftmaxprob = nn.functional.log_softmax(softmaxprob)
-        #print(type(logsoftmaxprob), type(ACTION), type(tfadv), ACTION)
         ACTION = torch.tensor(ACTION)
         
         tfadv = torch.tensor(tfadv)
@@ -193,20 +114,17 @@ class Estimator:
     def _build_policy(self):
         """[Method to build the Policy model and assign its loss and optimizers]
         """
-        
         self.pm = Policy_Model(self.state_dim, self.action_dim, inp_sizes = [128, 64, 32], act = nn.ReLU())
         self.pm_criterion = self.policy_net_loss
         self.pm_optimizer = optim.Adam(self.pm.parameters(), lr=0.001)
-        #return self.pm, self.pm_criterion
         
-    def action(self, s, ava_node, context, epsilon):
+    def action(self, s, ava_node, context):
         """
 
         Args:
             s ([Numpy Array]): [State Array]
             ava_node ([list]): [currently deployed nodes] #[Confusing name it is the nodes which are currently deployed]
             context ([list]): [Context is basically a flag]
-            epsilon ([float]): [DRL paramater but not used much]
 
         Returns:
             [Mostly tensors]: [action_tuple: Tuple of actions
@@ -216,9 +134,8 @@ class Estimator:
                curr_neighbor_mask_policy) : Neighbor masking policy
                next_state_ids : Propagated states
         """
-        
-        
-        value_output = self.vm(s)#.flatten()
+
+        value_output = self.vm(s)
         value_output = value_output.flatten()
         
         action_tuple = []
@@ -243,12 +160,8 @@ class Estimator:
         
         # compute policy probability.
         self.pm_out =self.pm(s)
-
         action_probs,_,_ = self.sm_prob( self.pm_out, curr_neighbor_mask) 
-
         curr_neighbor_mask_policy = []
-        
-        
         for idx, grid_valid_idx in enumerate(grid_ids):
             action_prob = action_probs[idx]
             # action probability for state value function
@@ -334,22 +247,14 @@ class Estimator:
 
         return np.array(targets).reshape([-1, 1])
     
-    
-            
-            
-# Don't see the point of initiallization , update_policy and update_value methods here
-# Well  now I do they are needed to optimize net
-    def update_value(self, s, y, learning_rate, global_step):
+    def update_value(self, s, y, learning_rate):
         """[Method to optimize the Value net]
 
         Args:
             s ([Numpy array]): [state]
             y ([Numpy array]): [target]
             learning_rate ([float]): [learning rate]
-            global_step ([int]): [Global step # Orchestration Time]
         """
-        
-        
         self.vm_optimizer.zero_grad()
         value_output = self.vm(s)
         y = torch.tensor(y)
@@ -358,9 +263,7 @@ class Estimator:
         loss.backward()
         self.vm_optimizer.step()
     
-    
-    def update_policy(self, policy_state, advantage, action_choosen_mat, curr_neighbor_mask, learning_rate,
-                      global_step):
+    def update_policy(self, policy_state, advantage, action_choosen_mat, curr_neighbor_mask, learning_rate):
         """[Optimize Policy net]
 
         Args:
@@ -369,169 +272,10 @@ class Estimator:
             action_choosen_mat ([Numpy Array]): [Choose action matrix]
             curr_neighbor_mask ([Numpy Array]): [Current Neighbor mask]
             learning_rate ([float]): [Learning Rate]
-            global_step ([int]): [Global step #Orchestration Time]
         """
-        
-        self.vm_optimizer.zero_grad()
+        self.pm_optimizer.zero_grad()
         policy_net_output = self.pm(policy_state)
         loss = self.pm_criterion( policy_net_output, curr_neighbor_mask, advantage, action_choosen_mat)
+        self.set_lr(self.pm_optimizer, learning_rate)
         loss.backward()
         self.pm_optimizer.step()
-        
-class policyReplayMemory:
-    """Class for Replay Memory of Policy Network
-    """
-    def __init__(self, memory_size, batch_size):
-        """[Initialisation Arguments]
-
-        Args:
-            memory_size ([int]): [Memory size to be allocated]
-            batch_size ([int]): [Batch Size]
-        """
-        
-        self.states = []
-        self.neighbor_mask = []
-        self.actions = []
-        self.rewards = []
-        self.batch_size = batch_size
-        self.memory_size = memory_size
-        self.current = 0
-        self.curr_lens = 0
-
-    # Put data in policy replay memory
-    def add(self, s, a, r, mask):
-        """Adds Experience to the object
-
-        Args:
-            s ([Numpy Array]): [State]
-            a ([Numpy Array]): [Action]
-            r ([list]): [reward]
-            mask ([Numpy Array]): [Mask]
-        """
-        
-        if self.curr_lens == 0:
-            self.states = s
-            self.actions = a
-            self.rewards = r
-            self.neighbor_mask = mask
-            self.curr_lens = self.states.shape[0]
-
-        elif self.curr_lens <= self.memory_size:
-            self.states = np.concatenate((self.states, s), axis=0)
-            self.neighbor_mask = np.concatenate((self.neighbor_mask, mask), axis=0)
-            self.actions = np.concatenate((self.actions, a), axis=0)
-            self.rewards = np.concatenate((self.rewards, r), axis=0)
-            self.curr_lens = self.states.shape[0]
-        else:
-            new_sample_lens = s.shape[0]
-            index = random.randint(0, self.curr_lens - new_sample_lens)
-            self.states[index:(index + new_sample_lens)] = s
-            self.actions[index:(index + new_sample_lens)] = a
-            self.rewards[index:(index + new_sample_lens)] = r
-            self.neighbor_mask[index:(index + new_sample_lens)] = mask
-
-    # Take a batch of samples
-    def sample(self):
-        """Sample a batch of experience
-
-        Returns:
-            [list]: [Batch of experience]
-        """
-        if self.curr_lens <= self.batch_size:
-            return [self.states, self.actions, np.array(self.rewards), self.neighbor_mask]
-        indices = random.sample(list(range(0, self.curr_lens)), self.batch_size)
-        batch_s = self.states[indices]
-        batch_a = self.actions[indices]
-        batch_r = self.rewards[indices]
-        batch_mask = self.neighbor_mask[indices]
-        return [batch_s, batch_a, batch_r, batch_mask]
-
-    def reset(self):
-        """reset the variables
-        """
-        self.states = []
-        self.actions = []
-        self.rewards = []
-        self.neighbor_mask = []
-        self.curr_lens = 0 
-        
-        
-class ReplayMemory:
-    """Class for replay memory
-    """
-    def __init__(self, memory_size, batch_size):
-        """Replay Memory initialization
-
-        Args:
-            memory_size ([int]): [length of the experience Replay object]
-            batch_size ([int]): [Sampling batch size]
-        """
-        self.states = []
-        self.next_states = []
-        self.actions = []
-        self.rewards = []
-
-        self.batch_size = batch_size
-        self.memory_size = memory_size
-        self.current = 0
-        self.curr_lens = 0
-
-    # Put data in policy replay memory
-    def add(self, s, a, r, next_s):
-        """[Add Experience]
-
-        Args:
-            s ([Numpy Array]): [State]
-            a ([Numpy Array]): [Action]
-            r ([Numpy Array]): [reward]
-            next_s ([Numpy Array]): [next State]
-        """
-        
-        if self.curr_lens == 0:
-            self.states = s
-            self.actions = a
-            self.rewards = r
-            self.next_states = next_s
-            self.curr_lens = self.states.shape[0]
-
-        elif self.curr_lens <= self.memory_size:
-            self.states = np.concatenate((self.states, s), axis=0)
-            self.next_states = np.concatenate((self.next_states, next_s), axis=0)
-            self.actions = np.concatenate((self.actions, a), axis=0)
-            self.rewards = np.concatenate((self.rewards, r), axis=0)
-            self.curr_lens = self.states.shape[0]
-        else:
-            new_sample_lens = s.shape[0]
-            index = random.randint(0, self.curr_lens - new_sample_lens)
-            self.states[index:(index + new_sample_lens)] = s
-            self.actions[index:(index + new_sample_lens)] = a
-            self.rewards[index:(index + new_sample_lens)] = r
-            self.next_states[index:(index + new_sample_lens)] = next_s
-
-    # Take a batch of samples
-    def sample(self):
-        """Returns a batch of experience
-
-        Returns:
-            [list]: [Batch of experience]
-        """
-        if self.curr_lens <= self.batch_size:
-            return [self.states, self.actions, self.rewards, self.next_states]
-        indices = random.sample(list(range(0, self.curr_lens)), self.batch_size)
-        batch_s = self.states[indices]
-        batch_a = self.actions[indices]
-        batch_r = self.rewards[indices]
-        batch_mask = self.next_states[indices]
-        return [batch_s, batch_a, batch_r, batch_mask]
-
-    def reset(self):
-        """reset the variables
-        """
-        self.states = []
-        self.actions = []
-        
-        
-# Don't see the use of the class ModelParametersCopier
-        self.rewards = []
-        self.next_states = []
-        self.curr_lens = 0

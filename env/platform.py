@@ -1,3 +1,5 @@
+# Class to define the elements of the environment
+
 class Cloud:
     """[This class serves as framework for definition of Cloud with properties such as 
     task queue, service_list, cpu processing and memory]

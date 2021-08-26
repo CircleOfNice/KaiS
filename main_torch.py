@@ -1,6 +1,5 @@
 import math
 import time
-import json
 import sys
 from algorithm_torch.cMMAC import *
 from algorithm_torch.GPG import *
@@ -224,7 +223,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     # Resource demand coefficients for different types of services
     service_coefficient = [0.8, 0.8, 0.9, 0.9, 1.0, 1.0, 1.1, 1.1, 1.2, 1.2, 1.3, 1.3, 1.4, 1.4]
     # Parameters related to DRL
-    epsilon = 0.5 # Exploration coefficient
     gamma = 0.9 # Discounting Coefficient
     learning_rate = 1e-3 # Learning Rate
     action_dim = 7 #Number of actions possibly edge nodes 6 plus Cluster
@@ -246,32 +244,25 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     exec_cap = 24 # Execution capacity (#TODO Not so sure yet)
     entropy_weight_min = 0.0001 # Minimum allowed entropy weight
     entropy_weight_decay = 1e-3 # Entropy weight decay rate
-    # Parameters related to GPU
-    worker_num_gpu = 0 # Unused
-    worker_gpu_fraction = 0.1 # Unused
     #####################################################################
     ########### Init ###########
     record = [] # list used to dump all the eAPS, tasks in queue, done tasks and undone tasks etcs
     throughput_list = [] # list of the progress of task done / total number of tasks
     sum_rewards = [] # Used to store average rewards in the list 
     achieve_num = [] # List to contain the currently tasks done in the requirement space  
-    achieve_num_sum = [] # Not used anywhere
     fail_num = [] # Number of tasks failed to meet the requirement
     deploy_reward = [] # List of sum of immediate rewards to be stored in experience
-    current_time = str(time.time()) # Current time
-    log_dir = "./log/{}/".format(current_time)
+    
     all_rewards = [] # List to accumulate all rewards 
     order_response_rate_episode = [] # List to monitor the average throughput rate
     episode_rewards = [] # Accumulated reward over episodes
     record_all_order_response_rate = [] # List to record all the throughput rate througout episodes
-    #sess = tf.Session()
-    #tf.set_random_seed(1)
+
     number_of_master_nodes  = 2 # number of eAPs # Only in this case whole thing makes sense
     q_estimator = Estimator(action_dim, state_dim, number_of_master_nodes) # Definition of cMMAc Agent
-    #sess.run(tf.global_variables_initializer())
     replay = ReplayMemory(memory_size=1e+6, batch_size=int(3e+3)) # experience Replay for value network for cMMMac Agent
     policy_replay = policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3)) #experience Replay for Policy network for cMMMac Agent
-    #saver = tf.compat.v1.train.Saver()
+
     global_step1 = 0
     global_step2 = 0
     all_task1 = get_all_task('./data/Task_1.csv')# processed data [type_list, start_time, end_time, cpu_list, mem_list] fed to eAP 1
@@ -394,7 +385,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 # Save data
                 if slot > 3 * CHO_CYCLE:
                     exp_tmp = exp
-                    #print('exp_tmp :', exp_tmp.keys())
+
                     del exp_tmp['node_inputs'][-1]
                     del exp_tmp['cluster_inputs'][-1]
                     del exp_tmp['node_act_vec'][-1]
@@ -436,7 +427,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             # Dispatch decision
             act, valid_action_prob_mat, policy_state, action_choosen_mat, \
             curr_state_value, curr_neighbor_mask, next_state_ids = q_estimator.action(s_grid, ava_node, context,
-                                                                                      epsilon)
+                                                                                    )
             # Put the current task on the queue based on dispatch decision
             for i in range(len(act)):
                 if curr_task[i][0] == -1:
@@ -576,14 +567,13 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         # update value network
         for _ in np.arange(TRAIN_TIMES):
             batch_s, _, batch_r, _ = replay.sample()
-            q_estimator.update_value(batch_s, batch_r, 1e-3, global_step1)
+            q_estimator.update_value(batch_s, batch_r, 1e-3)
             global_step1 += 1
 
         # update policy network
         for _ in np.arange(TRAIN_TIMES):
             batch_s, batch_a, batch_r, batch_mask = policy_replay.sample()
-            q_estimator.update_policy(batch_s, batch_r.reshape([-1, 1]), batch_a, batch_mask, learning_rate,
-                                      global_step2)
+            q_estimator.update_policy(batch_s, batch_r.reshape([-1, 1]), batch_a, batch_mask, learning_rate,)
             global_step2 += 1
 
     time_str = str(time.time())
@@ -592,7 +582,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         
     with open("./result/torch_out_time" + time_str + ".obj", 'rb') as fp:
         record = pickle.load(fp)
-    #print(record)
     return throughput_list
     
     
