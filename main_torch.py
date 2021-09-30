@@ -1,13 +1,10 @@
-
 import time
 import sys
 from algorithm_torch.cMMAC import *
 from algorithm_torch.GPG import *
 from env.platform import *
 from env.env_run import *
-
 import pickle,gzip
-
 from helpers_main_pytorch import *                
        
 def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
@@ -23,7 +20,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     Returns:
         [List]: [Throughput List (Achieved task/ total number of tasks)]
     """
-    
     #####################################################################
     ########### Init ###########
     record = [] # list used to dump all the eAPS, tasks in queue, done tasks and undone tasks etcs
@@ -54,7 +50,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 
     for n_iter in np.arange(RUN_TIMES):
         ########### Initialize the setup and repeat the experiment many times ###########
-
         batch_reward = []
         cur_time = 0
         entropy_weight = entropy_weight_init
@@ -71,23 +66,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                         [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1]]
 
         # Create clusters based on the hardware resources you need
-        node1_1 = Node(100.0, 4.0, [], [])  # (cpu, mem,...)
-        node1_2 = Node(200.0, 6.0, [], [])
-        node1_3 = Node(100.0, 8.0, [], [])
-        node_list1 = [node1_1, node1_2, node1_3]
-
-        node2_1 = Node(200.0, 8.0, [], [])
-        node2_2 = Node(100.0, 2.0, [], [])
-        node2_3 = Node(200.0, 6.0, [], [])
-        node_list2 = [node2_1, node2_2, node2_3]
-        # (cpu, mem,..., achieve task num, give up task num)
-        master1 = Master(200.0, 8.0, node_list1, [], all_task1, 0, 0, 0, [0] * MAX_TESK_TYPE, [0] * MAX_TESK_TYPE)
-        master2 = Master(200.0, 8.0, node_list2, [], all_task2, 0, 0, 0, [0] * MAX_TESK_TYPE, [0] * MAX_TESK_TYPE)
-        cloud = Cloud([], [], sys.maxsize, sys.maxsize)  # (..., cpu, mem)
-        ################################################################################################
-        for i in range(MAX_TESK_TYPE):
-            docker = Docker(POD_MEM * service_coefficient[i], POD_CPU * service_coefficient[i], cur_time, i, [-1])
-            cloud.service_list.append(docker)
+        master1, master2, cloud = create_eAP_and_Cloud(all_task1, all_task2, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time)
 
         # Crerate dockers based on deploy_state
         create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2)
@@ -112,9 +91,18 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                     deploy_state_float.append(tmp)
                 
                 # Orchestration
-                orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE,num_edge_nodes_per_eAP,
+                change_node, change_service, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE)
+                
+                # Randomising Orchestration
+                if random.uniform(0, 1)< 0.5:
+                    change_service = torch.randint(-12, 12, (3,))
+                    change_node = torch.randint(0, 6, (3,))
+                    print('Randomising Orchestration')
+                print('Not Randomising Orchestration')
+                #print(change_service, 'change_service')
+                #print(change_node, 'change_node')
+                execute_orchestration(change_node, change_service, num_edge_nodes_per_eAP,
                          deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2)
-
                 # Save data
                 if slot > 3 * CHO_CYCLE:
                     exp_tmp = exp
@@ -147,29 +135,31 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 ava_node.append(tmp_list)
 
             # Current state of CPU and memory
-            
             cpu_list1, mem_list1, task_num1 = state_inside_eAP(master1, num_edge_nodes_per_eAP)
             cpu_list2, mem_list2, task_num2 = state_inside_eAP(master2, num_edge_nodes_per_eAP)
                 
-               
             s_grid = np.array([flatten(flatten([deploy_state, [task_num1], cpu_list1, mem_list1])),
                                flatten(flatten([deploy_state, [task_num2], #cpu_list1, mem_list1]))])#
                                                 cpu_list2, mem_list2]))])
-            
-            
             # Dispatch decision
+            
+            #TODO Determine the Action Precisely 
             act, valid_action_prob_mat, policy_state, action_choosen_mat, \
-            curr_state_value, curr_neighbor_mask, next_state_ids = q_estimator.action(s_grid, ava_node, context,
-                                                                                    )
+            curr_state_value, curr_neighbor_mask, next_state_ids = q_estimator.action(s_grid, ava_node, context,)
+            
+            ###### Randomising if 0.05 then it is epsilor exploration
+            if random.uniform(0, 1)< 0.05:
+                	act = [random.randint(0,6), random.randint(0,6)] 
+            #print('act :', act)
+            
+            ####
             # Put the current task on the queue based on dispatch decision
             put_current_task_on_queue(act, curr_task, cluster_action_value, num_edge_nodes_per_eAP, cloud, master1, master2)
 
             # Update state of task
-            
             update_state_of_task(num_edge_nodes_per_eAP, cur_time, check_queue, cloud, master1, master2)
             
             # Update state of dockers in every node
-            
             cloud = update_state_of_dockers(cur_time, cloud, master1, master2)
                 
             cur_done = [master1.done - pre_done[0], master2.done - pre_done[1]]
@@ -194,7 +184,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 advantage = q_estimator.compute_advantage(curr_state_value_prev, next_state_ids_prev,
                                                           s_grid, r_grid, gamma)
                                                           
-                
                 if curr_task[0][0] != -1 and curr_task[1][0] != -1:
                     replay.add(state_mat_prev, action_mat_prev, targets_batch, s_grid)
                     policy_replay.add(policy_state_prev, action_choosen_mat_prev, advantage, curr_neighbor_mask_prev)
@@ -219,6 +208,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 order_response_rates.append(float(sum(cur_done) / (sum(cur_done) + sum(cur_undone))))
             else:
                 order_response_rates.append(0)
+        #a=b
 
         sum_rewards.append(float(sum(all_rewards)) / float(len(all_rewards)))
         all_rewards = []
@@ -250,15 +240,13 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     time_str = str(time.time())
     with gzip.open("./result/torch_out_time" + time_str + ".obj", "wb") as f:
         pickle.dump(record, f)
-        
+                
     with gzip.open("./result/torch_out_time" + time_str + ".obj", 'rb') as fp:
         record = pickle.load(fp)
-    #print(record)
-    
+
     with gzip.open("./result/throughput" + time_str + ".obj", "wb") as f:
         pickle.dump(throughput_list, f)
     return throughput_list
-    
     
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########

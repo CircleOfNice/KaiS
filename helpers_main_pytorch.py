@@ -3,7 +3,7 @@ import numpy as np
 from env.platform import *
 from env.env_run import update_docker
 from algorithm_torch.GPG import act_offload_agent
-
+import sys
 ############ Set up according to your own needs  ###########
 # The parameters are set to support the operation of the program, and may not be consistent with the actual system
 vaild_node = 6  # Number of edge nodes available
@@ -256,13 +256,14 @@ def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_e
                         master2.append_docker_to_node_service_list(j, docker)
                         
                         
-def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE,num_edge_nodes_per_eAP,
-                         deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2):
+def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE,):
     # Make decision of orchestration
     change_node, change_service, exp = act_offload_agent(orchestrate_agent, exp, done_tasks,
                                                                      undone_tasks, curr_tasks_in_queue,
                                                                      deploy_state_float, MAX_TESK_TYPE)
+    return change_node, change_service, exp
 
+def execute_orchestration(change_node, change_service, num_edge_nodes_per_eAP,deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2):
     # Execute orchestration
     for i in range(len(change_node)):
         if change_service[i] < 0:
@@ -285,6 +286,7 @@ def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_t
                 node_index = change_node[i] - num_edge_nodes_per_eAP
                 if master2.node_list[node_index].mem >= POD_MEM * service_coefficient[service_index]:
                     deploy_new_docker(master2, POD_MEM, POD_CPU, cur_time, node_index, service_coefficient, service_index, deploy_state)
+                    
                     
 def put_current_task_on_queue(act, curr_task, cluster_action_value, num_edge_nodes_per_eAP, cloud, master1, master2):
     for i in range(len(act)):
@@ -364,3 +366,23 @@ def update_state_of_dockers(cur_time, cloud, master1, master2):
     master2.update_done(done[1])
     
     return cloud   
+
+def create_eAP_and_Cloud(all_task1, all_task2, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time):
+            node1_1 = Node(100.0, 4.0, [], [])  # (cpu, mem,...)
+            node1_2 = Node(200.0, 6.0, [], [])
+            node1_3 = Node(100.0, 8.0, [], [])
+            node_list1 = [node1_1, node1_2, node1_3]
+
+            node2_1 = Node(200.0, 8.0, [], [])
+            node2_2 = Node(100.0, 2.0, [], [])
+            node2_3 = Node(200.0, 6.0, [], [])
+            node_list2 = [node2_1, node2_2, node2_3]
+            # (cpu, mem,..., achieve task num, give up task num)
+            master1 = Master(200.0, 8.0, node_list1, [], all_task1, 0, 0, 0, [0] * MAX_TESK_TYPE, [0] * MAX_TESK_TYPE)
+            master2 = Master(200.0, 8.0, node_list2, [], all_task2, 0, 0, 0, [0] * MAX_TESK_TYPE, [0] * MAX_TESK_TYPE)
+            cloud = Cloud([], [], sys.maxsize, sys.maxsize)  # (..., cpu, mem)
+            ################################################################################################
+            for i in range(MAX_TESK_TYPE):
+                docker = Docker(POD_MEM * service_coefficient[i], POD_CPU * service_coefficient[i], cur_time, i, [-1])
+                cloud.service_list.append(docker)
+            return master1, master2, cloud
