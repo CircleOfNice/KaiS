@@ -94,11 +94,13 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 change_node, change_service, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE)
                 
                 # Randomising Orchestration
-                if random.uniform(0, 1)< 0.5:
-                    change_service = torch.randint(-12, 12, (3,))
-                    change_node = torch.randint(0, 6, (3,))
-                    print('Randomising Orchestration')
-                print('Not Randomising Orchestration')
+                
+                #if random.uniform(0, 1)< 0.05:
+                #    change_service = torch.randint(-12, 12, (3,))
+                #    change_node = torch.randint(0, 6, (3,))
+                #    print('Randomising Orchestration')
+                #print('Not Randomising Orchestration')
+                
                 #print(change_service, 'change_service')
                 #print(change_node, 'change_node')
                 execute_orchestration(change_node, change_service, num_edge_nodes_per_eAP,
@@ -148,8 +150,9 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             curr_state_value, curr_neighbor_mask, next_state_ids = q_estimator.action(s_grid, ava_node, context,)
             
             ###### Randomising if 0.05 then it is epsilor exploration
-            if random.uniform(0, 1)< 0.05:
-                	act = [random.randint(0,6), random.randint(0,6)] 
+            #if random.uniform(0, 1)< 0.05:
+            #    	act = [random.randint(0,6), random.randint(0,6)] 
+            #act = [random.randint(0,6), random.randint(0,6)] 
             #print('act :', act)
             
             ####
@@ -236,22 +239,22 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             batch_s, batch_a, batch_r, batch_mask = policy_replay.sample()
             q_estimator.update_policy(batch_s, batch_r.reshape([-1, 1]), batch_a, batch_mask, learning_rate,)
             global_step2 += 1
-
+    name = 'full_randomisation_orchestration_no_randomisation_'
     time_str = str(time.time())
-    with gzip.open("./result/torch_out_time" + time_str + ".obj", "wb") as f:
+    with gzip.open("./result/torch_out_time" + name + time_str + ".obj", "wb") as f:
         pickle.dump(record, f)
                 
-    with gzip.open("./result/torch_out_time" + time_str + ".obj", 'rb') as fp:
+    with gzip.open("./result/torch_out_time" + name + time_str + ".obj", 'rb') as fp:
         record = pickle.load(fp)
 
-    with gzip.open("./result/throughput" + time_str + ".obj", "wb") as f:
+    with gzip.open("./result/throughput" + name + time_str + ".obj", "wb") as f:
         pickle.dump(throughput_list, f)
     return throughput_list
     
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 5000 # Number of Episodes to run
+    RUN_TIMES = 50 # Number of Episodes to run
     TASK_NUM = 5000 # Time for each Episode Ending
     TRAIN_TIMES = 50 # list containing two elements for tasks done on both master nodes
     CHO_CYCLE = 1000 # Orchestration cycle
