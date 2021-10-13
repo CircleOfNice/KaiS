@@ -139,12 +139,16 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             # Current state of CPU and memory
             cpu_list1, mem_list1, task_num1 = state_inside_eAP(master1, num_edge_nodes_per_eAP)
             cpu_list2, mem_list2, task_num2 = state_inside_eAP(master2, num_edge_nodes_per_eAP)
-                
-            s_grid = np.array([flatten(flatten([deploy_state, [task_num1], cpu_list1, mem_list1])),
-                               flatten(flatten([deploy_state, [task_num2], #cpu_list1, mem_list1]))])#
-                                                cpu_list2, mem_list2]))])
-            # Dispatch decision
             
+            
+            #print(task_num1, task_num2)
+            #a=b    
+            s_grid = np.array([flatten(flatten([deploy_state, [task_num1], cpu_list1, mem_list1, [[latency]], [[num_edge_nodes_per_eAP]]])),
+                               flatten(flatten([deploy_state, [task_num2], #cpu_list1, mem_list1]))])#
+                                                cpu_list2, mem_list2, [[latency]], [[num_edge_nodes_per_eAP]]]))])
+            # Dispatch decision
+            print(s_grid.shape)
+            a=b
             #TODO Determine the Action Precisely 
             act, valid_action_prob_mat, policy_state, action_choosen_mat, \
             curr_state_value, curr_neighbor_mask, next_state_ids = q_estimator.action(s_grid, ava_node, context,)
@@ -241,13 +245,13 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             global_step2 += 1
     name = 'full_randomisation_orchestration_no_randomisation_'
     time_str = str(time.time())
-    with gzip.open("./result/torch_out_time" + name + time_str + ".obj", "wb") as f:
+    with gzip.open("./result/torch_out_time_" + name + time_str + ".obj", "wb") as f:
         pickle.dump(record, f)
                 
-    with gzip.open("./result/torch_out_time" + name + time_str + ".obj", 'rb') as fp:
+    with gzip.open("./result/torch_out_time_" + name + time_str + ".obj", 'rb') as fp:
         record = pickle.load(fp)
 
-    with gzip.open("./result/throughput" + name + time_str + ".obj", "wb") as f:
+    with gzip.open("./result/throughput_" + name + time_str + ".obj", "wb") as f:
         pickle.dump(throughput_list, f)
     return throughput_list
     

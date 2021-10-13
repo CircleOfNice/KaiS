@@ -17,7 +17,7 @@ service_coefficient = [0.8, 0.8, 0.9, 0.9, 1.0, 1.0, 1.1, 1.1, 1.2, 1.2, 1.3, 1.
 gamma = 0.9 # Discounting Coefficient
 learning_rate = 1e-3 # Learning Rate
 action_dim = 7 #Number of actions possibly edge nodes 6 plus Cluster
-state_dim = 88 #Dimension of state for cMMAC (flattened Deployed state, task num, cpu_list, min_list)
+state_dim = 90#88 #Dimension of state for cMMAC (flattened Deployed state, task num, cpu_list, min_list)
 
 node_input_dim = 24 # Input dimension of Node part of the Orchestration Net 
 cluster_input_dim = 24 # Input dimension for Cluster part of the Orchestration Net
@@ -39,7 +39,7 @@ number_of_master_nodes  = 2 # number of eAPs # Only in this case whole thing mak
 
 num_edge_nodes_per_eAP =3
 cluster_action_value = 6
-
+latency = 0
 
 def flatten(list):
     """Function to serialize sublists inside a given list
@@ -52,71 +52,6 @@ def flatten(list):
     """    
     return [y for x in list for y in x]
     
-def calculate_reward(master1, master2, cur_done, cur_undone, num_edge_nodes_per_eAP):
-    """
-    Tailored MARDL for Decentralised request dispatch - Reward : Improve the longterm throughput while ensuring the load balancing at the edge
-    
-    [Function that returns rewards from environment given master nodes and the current tasks]
-
-    Args:
-        master1 ([Class]): [Master Node containing the cpu and memory values]
-        master2 ([Class]): [Master Node containing the cpu and memory values]
-        cur_done ([list]): [list containing two elements for tasks done on both master nodes]
-        cur_undone ([list]): [list containing two elements for tasks not done yet on both master nodes]
-
-    Returns:
-        reward [list]: [list of rewards for both master nodes]
-    """
-    
-    weight = 1.0
-    all_task = [float(cur_done[0] + cur_undone[0]), float(cur_done[1] + cur_undone[1])]
-    fail_task = [float(cur_undone[0]), float(cur_undone[1])]
-    reward = []
-    # The ratio of requests that violate delay requirements
-    task_fail_rate = []
-    if all_task[0] != 0:
-        task_fail_rate.append(fail_task[0] / all_task[0])
-    else:
-        task_fail_rate.append(0)
-
-    if all_task[1] != 0:
-        task_fail_rate.append(fail_task[1] / all_task[1])
-    else:
-        task_fail_rate.append(0)
-
-    # The standard deviation of the CPU and memory usage
-    standard_list = []
-    use_rate1 = []
-    use_rate2 = []
-    for i in range(num_edge_nodes_per_eAP):
-        use_rate1.append(master1.node_list[i].cpu / master1.node_list[i].cpu_max)
-        use_rate1.append(master1.node_list[i].mem / master1.node_list[i].mem_max)
-        use_rate2.append(master2.node_list[i].cpu / master2.node_list[i].cpu_max)
-        use_rate2.append(master2.node_list[i].mem / master2.node_list[i].mem_max)
-
-    standard_list.append(np.std(use_rate1, ddof=1))
-    standard_list.append(np.std(use_rate2, ddof=1))
-
-    reward.append(math.exp(-task_fail_rate[0]) + weight * math.exp(-standard_list[0]))
-    reward.append(math.exp(-task_fail_rate[1]) + weight * math.exp(-standard_list[1]))
-    # Immediate reward   e^(-lambda - weight_of_load_balancing *standard_deviation_of_cpu_memory)
-    
-    # Two rewards for each eAP
-    return reward
-    
-    
-    
-def to_grid_rewards(node_reward):
-    
-    """[Serialises the given node rewards]
-
-    Returns:
-        [list]: [serialised numpy array]
-    """
-    
-    return np.array(node_reward).reshape([-1, 1])
-    
-
 def get_state_characteristics(MAX_TESK_TYPE, master1, master2, num_edge_nodes_per_eAP):
     """Get lists of tasks that are done, undone and current task in queue
 
