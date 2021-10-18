@@ -170,25 +170,7 @@ def state_inside_eAP(master, num_edge_nodes_per_eAP):
 
 
 
-def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2):
-    for i in range(vaild_node):
-            for ii in range(MAX_TESK_TYPE):
-                dicision = deploy_state[i][ii]
-                if i < num_edge_nodes_per_eAP and dicision == 1:
-                    j = i
-                    if master1.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
-                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
-                                        ii, [-1])
-                        master1.add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
-                        master1.append_docker_to_node_service_list(j, docker)
 
-                if i >= num_edge_nodes_per_eAP and dicision == 1:
-                    j = i - num_edge_nodes_per_eAP
-                    if master2.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
-                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
-                                        ii, [-1])
-                        master2.add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
-                        master2.append_docker_to_node_service_list(j, docker)
                         
                         
 def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE,):
@@ -301,7 +283,28 @@ def update_state_of_dockers(cur_time, cloud, master1, master2):
     master2.update_done(done[1])
     
     return cloud   
+'''
+def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2):
+    #print('vaild_node :',vaild_node)
+    for i in range(vaild_node):
+            for ii in range(MAX_TESK_TYPE):
+                dicision = deploy_state[i][ii]
+                if i < num_edge_nodes_per_eAP and dicision == 1:
+                    j = i
+                    if master1.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
+                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
+                                        ii, [-1])
+                        master1.add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
+                        master1.append_docker_to_node_service_list(j, docker)
 
+                if i >= num_edge_nodes_per_eAP and dicision == 1:
+                    j = i - num_edge_nodes_per_eAP
+                    if master2.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
+                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
+                                        ii, [-1])
+                        master2.add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
+                        master2.append_docker_to_node_service_list(j, docker)
+                        
 def create_eAP_and_Cloud(all_task1, all_task2, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time):
             node1_1 = Node(100.0, 4.0, [], [])  # (cpu, mem,...)
             node1_2 = Node(200.0, 6.0, [], [])
@@ -321,3 +324,82 @@ def create_eAP_and_Cloud(all_task1, all_task2, MAX_TESK_TYPE, POD_MEM,  POD_CPU,
                 docker = Docker(POD_MEM * service_coefficient[i], POD_CPU * service_coefficient[i], cur_time, i, [-1])
                 cloud.service_list.append(docker)
             return master1, master2, cloud
+'''
+                        
+def create_node_list(spec_list):
+    node_list = []
+    for spec in spec_list:
+        nod = Node(spec[0], spec[1], [], [])
+        #print(nod.mem)
+        node_list.append(nod)
+        
+    return node_list
+
+def create_master_node(master_value, node_list, all_task, MAX_TESK_TYPE):
+    master = Master(master_value[0], master_value[1], node_list, [], all_task, 0, 0, 0, [0] * MAX_TESK_TYPE, [0] * MAX_TESK_TYPE)
+    #print(master.mem)
+    return master
+
+def create_cloud(POD_MEM, POD_CPU, service_coefficient, cur_time):
+    cloud = Cloud([], [], sys.maxsize, sys.maxsize)  # (..., cpu, mem)
+    for i in range(MAX_TESK_TYPE):
+        docker = Docker(POD_MEM * service_coefficient[i], POD_CPU * service_coefficient[i], cur_time, i, [-1])
+        cloud.service_list.append(docker)
+    return cloud
+
+def get_valid_nodes(node_lists):
+    length = 0
+    for node_list in node_lists:
+        length+=len(node_list)
+    return length
+        
+def get_length(lengths_nodelist, index):
+    sum = 0
+    for i in range(index + 1):
+        sum += lengths_nodelist[i]
+    return sum
+            
+def create_dockers(valid_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2):
+    print('valid_node :',valid_node)
+    lengths_nodelist = [len(master1.node_list), len(master2.node_list)]
+    init = 0
+    init_pos = 0
+    next_pos = lengths_nodelist[init]
+    
+    
+    print(lengths_nodelist)
+    for i in range(valid_node):
+            for ii in range(MAX_TESK_TYPE):
+                decision = deploy_state[i][ii]
+                if i >= init_pos and i< next_pos and decision ==1:
+                    j = i - init_pos
+                    if master1.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
+                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
+                                        ii, [-1])
+                        master1.add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
+                        master1.append_docker_to_node_service_list(j, docker)
+                else:
+                    init = init + 1
+                    init_pos = init_pos + lengths_nodelist[init] 
+                    next_pos = next_pos + lengths_nodelist[init+1] 
+                    
+                '''
+                if i < lengths_nodelist[0] and decision == 1:
+                    print('i < lengths_nodelist[0] and decision == 1')
+                    j = i
+                    if master1.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
+                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
+                                        ii, [-1])
+                        master1.add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
+                        master1.append_docker_to_node_service_list(j, docker)
+
+                if i >= lengths_nodelist[0] and i< (lengths_nodelist[0] + lengths_nodelist[1]) and decision == 1:
+                    print('i >= lengths_nodelist[0] and i< lengths_nodelist[1] and decision == 1')
+                    j = i - num_edge_nodes_per_eAP
+                    if master2.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
+                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
+                                        ii, [-1])
+                        master2.add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
+                        master2.append_docker_to_node_service_list(j, docker)
+                        
+                        '''

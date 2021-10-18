@@ -66,10 +66,40 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                         [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1]]
 
         # Create clusters based on the hardware resources you need
-        master1, master2, cloud = create_eAP_and_Cloud(all_task1, all_task2, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time)
-
+        #master1, master2, cloud = create_eAP_and_Cloud(all_task1, all_task2, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time)
+        node_list_1 = [[100.0, 4.0], [200.0, 6.0,], [100.0, 8.0]]
+        node_list_2 = [[200.0, 8.0], [100.0, 2.0,], [200.0, 6.0]]
+        node_lists = [create_node_list(node_list_1), create_node_list(node_list_2)]
+         
+        for i, node_list in enumerate(node_lists):
+            print('node_list : ', i, node_list)
+            for node in node_list:
+                print('node : ' , node.mem)
+        master_values = [[200.0, 8.0], [200.0, 8.0]]
+    
+        all_tasks = [all_task1, all_task2]
+        master_list = []
+        for num in range(number_of_master_nodes):
+            #print('num : ', num)
+            master_list.append(create_master_node(master_values[num],  node_lists[num], all_tasks[num], MAX_TESK_TYPE))
+        '''    
+        for master_ in master_list:
+            print('master_list ', master_.mem)
+            for node in master_.node_list:
+                print('node master: ' , node.mem)'''
+        cloud = create_cloud(POD_MEM, POD_CPU, service_coefficient, cur_time)
+        valid_node = get_valid_nodes(node_lists)
+        print('valid_node : ', valid_node)
+        #print(cloud)
+        #print(master_list)
+        #print('master_list mem : ',master_list[0].mem, master_list[1].mem)
+        #print('master nodelist node memory', master_list[0].node_list)
+        #print('master nodelist node memory', master_list[0].node_list[0], len(master_list[0].node_list[0]))
+        #
         # Crerate dockers based on deploy_state
-        create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2)
+        #create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2)
+        create_dockers(valid_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list[0], master_list[1])
+        a=b
         ########### Each slot ###########
         for slot in range(BREAK_POINT):
             cur_time = cur_time + SLOT_TIME
@@ -144,11 +174,10 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             #print(task_num1, task_num2)
             #a=b    
             s_grid = np.array([flatten(flatten([deploy_state, [task_num1], cpu_list1, mem_list1, [[latency]], [[num_edge_nodes_per_eAP]]])),
-                               flatten(flatten([deploy_state, [task_num2], #cpu_list1, mem_list1]))])#
-                                                cpu_list2, mem_list2, [[latency]], [[num_edge_nodes_per_eAP]]]))])
+                               flatten(flatten([deploy_state, [task_num2],  cpu_list2, mem_list2, [[latency]], [[num_edge_nodes_per_eAP]]]))])
             # Dispatch decision
-            print(s_grid.shape)
-            a=b
+            #print(s_grid.shape)
+            
             #TODO Determine the Action Precisely 
             act, valid_action_prob_mat, policy_state, action_choosen_mat, \
             curr_state_value, curr_neighbor_mask, next_state_ids = q_estimator.action(s_grid, ava_node, context,)
