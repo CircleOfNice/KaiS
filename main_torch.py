@@ -89,7 +89,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 print('node master: ' , node.mem)'''
         cloud = create_cloud(POD_MEM, POD_CPU, service_coefficient, cur_time)
         valid_node = get_valid_nodes(node_lists)
-        print('valid_node : ', valid_node)
+        #print('valid_node : ', valid_node)
         #print(cloud)
         #print(master_list)
         #print('master_list mem : ',master_list[0].mem, master_list[1].mem)
@@ -98,8 +98,8 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         #
         # Crerate dockers based on deploy_state
         #create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2)
-        create_dockers(valid_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list[0], master_list[1])
-        a=b
+        create_dockers(valid_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, [master_list[0], master_list[1]])
+        
         ########### Each slot ###########
         for slot in range(BREAK_POINT):
             cur_time = cur_time + SLOT_TIME
@@ -107,7 +107,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             if slot % CHO_CYCLE == 0 and slot != 0:
                 # Get task state, include successful, failed, and unresolved
                 done_tasks, undone_tasks, curr_tasks_in_queue = get_state_characteristics(MAX_TESK_TYPE, master1, master2, num_edge_nodes_per_eAP) 
-                   
+                
                 if slot != CHO_CYCLE:
                     exp['reward'].append(float(sum(deploy_reward)) / float(len(deploy_reward)))
                     deploy_reward = []
@@ -150,13 +150,21 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                                                   entropy_weight_min, entropy_weight_decay)
 
             # Get current task
-            master1 = update_task_queue(master1, cur_time, 0)
-            master2 = update_task_queue(master2, cur_time, 1)
-
-            task1 = get_current_task(master1)
-            task2 = get_current_task(master2)
+            
+            for i, _master in enumerate(master_list):
+                master_list[i] = update_task_queue(_master, cur_time, i)
                 
-            curr_task = [task1, task2]
+                
+            #master1 = update_task_queue(master1, cur_time, 0)
+            #master2 = update_task_queue(master2, cur_time, 1)
+            curr_task = []
+            
+            for _master in master_list:
+                curr_task.append(get_current_task(_master))
+            #task1 = get_current_task(master1)
+            #task2 = get_current_task(master2)
+                
+            #curr_task = [task1, task2]
             ava_node = []
 
             for i in range(len(curr_task)):
@@ -165,10 +173,12 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                     if deploy_state[ii][curr_task[i][0]] == 1:
                         tmp_list.append(ii)
                 ava_node.append(tmp_list)
-
+            
+            
             # Current state of CPU and memory
-            cpu_list1, mem_list1, task_num1 = state_inside_eAP(master1, num_edge_nodes_per_eAP)
-            cpu_list2, mem_list2, task_num2 = state_inside_eAP(master2, num_edge_nodes_per_eAP)
+            #TODO it is only possible to generalise this after separation of Q estimaters
+            cpu_list1, mem_list1, task_num1 = state_inside_eAP(master_list[0], num_edge_nodes_per_eAP)
+            cpu_list2, mem_list2, task_num2 = state_inside_eAP(master_list[1], num_edge_nodes_per_eAP)
             
             
             #print(task_num1, task_num2)
@@ -179,6 +189,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             #print(s_grid.shape)
             
             #TODO Determine the Action Precisely 
+            
             act, valid_action_prob_mat, policy_state, action_choosen_mat, \
             curr_state_value, curr_neighbor_mask, next_state_ids = q_estimator.action(s_grid, ava_node, context,)
             
@@ -190,11 +201,13 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             
             ####
             # Put the current task on the queue based on dispatch decision
-            put_current_task_on_queue(act, curr_task, cluster_action_value, num_edge_nodes_per_eAP, cloud, master1, master2)
-
-            # Update state of task
-            update_state_of_task(num_edge_nodes_per_eAP, cur_time, check_queue, cloud, master1, master2)
+            #act = [2, 5]
+            put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, master_list)
             
+            # Update state of task
+            #update_state_of_task(num_edge_nodes_per_eAP, cur_time, check_queue, cloud, master1, master2)
+            update_state_of_task(num_edge_nodes_per_eAP, cur_time, check_queue, cloud, master_list[0], master_list[1])
+            a=b
             # Update state of dockers in every node
             cloud = update_state_of_dockers(cur_time, cloud, master1, master2)
                 
