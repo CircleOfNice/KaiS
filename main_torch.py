@@ -71,10 +71,10 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         node_list_2 = [[200.0, 8.0], [100.0, 2.0,], [200.0, 6.0]]
         node_lists = [create_node_list(node_list_1), create_node_list(node_list_2)]
          
-        for i, node_list in enumerate(node_lists):
-            print('node_list : ', i, node_list)
-            for node in node_list:
-                print('node : ' , node.mem)
+        #for i, node_list in enumerate(node_lists):
+        #    print('node_list : ', i, node_list)
+        #    for node in node_list:
+        #        print('node : ' , node.mem)
         master_values = [[200.0, 8.0], [200.0, 8.0]]
     
         all_tasks = [all_task1, all_task2]
@@ -98,7 +98,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         #
         # Crerate dockers based on deploy_state
         #create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2)
-        create_dockers(valid_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, [master_list[0], master_list[1]])
+        create_dockers(valid_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list)
         
         ########### Each slot ###########
         for slot in range(BREAK_POINT):
@@ -106,7 +106,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             ########### Each frame ###########
             if slot % CHO_CYCLE == 0 and slot != 0:
                 # Get task state, include successful, failed, and unresolved
-                done_tasks, undone_tasks, curr_tasks_in_queue = get_state_characteristics(MAX_TESK_TYPE, master1, master2, num_edge_nodes_per_eAP) 
+                done_tasks, undone_tasks, curr_tasks_in_queue = get_state_characteristics(MAX_TESK_TYPE, master_list) 
                 
                 if slot != CHO_CYCLE:
                     exp['reward'].append(float(sum(deploy_reward)) / float(len(deploy_reward)))
@@ -206,22 +206,32 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             
             # Update state of task
             #update_state_of_task(num_edge_nodes_per_eAP, cur_time, check_queue, cloud, master1, master2)
-            update_state_of_task(num_edge_nodes_per_eAP, cur_time, check_queue, cloud, master_list[0], master_list[1])
-            a=b
+            #update_state_of_task(num_edge_nodes_per_eAP, cur_time, check_queue, cloud, master_list[0], master_list[1])
+            #TODO update check_queue
+            update_state_of_task(cur_time, check_queue, cloud, master_list)
+            
             # Update state of dockers in every node
-            cloud = update_state_of_dockers(cur_time, cloud, master1, master2)
-                
-            cur_done = [master1.done - pre_done[0], master2.done - pre_done[1]]
-            cur_undone = [master1.undone - pre_undone[0], master2.undone - pre_undone[1]]
+            cloud = update_state_of_dockers(cur_time, cloud, master_list)
+            
+            #cur_done = [master1.done - pre_done[0], master2.done - pre_done[1]]
+            #cur_undone = [master1.undone - pre_undone[0], master2.undone - pre_undone[1]]
 
-            pre_done = [master1.done, master2.done]
-            pre_undone = [master1.undone, master2.undone]
-
+            #pre_done = [master1.done, master2.done]
+            #pre_undone = [master1.undone, master2.undone]
+            
+            cur_done, cur_undone = [],[]
+            for i, master_ in enumerate(master_list):
+                cur_done.append(master_.done - pre_done[i])
+                cur_undone.append(master_.undone - pre_undone[i])
+                pre_done[i] = master_.done
+                pre_undone[i] = master_.undone
+                #print(master_.done - pre_done[i], master_.undone - pre_undone[i], master_.done, master_.undone)
             achieve_num.append(sum(cur_done))
             fail_num.append(sum(cur_undone))
-            immediate_reward = calculate_reward(master1, master2, cur_done, cur_undone, num_edge_nodes_per_eAP)
+            #immediate_reward = calculate_reward(master1, master2, cur_done, cur_undone, num_edge_nodes_per_eAP)
+            immediate_reward = calculate_reward(master_list, cur_done, cur_undone, num_edge_nodes_per_eAP)
 
-            record.append([master1, master2, cur_done, cur_undone, immediate_reward])
+            record.append([master_list, cur_done, cur_undone, immediate_reward])
 
             deploy_reward.append(sum(immediate_reward))
 

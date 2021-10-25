@@ -105,19 +105,19 @@ def check_queue(task_queue, cur_time):
     Returns:
         [list]: [tasks in the queue, tasks undone(not done), there type(kind)]
     """
+    
     task_queue = sorted(task_queue, key=lambda x: (x[2], x[1]))
-    print('task_queue : ', task_queue)
     undone = [0, 0]
     undone_kind = []
     # clean task for overtime
     i = 0
     while len(task_queue) != i:
-        print(i)
-        print('cur_time, task_queue[i][2] : ', cur_time, task_queue[i][2])
         flag = 0
+        #print('I : ', i)
         if cur_time >= task_queue[i][2]:
-            print(task_queue[i][2], cur_time, undone[task_queue[i][5]], undone)
             undone[task_queue[i][5]] = undone[task_queue[i][5]] + 1
+            
+            print('Still need to be checked cur_time >= task_queue[i][2], undone[task_queue[i][5]] : ', cur_time >= task_queue[i][2], undone[task_queue[i][5]])
             undone_kind.append(task_queue[i][0])
             del task_queue[i]
             flag = 1
@@ -125,7 +125,7 @@ def check_queue(task_queue, cur_time):
             flag = 0
         else:
             i = i + 1
-    print('task_queue, undone, undone_kind : ', task_queue, undone, undone_kind)
+    #print('check task_queue, undone, undone_kind : ', task_queue, undone, undone_kind)
     return task_queue, undone, undone_kind
 
 
