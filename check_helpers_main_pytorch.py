@@ -52,8 +52,8 @@ def flatten(list):
     """    
     return [y for x in list for y in x]
 
-    '''   
-    def get_state_characteristics(MAX_TESK_TYPE, master1, master2, num_edge_nodes_per_eAP):
+   
+def get_state_characteristics(MAX_TESK_TYPE, master1, master2, num_edge_nodes_per_eAP):
     """Get lists of tasks that are done, undone and current task in queue
 
     Args:
@@ -84,7 +84,7 @@ def flatten(list):
             tmp[master2.node_list[i].task_queue[k][0]] = tmp[master2.node_list[i].task_queue[k][0]] + 1
         curr_tasks_in_queue.append(tmp)    
     return done_tasks, undone_tasks, curr_tasks_in_queue
-    '''
+'''    
 def get_state_characteristics(MAX_TESK_TYPE, master_list):
     """Get lists of tasks that are done, undone and current task in queue
 
@@ -118,20 +118,21 @@ def get_state_characteristics(MAX_TESK_TYPE, master_list):
         for j in range(len(master.node_list[i].task_queue)):
             tmp[master.node_list[i].task_queue[j][0]] = tmp[master.node_list[i].task_queue[j][0]] + 1.0
         curr_tasks_in_queue.append(tmp)
-    '''
-    for i in range(num_edge_nodes_per_eAP):
-        tmp = [0.0] * MAX_TESK_TYPE
-        for j in range(len(master1.node_list[i].task_queue)):
-            tmp[master1.node_list[i].task_queue[j][0]] = tmp[master1.node_list[i].task_queue[j][0]] + 1.0
-        curr_tasks_in_queue.append(tmp)
-    for i in range(num_edge_nodes_per_eAP):
-        tmp = [0.0] * MAX_TESK_TYPE
-        for k in range(len(master2.node_list[i].task_queue)):
-            tmp[master2.node_list[i].task_queue[k][0]] = tmp[master2.node_list[i].task_queue[k][0]] + 1
-        curr_tasks_in_queue.append(tmp)    
-        '''
+
+    #for i in range(num_edge_nodes_per_eAP):
+    #    tmp = [0.0] * MAX_TESK_TYPE
+    #    for j in range(len(master1.node_list[i].task_queue)):
+    #        tmp[master1.node_list[i].task_queue[j][0]] = tmp[master1.node_list[i].task_queue[j][0]] + 1.0
+    #    curr_tasks_in_queue.append(tmp)
+    #for i in range(num_edge_nodes_per_eAP):
+    #    tmp = [0.0] * MAX_TESK_TYPE
+    #    for k in range(len(master2.node_list[i].task_queue)):
+    #        tmp[master2.node_list[i].task_queue[k][0]] = tmp[master2.node_list[i].task_queue[k][0]] + 1
+    #    curr_tasks_in_queue.append(tmp)    
+
     #print('done_tasks, undone_tasks, curr_tasks_in_queue : ', done_tasks, undone_tasks, curr_tasks_in_queue)
     return done_tasks, undone_tasks, curr_tasks_in_queue
+'''
 
 def remove_docker_from_master_node(master, change_node_idx, service_index, deploy_state):
     """Function to remove appropriate docker container from a given EAP (master node)
@@ -218,9 +219,6 @@ def state_inside_eAP(master, num_edge_nodes_per_eAP):
     return cpu_list, mem_list, task_num
 
 
-
-
-                        
                         
 def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE,):
     # Make decision of orchestration
@@ -320,26 +318,7 @@ def update_state_of_dockers(cur_time, cloud, master1, master2):
     
     return cloud   
 
-def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2):
-    #print('vaild_node :',vaild_node)
-    for i in range(vaild_node):
-            for ii in range(MAX_TESK_TYPE):
-                dicision = deploy_state[i][ii]
-                if i < num_edge_nodes_per_eAP and dicision == 1:
-                    j = i
-                    if master1.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
-                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
-                                        ii, [-1])
-                        master1.add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
-                        master1.append_docker_to_node_service_list(j, docker)
 
-                if i >= num_edge_nodes_per_eAP and dicision == 1:
-                    j = i - num_edge_nodes_per_eAP
-                    if master2.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
-                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
-                                        ii, [-1])
-                        master2.add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
-                        master2.append_docker_to_node_service_list(j, docker)
                         
 def create_eAP_and_Cloud(all_task1, all_task2, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time):
             node1_1 = Node(100.0, 4.0, [], [])  # (cpu, mem,...)
@@ -416,32 +395,27 @@ def create_and_add_to_master(cur_time, master_list, ii, j , init):
     master_list[init].add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
     master_list[init].append_docker_to_node_service_list(j, docker)
                 
-def create_dockers(valid_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list ):
-    lengths_nodelist = []
-    for master in master_list:
-        lengths_nodelist.append(len(master.node_list))
-    init = 0
-    init_pos = 0
-    next_pos = lengths_nodelist[init]
-
-    for i in range(valid_node):
+def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2):
+    #print('vaild_node :',vaild_node)
+    for i in range(vaild_node):
             for ii in range(MAX_TESK_TYPE):
-                decision = deploy_state[i][ii]
-                if i >= init_pos and i< next_pos and decision ==1:
-                    j = i - init_pos
-                    
-                    if master_list[init].node_list[j].mem >= POD_MEM * service_coefficient[ii]:
-                        create_and_add_to_master(cur_time, master_list, ii, j , init)
+                dicision = deploy_state[i][ii]
+                if i < num_edge_nodes_per_eAP and dicision == 1:
+                    j = i
+                    if master1.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
+                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
+                                        ii, [-1])
+                        master1.add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
+                        master1.append_docker_to_node_service_list(j, docker)
 
-                elif i >= next_pos and i < valid_node and decision ==1 :
-                    init = init + 1
-                    init_pos = next_pos
-                    next_pos = next_pos + lengths_nodelist[init] 
-                    j = i - init_pos
+                if i >= num_edge_nodes_per_eAP and dicision == 1:
+                    j = i - num_edge_nodes_per_eAP
+                    if master2.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
+                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
+                                        ii, [-1])
+                        master2.add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
+                        master2.append_docker_to_node_service_list(j, docker)
                     
-                    if master_list[init].node_list[j].mem >= POD_MEM * service_coefficient[ii]:
-                        create_and_add_to_master(cur_time, master_list, ii, j , init)
-'''                       
 def put_current_task_on_queue(act, curr_task, cluster_action_value, num_edge_nodes_per_eAP, cloud, master1, master2):
     #print('Len Act : ', len(act), act)
     for i in range(len(act)):
@@ -483,30 +457,18 @@ def put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, maste
             print('condition act[i] >= init_pos and act[i] < next_pos: ', act[i], next_pos, init_pos)
             master_list[init].node_list[act[i]].task_queue.append(curr_task[i])
             continue
-        try:
-            
-            if act[i] >= next_pos and act[i] < next_pos + lengths_nodelist[init+1]:
-                #print('try: condition act[i] >= next_pos and act[i] < next_pos + lengths_nodelist[init+1]: ', act[i], cluster_action_value, next_pos)
-                print('Before init, init_pos, next_pos, act[i] : ', init, init_pos, next_pos, act[i])
-                init = init + 1
-                init_pos = next_pos
-                next_pos = next_pos + lengths_nodelist[init] 
-                #print('try: after condition act[i] >= next_pos and act[i] < next_pos + lengths_nodelist[init+1]: ', act[i], cluster_action_value, next_pos)
-                print('After init, init_pos, next_pos, act[i] : ', init, init_pos, next_pos, act[i])
-                master_list[init].node_list[act[i] - init_pos].task_queue.append(curr_task[i])
-                continue
-        except:
-            if act[i] >= next_pos and act[i] < cluster_action_value:
-                print('except condition act[i] >= next_pos and act[i] < cluster_action_value: ', act[i], cluster_action_value, next_pos)
-                init = init + 1
-                init_pos = next_pos
-                next_pos = next_pos + lengths_nodelist[init] 
+        
+        if act[i] >= next_pos and act[i] < cluster_action_value:
+            print('condition act[i] >= next_pos and act[i] < cluster_action_value: ', act[i], cluster_action_value, next_pos)
+            init = init + 1
+            init_pos = next_pos
+            next_pos = next_pos + lengths_nodelist[init] 
 
-                master_list[init].node_list[act[i] - init_pos].task_queue.append(curr_task[i])
-                continue
+            master_list[init].node_list[act[i] - init_pos].task_queue.append(curr_task[i])
+            continue
         else:
             pass
- 
+'''   
       
 def update_all_task_queue(master, master_list, cur_time, check_queue, i):
     

@@ -5,7 +5,42 @@ from algorithm_torch.GPG import *
 from env.platform import *
 from env.env_run import *
 import pickle,gzip
-from helpers_main_pytorch import *                
+from check_helpers_main_pytorch import *                
+
+
+def calculate_rewards(master1, master2, cur_done, cur_undone):
+    weight = 1.0
+    all_task = [float(cur_done[0] + cur_undone[0]), float(cur_done[1] + cur_undone[1])]
+    fail_task = [float(cur_undone[0]), float(cur_undone[1])]
+    reward = []
+    # The ratio of requests that violate delay requirements
+    task_fail_rate = []
+    if all_task[0] != 0:
+        task_fail_rate.append(fail_task[0] / all_task[0])
+    else:
+        task_fail_rate.append(0)
+
+    if all_task[1] != 0:
+        task_fail_rate.append(fail_task[1] / all_task[1])
+    else:
+        task_fail_rate.append(0)
+
+    # The standard deviation of the CPU and memory usage
+    standard_list = []
+    use_rate1 = []
+    use_rate2 = []
+    for i in range(3):
+        use_rate1.append(master1.node_list[i].cpu / master1.node_list[i].cpu_max)
+        use_rate1.append(master1.node_list[i].mem / master1.node_list[i].mem_max)
+        use_rate2.append(master2.node_list[i].cpu / master2.node_list[i].cpu_max)
+        use_rate2.append(master2.node_list[i].mem / master2.node_list[i].mem_max)
+
+    standard_list.append(np.std(use_rate1, ddof=1))
+    standard_list.append(np.std(use_rate2, ddof=1))
+
+    reward.append(math.exp(-task_fail_rate[0]) + weight * math.exp(-standard_list[0]))
+    reward.append(math.exp(-task_fail_rate[1]) + weight * math.exp(-standard_list[1]))
+    return reward
        
 def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     
@@ -66,51 +101,50 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                         [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1]]
 
         # Create clusters based on the hardware resources you need
-        #master1, master2, cloud = create_eAP_and_Cloud(all_task1, all_task2, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time)
-        node_list_1 = [[100.0, 4.0], [200.0, 6.0,], [100.0, 8.0]]
-        node_list_2 = [[200.0, 8.0], [100.0, 2.0,], [200.0, 6.0]]
-        node_lists = [create_node_list(node_list_1), create_node_list(node_list_2)]
+        node1_1 = Node(100.0, 4.0, [], [])  # (cpu, mem,...)
+        node1_2 = Node(200.0, 6.0, [], [])
+        node1_3 = Node(100.0, 8.0, [], [])
+        node_list1 = [node1_1, node1_2, node1_3]
 
-        
-        #for i, node_list in enumerate(node_lists):
-        #    print('node_list : ', i, node_list)
-        #    for node in node_list:
-        #        print('node : ' , node.mem)
-        master_values = [[200.0, 8.0], [200.0, 8.0]]
-    
-        all_tasks = [all_task1, all_task2]
-        master_list = []
-        for num in range(number_of_master_nodes):
-            #print('num : ', num)
-            #print(create_master_node(master_values[num],  node_lists[num], all_tasks[num], MAX_TESK_TYPE))
-            master_list.append(create_master_node(master_values[num],  node_lists[num], all_tasks[num], MAX_TESK_TYPE))
-            
-        #a=b
-        '''    
-        for master_ in master_list:
-            print('master_list ', master_.mem)
-            for node in master_.node_list:
-                print('node master: ' , node.mem)'''
-        cloud = create_cloud(POD_MEM, POD_CPU, service_coefficient, cur_time)
-        valid_node = get_valid_nodes(node_lists)
-        #print('valid_node : ', valid_node)
-        #print(cloud)
-        #print(master_list)
-        #print('master_list mem : ',master_list[0].mem, master_list[1].mem)
-        #print('master nodelist node memory', master_list[0].node_list)
-        #print('master nodelist node memory', master_list[0].node_list[0], len(master_list[0].node_list[0]))
-        #
+        node2_1 = Node(200.0, 8.0, [], [])
+        node2_2 = Node(100.0, 2.0, [], [])
+        node2_3 = Node(200.0, 6.0, [], [])
+        node_list2 = [node2_1, node2_2, node2_3]
+        # (cpu, mem,..., achieve task num, give up task num)
+        master1 = Master(200.0, 8.0, node_list1, [], all_task1, 0, 0, 0, [0] * MAX_TESK_TYPE, [0] * MAX_TESK_TYPE)
+        master2 = Master(200.0, 8.0, node_list2, [], all_task2, 0, 0, 0, [0] * MAX_TESK_TYPE, [0] * MAX_TESK_TYPE)
+        cloud = Cloud([], [], sys.maxsize, sys.maxsize)  # (..., cpu, mem)
+
+        valid_node = get_valid_nodes([node_list1, node_list2])
         # Crerate dockers based on deploy_state
         #create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2)
-        create_dockers(valid_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list)
-        
+        #create_dockers(valid_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list)
+        # Crerate dockers based on deploy_state
+        for i in range(valid_node):
+            for ii in range(MAX_TESK_TYPE):
+                dicision = deploy_state[i][ii]
+                if i < 3 and dicision == 1:
+                    j = i
+                    if master1.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
+                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
+                                        ii, [-1])
+                        master1.node_list[j].mem = master1.node_list[j].mem - POD_MEM * service_coefficient[ii]
+                        master1.node_list[j].service_list.append(docker)
+
+                if i >= 3 and dicision == 1:
+                    j = i - 3
+                    if master2.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
+                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
+                                        ii, [-1])
+                        master2.node_list[j].mem = master2.node_list[j].mem - POD_MEM * service_coefficient[ii]
+                        master2.node_list[j].service_list.append(docker)
         ########### Each slot ###########
         for slot in range(BREAK_POINT):
             cur_time = cur_time + SLOT_TIME
             ########### Each frame ###########
             if slot % CHO_CYCLE == 0 and slot != 0:
                 # Get task state, include successful, failed, and unresolved
-                done_tasks, undone_tasks, curr_tasks_in_queue = get_state_characteristics(MAX_TESK_TYPE, master_list) 
+                done_tasks, undone_tasks, curr_tasks_in_queue = get_state_characteristics(MAX_TESK_TYPE, master1, master2, num_edge_nodes_per_eAP)
                 
                 if slot != CHO_CYCLE:
                     exp['reward'].append(float(sum(deploy_reward)) / float(len(deploy_reward)))
@@ -155,20 +189,17 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 
             # Get current task
             
-            for i, _master in enumerate(master_list):
-                master_list[i] = update_task_queue(_master, cur_time, i)
-                
-                
-            #master1 = update_task_queue(master1, cur_time, 0)
-            #master2 = update_task_queue(master2, cur_time, 1)
-            curr_task = []
-            
-            for _master in master_list:
-                curr_task.append(get_current_task(_master))
-            #task1 = get_current_task(master1)
-            #task2 = get_current_task(master2)
-                
-            #curr_task = [task1, task2]
+            master1 = update_task_queue(master1, cur_time, 0)
+            master2 = update_task_queue(master2, cur_time, 1)
+            task1 = [-1]
+            task2 = [-1]
+            if len(master1.task_queue) != 0:
+                task1 = master1.task_queue[0]
+                del master1.task_queue[0]
+            if len(master2.task_queue) != 0:
+                task2 = master2.task_queue[0]
+                del master2.task_queue[0]
+            curr_task = [task1, task2]
             ava_node = []
 
             for i in range(len(curr_task)):
@@ -181,8 +212,20 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             
             # Current state of CPU and memory
             #TODO it is only possible to generalise this after separation of Q estimaters
-            cpu_list1, mem_list1, task_num1 = state_inside_eAP(master_list[0], num_edge_nodes_per_eAP)
-            cpu_list2, mem_list2, task_num2 = state_inside_eAP(master_list[1], num_edge_nodes_per_eAP)
+            cpu_list1 = []
+            mem_list1 = []
+            cpu_list2 = []
+            mem_list2 = []
+            task_num1 = [len(master1.task_queue)]
+            task_num2 = [len(master2.task_queue)]
+            for i in range(3):
+                cpu_list1.append([master1.node_list[i].cpu, master1.node_list[i].cpu_max])
+                mem_list1.append([master1.node_list[i].mem, master1.node_list[i].mem_max])
+                task_num1.append(len(master1.node_list[i].task_queue))
+            for i in range(3):
+                cpu_list2.append([master2.node_list[i].cpu, master2.node_list[i].cpu_max])
+                mem_list2.append([master2.node_list[i].mem, master2.node_list[i].mem_max])
+                task_num2.append(len(master2.node_list[i].task_queue))
             
             
             #print(task_num1, task_num2)
@@ -206,37 +249,89 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             ####
             # Put the current task on the queue based on dispatch decision
             #act = [2, 5]
-            put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, master_list)
-            #put_current_task_on_queue(act, curr_task, cluster_action_value, num_edge_nodes_per_eAP, cloud, master_list[0], master_list[1])
-            
+            #put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, master_list)
+            #put_current_task_on_queue(act, curr_task, cluster_action_value, num_edge_nodes_per_eAP, cloud, master1, master2)
+            for i in range(len(act)):
+                if curr_task[i][0] == -1:
+                    continue
+                if act[i] == 6:
+                    cloud.task_queue.append(curr_task[i])
+                    continue
+                if act[i] >= 0 and act[i] < 3:
+                    master1.node_list[act[i]].task_queue.append(curr_task[i])
+                    continue
+                if act[i] >= 3 and act[i] < 6:
+                    master2.node_list[act[i] - 3].task_queue.append(curr_task[i])
+                    continue
+                else:
+                    pass
             # Update state of task
             #update_state_of_task(num_edge_nodes_per_eAP, cur_time, check_queue, cloud, master1, master2)
             #update_state_of_task(num_edge_nodes_per_eAP, cur_time, check_queue, cloud, master_list[0], master_list[1])
             #TODO update check_queue
-            update_state_of_task(cur_time, check_queue, cloud, master_list)
-            
-            # Update state of dockers in every node
-            cloud = update_state_of_dockers(cur_time, cloud, master_list)
-            
-            #cur_done = [master1.done - pre_done[0], master2.done - pre_done[1]]
-            #cur_undone = [master1.undone - pre_undone[0], master2.undone - pre_undone[1]]
+            for i in range(3):
+                master1.node_list[i].task_queue, undone, undone_kind = check_queue(master1.node_list[i].task_queue,
+                                                                                   cur_time)
+                for j in undone_kind:
+                    master1.undone_kind[j] = master1.undone_kind[j] + 1
+                master1.undone = master1.undone + undone[0]
+                master2.undone = master2.undone + undone[1]
 
-            #pre_done = [master1.done, master2.done]
-            #pre_undone = [master1.undone, master2.undone]
+                master2.node_list[i].task_queue, undone, undone_kind = check_queue(master2.node_list[i].task_queue,
+                                                                                   cur_time)
+                for j in undone_kind:
+                    master2.undone_kind[j] = master2.undone_kind[j] + 1
+                master1.undone = master1.undone + undone[0]
+                master2.undone = master2.undone + undone[1]
+
+            cloud.task_queue, undone, undone_kind = check_queue(cloud.task_queue, cur_time)
+            master1.undone = master1.undone + undone[0]
+            master2.undone = master2.undone + undone[1]
+
+            # Update state of dockers in every node
+            for i in range(3):
+                master1.node_list[i], undone, done, done_kind, undone_kind = update_docker(master1.node_list[i],
+                                                                                           cur_time,
+                                                                                           service_coefficient, POD_CPU)
+                for j in range(len(done_kind)):
+                    master1.done_kind[done_kind[j]] = master1.done_kind[done_kind[j]] + 1
+                for j in range(len(undone_kind)):
+                    master1.undone_kind[undone_kind[j]] = master1.undone_kind[undone_kind[j]] + 1
+                master1.undone = master1.undone + undone[0]
+                master2.undone = master2.undone + undone[1]
+                master1.done = master1.done + done[0]
+                master2.done = master2.done + done[1]
+
+                master2.node_list[i], undone, done, done_kind, undone_kind = update_docker(master2.node_list[i],
+                                                                                           cur_time,
+                                                                                           service_coefficient, POD_CPU)
+                for j in range(len(done_kind)):
+                    master1.done_kind[done_kind[j]] = master1.done_kind[done_kind[j]] + 1
+                for j in range(len(undone_kind)):
+                    master1.undone_kind[undone_kind[j]] = master1.undone_kind[undone_kind[j]] + 1
+                master1.undone = master1.undone + undone[0]
+                master2.undone = master2.undone + undone[1]
+                master1.done = master1.done + done[0]
+                master2.done = master2.done + done[1]
+
+            cloud, undone, done, done_kind, undone_kind = update_docker(cloud, cur_time, service_coefficient, POD_CPU)
             
-            cur_done, cur_undone = [],[]
-            for i, master_ in enumerate(master_list):
-                cur_done.append(master_.done - pre_done[i])
-                cur_undone.append(master_.undone - pre_undone[i])
-                pre_done[i] = master_.done
-                pre_undone[i] = master_.undone
-                #print(master_.done - pre_done[i], master_.undone - pre_undone[i], master_.done, master_.undone)
+            master1.undone = master1.undone + undone[0]
+            master2.undone = master2.undone + undone[1]
+            master1.done = master1.done + done[0]
+            master2.done = master2.done + done[1]
+
+            cur_done = [master1.done - pre_done[0], master2.done - pre_done[1]]
+            cur_undone = [master1.undone - pre_undone[0], master2.undone - pre_undone[1]]
+
+            pre_done = [master1.done, master2.done]
+            pre_undone = [master1.undone, master2.undone]
+
             achieve_num.append(sum(cur_done))
             fail_num.append(sum(cur_undone))
-            #immediate_reward = calculate_reward(master1, master2, cur_done, cur_undone, num_edge_nodes_per_eAP)
-            immediate_reward = calculate_reward(master_list, cur_done, cur_undone, num_edge_nodes_per_eAP)
-
-            record.append([master_list, cur_done, cur_undone, immediate_reward])
+            immediate_reward = calculate_rewards(master1, master2, cur_done, cur_undone)
+            #print('immediate_reward : ', immediate_reward)
+            record.append([master1, master2, cur_done, cur_undone, immediate_reward])
 
             deploy_reward.append(sum(immediate_reward))
 
@@ -315,7 +410,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 50 # Number of Episodes to run
+    RUN_TIMES =  3 #500 Number of Episodes to run
     TASK_NUM = 5000 # Time for each Episode Ending
     TRAIN_TIMES = 50 # list containing two elements for tasks done on both master nodes
     CHO_CYCLE = 1000 # Orchestration cycle

@@ -206,9 +206,11 @@ class OrchestrateAgent(Agent):
         # Map gcn_outputs and raw_inputs to action probabilities
         self.node_act_probs, self.cluster_act_probs = self.ocn_net.predict((self.node_inputs, self.cluster_inputs, self.gcn.outputs) )#
         
+        
         # Draw action based on the probability
         logits = torch.log(self.node_act_probs)
         noise = torch.rand(logits.shape)
+        #print('self.node_act_probs,  logits.shape : ', self.node_act_probs.shape, logits.shape)
         self.node_acts = torch.topk(logits - torch.log(-torch.log(noise)), k=3).indices
 
         # Cluster_acts
