@@ -24,6 +24,7 @@ class Estimator:
         self.number_of_master_nodes = number_of_master_nodes
         self.action_dim = action_dim
         self.state_dim = state_dim
+        print(self.number_of_master_nodes)
         # Initial value for losses
         self.actor_loss = 0
         self.value_loss = 0
@@ -147,10 +148,11 @@ class Estimator:
         curr_state_value = []
         next_state_ids = []
         
+        
         grid_ids = [x for x in range(self.number_of_master_nodes)]
         
         self.valid_action_mask = np.zeros((self.number_of_master_nodes, self.action_dim))
-
+        #print('grid_ids, self.valid_action_mask : ', grid_ids, self.valid_action_mask)
         for i in range(len(ava_node)):
             for j in ava_node[i]:
                 self.valid_action_mask[i][j] = 1
