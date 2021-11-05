@@ -279,61 +279,6 @@ class Estimator:
         self.set_lr(self.pm_optimizer, learning_rate)
         loss.backward()
         self.pm_optimizer.step()
-        
-'''        
-def calculate_reward(master1, master2, cur_done, cur_undone, num_edge_nodes_per_eAP):
-    """
-    Tailored MARDL for Decentralised request dispatch - Reward : Improve the longterm throughput while ensuring the load balancing at the edge
-    
-    [Function that returns rewards from environment given master nodes and the current tasks]
-
-    Args:
-        master1 ([Class]): [Master Node containing the cpu and memory values]
-        master2 ([Class]): [Master Node containing the cpu and memory values]
-        cur_done ([list]): [list containing two elements for tasks done on both master nodes]
-        cur_undone ([list]): [list containing two elements for tasks not done yet on both master nodes]
-
-    Returns:
-        reward [list]: [list of rewards for both master nodes]
-    """
-    
-    weight = 1.0
-    all_task = [float(cur_done[0] + cur_undone[0]), float(cur_done[1] + cur_undone[1])]
-    fail_task = [float(cur_undone[0]), float(cur_undone[1])]
-    reward = []
-    # The ratio of requests that violate delay requirements
-    task_fail_rate = []
-    if all_task[0] != 0:
-        task_fail_rate.append(fail_task[0] / all_task[0])
-    else:
-        task_fail_rate.append(0)
-
-    if all_task[1] != 0:
-        task_fail_rate.append(fail_task[1] / all_task[1])
-    else:
-        task_fail_rate.append(0)
-
-    # The standard deviation of the CPU and memory usage
-    standard_list = []
-    use_rate1 = []
-    use_rate2 = []
-    for i in range(num_edge_nodes_per_eAP):
-        use_rate1.append(master1.node_list[i].cpu / master1.node_list[i].cpu_max)
-        use_rate1.append(master1.node_list[i].mem / master1.node_list[i].mem_max)
-        use_rate2.append(master2.node_list[i].cpu / master2.node_list[i].cpu_max)
-        use_rate2.append(master2.node_list[i].mem / master2.node_list[i].mem_max)
-
-    standard_list.append(np.std(use_rate1, ddof=1))
-    standard_list.append(np.std(use_rate2, ddof=1))
-
-    reward.append(math.exp(-task_fail_rate[0]) + weight * math.exp(-standard_list[0]))
-    reward.append(math.exp(-task_fail_rate[1]) + weight * math.exp(-standard_list[1]))
-    # Immediate reward   e^(-lambda - weight_of_load_balancing *standard_deviation_of_cpu_memory)
-    
-    # Two rewards for each eAP
-    return reward
-    
-    '''
     
 def to_grid_rewards(node_reward):
     
@@ -345,33 +290,29 @@ def to_grid_rewards(node_reward):
     
     return np.array(node_reward).reshape([-1, 1])
 
-def calculate_reward(master_list, cur_done, cur_undone, num_edge_nodes_per_eAP):
+
+
+def calculate_reward(master_list, cur_done, cur_undone):
     """
     Tailored MARDL for Decentralised request dispatch - Reward : Improve the longterm throughput while ensuring the load balancing at the edge
     
     [Function that returns rewards from environment given master nodes and the current tasks]
 
     Args:
-        master1 ([Class]): [Master Node containing the cpu and memory values]
-        master2 ([Class]): [Master Node containing the cpu and memory values]
+        master_list ([Master Object list]): [Edge Access Point list containing nodes]
         cur_done ([list]): [list containing two elements for tasks done on both master nodes]
         cur_undone ([list]): [list containing two elements for tasks not done yet on both master nodes]
 
     Returns:
         reward [list]: [list of rewards for both master nodes]
     """
-    #master_list = [master1, master2]
     weight = 1.0
     all_task = []
-    for i in range(len(cur_done)):
+    fail_task = []
+    for i in range(len(master_list)):
         all_task.append(float(cur_done[i] + cur_undone[i]))
-    
-    fail_task = []    
-    for i in range(len(cur_undone)):      
-        fail_task.append(cur_undone[i]) 
+        fail_task.append(float(cur_undone[i]))
         
-    #all_task = [float(cur_done[0] + cur_undone[0]), float(cur_done[1] + cur_undone[1])]
-    #fail_task = [float(cur_undone[0]), float(cur_undone[1])]
     reward = []
     # The ratio of requests that violate delay requirements
     task_fail_rate = []
@@ -386,41 +327,26 @@ def calculate_reward(master_list, cur_done, cur_undone, num_edge_nodes_per_eAP):
         task_fail_rate.append(0)
 
     # The standard deviation of the CPU and memory usage
-    standard_list = []
     
-    use_dict = {}
+    use_rate_dict = {}
     for i in range(len(master_list)):
-        use_dict[i] = []
+        use_rate_dict[i] = []
     
-    
-    for i, master in enumerate(master_list):
-        for node in master.node_list:
-            use_dict[i].append(node.cpu/node.cpu_max)
-            use_dict[i].append(node.mem/node.mem_max)           
-             
-    for i in range(len(master_list)):
-        standard_list.append(np.std(use_dict[i], ddof=1))
-    
-    
-    for i in range(len(master_list)):
-        reward.append(math.exp(-task_fail_rate[0]) + weight * math.exp(-standard_list[0]))
-    
-    '''        
-    use_rate1 = []
-    use_rate2 = []
-    for i in range(num_edge_nodes_per_eAP):
-        use_rate1.append(master1.node_list[i].cpu / master1.node_list[i].cpu_max)
-        use_rate1.append(master1.node_list[i].mem / master1.node_list[i].mem_max)
-        use_rate2.append(master2.node_list[i].cpu / master2.node_list[i].cpu_max)
-        use_rate2.append(master2.node_list[i].mem / master2.node_list[i].mem_max)
+    for i, mstr in enumerate(master_list):
+        for j in range(len(mstr.node_list)):
+            use_rate_dict[i].append(mstr.node_list[j].cpu / mstr.node_list[j].cpu_max)
+            use_rate_dict[i].append(mstr.node_list[j].mem / mstr.node_list[j].mem_max)
 
-    standard_list.append(np.std(use_rate1, ddof=1))
-    standard_list.append(np.std(use_rate2, ddof=1))
+    standard_list_dict = {}
+    for i in range(len(master_list)):
+        standard_list_dict[i] = np.std(use_rate_dict[i], ddof=1)
 
-    reward.append(math.exp(-task_fail_rate[0]) + weight * math.exp(-standard_list[0]))
-    reward.append(math.exp(-task_fail_rate[1]) + weight * math.exp(-standard_list[1]))
+    reward_dict = {}
+    for i in range(len(master_list)):
+        reward_dict[i] = math.exp(-task_fail_rate[i]) + weight * math.exp(-standard_list_dict[i])
+
+    reward = []
+    for r in range(len(master_list)):
+        reward.append(reward_dict[r])
     # Immediate reward   e^(-lambda - weight_of_load_balancing *standard_deviation_of_cpu_memory)
-    '''
-    # Two rewards for each eAP
-    #print('Reward : ', reward)
     return reward

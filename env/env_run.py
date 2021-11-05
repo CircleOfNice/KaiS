@@ -113,11 +113,8 @@ def check_queue(task_queue, cur_time):
     i = 0
     while len(task_queue) != i:
         flag = 0
-        #print('I : ', i)
         if cur_time >= task_queue[i][2]:
             undone[task_queue[i][5]] = undone[task_queue[i][5]] + 1
-            
-            print('Still need to be checked cur_time, task_queue[i][2], cur_time >= task_queue[i][2], undone[task_queue[i][5]] , len(task_queue): ', cur_time, task_queue[i][2], cur_time >= task_queue[i][2], undone[task_queue[i][5]], len(task_queue))
             undone_kind.append(task_queue[i][0])
             del task_queue[i]
             flag = 1
@@ -125,7 +122,6 @@ def check_queue(task_queue, cur_time):
             flag = 0
         else:
             i = i + 1
-    #print('check task_queue, undone, undone_kind : ', task_queue, undone, undone_kind)
     return task_queue, undone, undone_kind
 
 

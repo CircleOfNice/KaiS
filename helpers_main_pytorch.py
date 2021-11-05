@@ -51,87 +51,7 @@ def flatten(list):
         [list]: [Serialized list ]
     """    
     return [y for x in list for y in x]
-
-    '''   
-    def get_state_characteristics(MAX_TESK_TYPE, master1, master2, num_edge_nodes_per_eAP):
-    """Get lists of tasks that are done, undone and current task in queue
-
-    Args:
-        MAX_TESK_TYPE ([int]): Maximum types of tasks
-        master1 ([Master Object]): [Edge Access Point 1]
-        master2 ([Master Object]): [Edge Access Point 2]
-        num_edge_nodes_per_eAP ([type]): [Number of edge nodes under an edge access point]
-
-    Returns:
-        [lists]: [lists of number of done, undone and current tasks in queue]
-    """
-    done_tasks = []
-    undone_tasks = []
-    curr_tasks_in_queue = []
-    # Get task state, include successful, failed, and unresolved
-    for i in range(MAX_TESK_TYPE):
-        done_tasks.append(float(master1.done_kind[i] + master2.done_kind[i]))
-        undone_tasks.append(float(master1.undone_kind[i] + master2.undone_kind[i]))
-        
-    for i in range(num_edge_nodes_per_eAP):
-        tmp = [0.0] * MAX_TESK_TYPE
-        for j in range(len(master1.node_list[i].task_queue)):
-            tmp[master1.node_list[i].task_queue[j][0]] = tmp[master1.node_list[i].task_queue[j][0]] + 1.0
-        curr_tasks_in_queue.append(tmp)
-    for i in range(num_edge_nodes_per_eAP):
-        tmp = [0.0] * MAX_TESK_TYPE
-        for k in range(len(master2.node_list[i].task_queue)):
-            tmp[master2.node_list[i].task_queue[k][0]] = tmp[master2.node_list[i].task_queue[k][0]] + 1
-        curr_tasks_in_queue.append(tmp)    
-    return done_tasks, undone_tasks, curr_tasks_in_queue
-    '''
-def get_state_characteristics(MAX_TESK_TYPE, master_list):
-    """Get lists of tasks that are done, undone and current task in queue
-
-    Args:
-        MAX_TESK_TYPE ([int]): Maximum types of tasks
-        master1 ([Master Object]): [Edge Access Point 1]
-        master2 ([Master Object]): [Edge Access Point 2]
-        num_edge_nodes_per_eAP ([type]): [Number of edge nodes under an edge access point]
-
-    Returns:
-        [lists]: [lists of number of done, undone and current tasks in queue]
-    """
-    
-    #master_list = [master1, master2]
-    done_tasks = []
-    undone_tasks = []
-    curr_tasks_in_queue = []
-    # Get task state, include successful, failed, and unresolved
-    for i in range(MAX_TESK_TYPE):
-        done_kind_val = 0
-        undone_kind_val = 0
-        for j in range(len(master_list)):
-            done_kind_val += float(master_list[j].done_kind[i] )
-            undone_kind_val += float(master_list[j].undone_kind[i] )  
-        done_tasks.append(done_kind_val)
-        undone_tasks.append(undone_kind_val)
-    
-    for master in master_list:
-        for i in range(len(master.node_list)):
-            tmp = [0.0] * MAX_TESK_TYPE
-        for j in range(len(master.node_list[i].task_queue)):
-            tmp[master.node_list[i].task_queue[j][0]] = tmp[master.node_list[i].task_queue[j][0]] + 1.0
-        curr_tasks_in_queue.append(tmp)
-    '''
-    for i in range(num_edge_nodes_per_eAP):
-        tmp = [0.0] * MAX_TESK_TYPE
-        for j in range(len(master1.node_list[i].task_queue)):
-            tmp[master1.node_list[i].task_queue[j][0]] = tmp[master1.node_list[i].task_queue[j][0]] + 1.0
-        curr_tasks_in_queue.append(tmp)
-    for i in range(num_edge_nodes_per_eAP):
-        tmp = [0.0] * MAX_TESK_TYPE
-        for k in range(len(master2.node_list[i].task_queue)):
-            tmp[master2.node_list[i].task_queue[k][0]] = tmp[master2.node_list[i].task_queue[k][0]] + 1
-        curr_tasks_in_queue.append(tmp)    
-        '''
-    #print('done_tasks, undone_tasks, curr_tasks_in_queue : ', done_tasks, undone_tasks, curr_tasks_in_queue)
-    return done_tasks, undone_tasks, curr_tasks_in_queue
+ 
 
 def remove_docker_from_master_node(master, change_node_idx, service_index, deploy_state):
     """Function to remove appropriate docker container from a given EAP (master node)
@@ -216,12 +136,7 @@ def state_inside_eAP(master, num_edge_nodes_per_eAP):
         mem_list.append([master.node_list[i].mem, master.node_list[i].mem_max])
         task_num.append(len(master.node_list[i].task_queue))
     return cpu_list, mem_list, task_num
-
-
-
-
-                        
-                        
+                      
 def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE,):
     # Make decision of orchestration
     change_node, change_service, exp = act_offload_agent(orchestrate_agent, exp, done_tasks,
@@ -229,335 +144,164 @@ def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_t
                                                                      deploy_state_float, MAX_TESK_TYPE)
     return change_node, change_service, exp
 
-def execute_orchestration(change_node, change_service, num_edge_nodes_per_eAP,deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2):
+def create_node_list(node_specification):
+    node_list = []
+    for node_spec in node_specification:
+        node_list.append(Node(node_spec[0], node_spec[1], [], []))
+    return node_list
+
+def create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time):
+    
+    node_lists = []
+    for node_params in node_param_lists:
+        node_lists.append(create_node_list(node_params))
+    
+    # (cpu, mem,..., achieve task num, give up task num)
+    master_list = []
+    for i, master_params in enumerate(master_param_lists):
+        master_list.append(Master(master_params[0], master_params[1], node_lists[i], [], all_task_list[i], 0, 0, 0, [0] * MAX_TESK_TYPE, [0] * MAX_TESK_TYPE))
+    
+    
+    cloud = Cloud([], [], sys.maxsize, sys.maxsize)  # (..., cpu, mem)
+    ################################################################################################
+    for i in range(MAX_TESK_TYPE):
+        docker = Docker(POD_MEM * service_coefficient[i], POD_CPU * service_coefficient[i], cur_time, i, [-1])
+        cloud.service_list.append(docker)
+    
+    return master_list, cloud
+        
+def put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, master_list): 
+    length_list = [0]
+    last_length = length_list[0]
+    for mstr in master_list:
+        length_list.append(last_length + len(mstr.node_list))
+        last_length = last_length + len(mstr.node_list)
+    for i in range(len(act)):
+        if curr_task[i][0] == -1:
+            continue
+        if act[i] == cluster_action_value:
+            cloud.task_queue.append(curr_task[i])
+            continue
+        
+        for j in range(len(length_list)-1):
+            if act[i] >= length_list[j] and act[i] < length_list[j+1] :
+                master_list[j].node_list[act[i] - length_list[j]].task_queue.append(curr_task[i])
+                
+            
+def update_state_of_task( cur_time, check_queue, cloud, master_list):
+    for mstr in master_list:
+        for i in range(len(mstr.node_list)):
+            mstr.node_list[i].task_queue, undone, undone_kind = check_queue(mstr.node_list[i].task_queue, cur_time)
+            for j in undone_kind:
+                mstr.undone_kind[j] = mstr.undone_kind[j] + 1
+            
+            #TODO I do not understand why the undone list is used to update every other list
+            
+            for i, master_entity in enumerate(master_list):
+                master_entity.update_undone(undone[i])
+
+    cloud.task_queue, undone, undone_kind = check_queue(cloud.task_queue, cur_time)
+    for i, master_entity in enumerate(master_list):
+        master_entity.update_undone(undone[i])
+    
+def update_state_of_dockers(cur_time, cloud, master_list):
+    for mstr in master_list:
+        for i in range(len(mstr.node_list)):
+            mstr.node_list[i], undone, done, done_kind, undone_kind = update_docker(mstr.node_list[i], cur_time, service_coefficient, POD_CPU)
+            for j in range(len(done_kind)):
+                mstr.done_kind[done_kind[j]] = mstr.done_kind[done_kind[j]] + 1
+            for j in range(len(undone_kind)):
+                mstr.undone_kind[undone_kind[j]] = mstr.undone_kind[undone_kind[j]] + 1
+            
+            for i, master_entity in enumerate(master_list):
+                master_entity.update_undone(undone[i])
+                master_entity.update_done(done[i])
+    cloud, undone, done, done_kind, undone_kind = update_docker(cloud, cur_time, service_coefficient, POD_CPU)
+
+    for i, master_entity in enumerate(master_list):
+                master_entity.update_undone(undone[i])
+                master_entity.update_done(done[i])
+
+    return cloud  
+
+def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list):
+
+    length_list = [0]
+    last_length = length_list[0]
+    for mstr in master_list:
+        length_list.append(last_length + len(mstr.node_list))
+        last_length = last_length + len(mstr.node_list)
+    
+    for i in range(vaild_node):
+            for ii in range(MAX_TESK_TYPE):
+                dicision = deploy_state[i][ii]
+                for j in range(len(length_list)-1):
+                    if i>= length_list[j] and i < length_list[j+1] and dicision == 1:
+                        k= i-length_list[j]
+                        if master_list[j].node_list[k].mem >= POD_MEM * service_coefficient[ii]:
+                            docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
+                                            ii, [-1])
+                            master_list[j].add_to_node_attribute(k, 'mem', - POD_MEM * service_coefficient[ii])
+                            master_list[j].append_docker_to_node_service_list(k, docker)
+                            
+                        
+                        
+def get_state_characteristics(MAX_TESK_TYPE, master_list):
+    """Get lists of tasks that are done, undone and current task in queue
+
+    Args:
+        MAX_TESK_TYPE ([int]): Maximum types of tasks
+        master_list ([Master Object list]): [Edge Access Point list containing nodes]
+        num_edge_nodes_per_eAP ([type]): [Number of edge nodes under an edge access point]
+
+    Returns:
+        [lists]: [lists of number of done, undone and current tasks in queue]
+    """
+    done_tasks = []
+    undone_tasks = []
+    curr_tasks_in_queue = []
+    
+    # Get task state, include successful, failed, and unresolved
+    for i in range(MAX_TESK_TYPE):
+        done_val = 0.0
+        undone_val = 0.0
+        for master in master_list:
+            done_val += master.done_kind[i]
+            undone_val += master.undone_kind[i]
+        done_tasks.append(done_val)
+        undone_tasks.append(undone_val)     
+        
+    for master in master_list:
+        for i in range(len(master.node_list)):
+            tmp = [0.0] * MAX_TESK_TYPE
+            for j in range(len(master.node_list[i].task_queue)):
+                tmp[master.node_list[i].task_queue[j][0]] = tmp[master.node_list[i].task_queue[j][0]] + 1.0
+            curr_tasks_in_queue.append(tmp)
+    return done_tasks, undone_tasks, curr_tasks_in_queue
+
+
+def execute_orchestration(change_node, change_service,deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list):
+    
+    length_list = [0]
+    last_length = length_list[0]
+    for mstr in master_list:
+        length_list.append(last_length + len(mstr.node_list))
+        last_length = last_length + len(mstr.node_list)
     # Execute orchestration
     for i in range(len(change_node)):
         if change_service[i] < 0:
             # Delete docker and free memory
             service_index = -1 * change_service[i] - 1
-            if change_node[i] < num_edge_nodes_per_eAP:
-                remove_docker_from_master_node(master1, change_node[i], service_index, deploy_state)
-
-            else:
-                node_index = change_node[i] - num_edge_nodes_per_eAP
-                remove_docker_from_master_node(master2, node_index, service_index, deploy_state)
-
+            
+            for iter in range(len(length_list)-1):
+                if change_node[i] < length_list[iter+1] and change_node[i] >= length_list[iter]:
+                    node_index = change_node[i] - length_list[iter]
+                    remove_docker_from_master_node(master_list[iter], node_index, service_index, deploy_state)
         else:
             # Add docker and tack up memory
             service_index = change_service[i] - 1
-            if change_node[i] < num_edge_nodes_per_eAP:
-                if master1.node_list[change_node[i]].mem >= POD_MEM * service_coefficient[service_index]:
-                    deploy_new_docker(master1, POD_MEM, POD_CPU, cur_time, change_node[i], service_coefficient, service_index, deploy_state)
-            else:
-                node_index = change_node[i] - num_edge_nodes_per_eAP
-                if master2.node_list[node_index].mem >= POD_MEM * service_coefficient[service_index]:
-                    deploy_new_docker(master2, POD_MEM, POD_CPU, cur_time, node_index, service_coefficient, service_index, deploy_state)
-                    
-                    
-'''
-        
-def update_state_of_task(num_edge_nodes_per_eAP, cur_time, check_queue, cloud, master1, master2):
-                
-    for i in range(num_edge_nodes_per_eAP):
-        master1.node_list[i].task_queue, undone, undone_kind = check_queue(master1.node_list[i].task_queue,
-                                                                        cur_time)
-        for j in undone_kind:
-            master1.undone_kind[j] = master1.undone_kind[j] + 1
-        master1.update_undone(undone[0])
-        master2.update_undone(undone[1])
-        
-        master2.node_list[i].task_queue, undone, undone_kind = check_queue(master2.node_list[i].task_queue,
-                                                                        cur_time)
-        for j in undone_kind:
-            master2.undone_kind[j] = master2.undone_kind[j] + 1
-        master1.update_undone(undone[0])
-        master2.update_undone(undone[1])
-        
-
-    cloud.task_queue, undone, undone_kind = check_queue(cloud.task_queue, cur_time)
-    master1.update_undone(undone[0])
-    master2.update_undone(undone[1])    
-    
-    
-    
-
-def update_state_of_dockers(cur_time, cloud, master1, master2):
-                
-    for i in range(num_edge_nodes_per_eAP):
-        master1.node_list[i], undone, done, done_kind, undone_kind = update_docker(master1.node_list[i],
-                                                                                cur_time,
-                                                                                service_coefficient, POD_CPU)
-        for j in range(len(done_kind)):
-            master1.done_kind[done_kind[j]] = master1.done_kind[done_kind[j]] + 1
-        for j in range(len(undone_kind)):
-            master1.undone_kind[undone_kind[j]] = master1.undone_kind[undone_kind[j]] + 1
-        
-        master1.update_undone(undone[0])
-        master2.update_undone(undone[1])
-        master1.update_done(done[0])
-        master2.update_done(done[1])
-
-        master2.node_list[i], undone, done, done_kind, undone_kind = update_docker(master2.node_list[i],
-                                                                                cur_time,
-                                                                                service_coefficient, POD_CPU)
-        for j in range(len(done_kind)):
-            master1.done_kind[done_kind[j]] = master1.done_kind[done_kind[j]] + 1
-        for j in range(len(undone_kind)):
-            master1.undone_kind[undone_kind[j]] = master1.undone_kind[undone_kind[j]] + 1
-        
-        master1.update_undone(undone[0])
-        master2.update_undone(undone[1])
-        master1.update_done(done[0])
-        master2.update_done(done[1])
-
-    cloud, undone, done, done_kind, undone_kind = update_docker(cloud, cur_time, service_coefficient, POD_CPU)
-
-
-    master1.update_undone(undone[0])
-    master2.update_undone(undone[1])
-    master1.update_done(done[0])
-    master2.update_done(done[1])
-    
-    return cloud   
-
-def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2):
-    #print('vaild_node :',vaild_node)
-    for i in range(vaild_node):
-            for ii in range(MAX_TESK_TYPE):
-                dicision = deploy_state[i][ii]
-                if i < num_edge_nodes_per_eAP and dicision == 1:
-                    j = i
-                    if master1.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
-                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
-                                        ii, [-1])
-                        master1.add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
-                        master1.append_docker_to_node_service_list(j, docker)
-
-                if i >= num_edge_nodes_per_eAP and dicision == 1:
-                    j = i - num_edge_nodes_per_eAP
-                    if master2.node_list[j].mem >= POD_MEM * service_coefficient[ii]:
-                        docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
-                                        ii, [-1])
-                        master2.add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
-                        master2.append_docker_to_node_service_list(j, docker)
-                        
-def create_eAP_and_Cloud(all_task1, all_task2, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time):
-            node1_1 = Node(100.0, 4.0, [], [])  # (cpu, mem,...)
-            node1_2 = Node(200.0, 6.0, [], [])
-            node1_3 = Node(100.0, 8.0, [], [])
-            node_list1 = [node1_1, node1_2, node1_3]
-
-            node2_1 = Node(200.0, 8.0, [], [])
-            node2_2 = Node(100.0, 2.0, [], [])
-            node2_3 = Node(200.0, 6.0, [], [])
-            node_list2 = [node2_1, node2_2, node2_3]
-            # (cpu, mem,..., achieve task num, give up task num)
-            master1 = Master(200.0, 8.0, node_list1, [], all_task1, 0, 0, 0, [0] * MAX_TESK_TYPE, [0] * MAX_TESK_TYPE)
-            master2 = Master(200.0, 8.0, node_list2, [], all_task2, 0, 0, 0, [0] * MAX_TESK_TYPE, [0] * MAX_TESK_TYPE)
-            cloud = Cloud([], [], sys.maxsize, sys.maxsize)  # (..., cpu, mem)
-            ################################################################################################
-            for i in range(MAX_TESK_TYPE):
-                docker = Docker(POD_MEM * service_coefficient[i], POD_CPU * service_coefficient[i], cur_time, i, [-1])
-                cloud.service_list.append(docker)
-            return master1, master2, cloud
             
-            
-def put_current_task_on_queue(act, curr_task, cluster_action_value, num_edge_nodes_per_eAP, cloud, master1, master2):
-    for i in range(len(act)):
-        if curr_task[i][0] == -1:
-            continue
-        if act[i] == cluster_action_value:
-            cloud.task_queue.append(curr_task[i])
-            continue
-        if act[i] >= 0 and act[i] < num_edge_nodes_per_eAP:
-            master1.node_list[act[i]].task_queue.append(curr_task[i])
-            continue
-        if act[i] >= num_edge_nodes_per_eAP and act[i] < cluster_action_value:
-            master2.node_list[act[i] - num_edge_nodes_per_eAP].task_queue.append(curr_task[i])
-            continue
-        else:
-            pass         
-'''
-                        
-def create_node_list(spec_list):
-    node_list = []
-    for spec in spec_list:
-        nod = Node(spec[0], spec[1], [], [])
-        node_list.append(nod)
-        
-    return node_list
-
-def create_master_node(master_value, node_list, all_task, MAX_TESK_TYPE):
-    master = Master(master_value[0], master_value[1], node_list, [], all_task, 0, 0, 0, [0] * MAX_TESK_TYPE, [0] * MAX_TESK_TYPE)
-    return master
-
-def create_cloud(POD_MEM, POD_CPU, service_coefficient, cur_time):
-    cloud = Cloud([], [], sys.maxsize, sys.maxsize)  # (..., cpu, mem)
-    for i in range(MAX_TESK_TYPE):
-        docker = Docker(POD_MEM * service_coefficient[i], POD_CPU * service_coefficient[i], cur_time, i, [-1])
-        cloud.service_list.append(docker)
-    return cloud
-
-def get_valid_nodes(node_lists):
-    length = 0
-    for node_list in node_lists:
-        length+=len(node_list)
-    return length
-        
-def get_length(lengths_nodelist, index):
-    sum = 0
-    for i in range(index + 1):
-        sum += lengths_nodelist[i]
-    return sum
-
-def create_and_add_to_master(cur_time, master_list, ii, j , init):
-    docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
-                                        ii, [-1])
-    master_list[init].add_to_node_attribute(j, 'mem', - POD_MEM * service_coefficient[ii])
-    master_list[init].append_docker_to_node_service_list(j, docker)
-                
-def create_dockers(valid_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list ):
-    lengths_nodelist = []
-    for master in master_list:
-        lengths_nodelist.append(len(master.node_list))
-    init = 0
-    init_pos = 0
-    next_pos = lengths_nodelist[init]
-
-    for i in range(valid_node):
-            for ii in range(MAX_TESK_TYPE):
-                decision = deploy_state[i][ii]
-                if i >= init_pos and i< next_pos and decision ==1:
-                    j = i - init_pos
-                    
-                    if master_list[init].node_list[j].mem >= POD_MEM * service_coefficient[ii]:
-                        create_and_add_to_master(cur_time, master_list, ii, j , init)
-
-                elif i >= next_pos and i < valid_node and decision ==1 :
-                    init = init + 1
-                    init_pos = next_pos
-                    next_pos = next_pos + lengths_nodelist[init] 
-                    j = i - init_pos
-                    
-                    if master_list[init].node_list[j].mem >= POD_MEM * service_coefficient[ii]:
-                        create_and_add_to_master(cur_time, master_list, ii, j , init)
-'''                       
-def put_current_task_on_queue(act, curr_task, cluster_action_value, num_edge_nodes_per_eAP, cloud, master1, master2):
-    #print('Len Act : ', len(act), act)
-    for i in range(len(act)):
-        if curr_task[i][0] == -1:
-            #print('curr_task[i][0] == -1 : ', curr_task[i][0])
-            continue
-        if act[i] == cluster_action_value:
-            #print('Cloud : ', act[i], cluster_action_value)
-            cloud.task_queue.append(curr_task[i])
-            continue
-        if act[i] >= 0 and act[i] < num_edge_nodes_per_eAP:
-            print('act[i] >= 0 and act[i] < num_edge_nodes_per_eAP: ', act[i], num_edge_nodes_per_eAP)
-            master1.node_list[act[i]].task_queue.append(curr_task[i])
-            continue
-        if act[i] >= num_edge_nodes_per_eAP and act[i] < cluster_action_value:
-            print('act[i] >= num_edge_nodes_per_eAP and act[i] < cluster_action_value: ', act[i], num_edge_nodes_per_eAP, cluster_action_value)
-            master2.node_list[act[i] - num_edge_nodes_per_eAP].task_queue.append(curr_task[i])
-            continue
-        else:
-            pass   
-'''                    
-def put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, master_list):
-    lengths_nodelist = []
-    for master in master_list:
-        lengths_nodelist.append(len(master.node_list))
-    init = 0
-    init_pos = 0
-    next_pos = lengths_nodelist[init]
-    
-    for i in range(len(act)):
-        if curr_task[i][0] == -1:
-            #print('curr_task[i][0] == -1 : ', curr_task[i][0])
-            continue
-        if act[i] == cluster_action_value:
-            #print('Cloud : ', act[i], cluster_action_value)
-            cloud.task_queue.append(curr_task[i])
-            continue
-        if act[i] >= init_pos and act[i] < next_pos:
-            print('condition act[i] >= init_pos and act[i] < next_pos: ', act[i], next_pos, init_pos)
-            master_list[init].node_list[act[i]].task_queue.append(curr_task[i])
-            continue
-        try:
-            
-            if act[i] >= next_pos and act[i] < next_pos + lengths_nodelist[init+1]:
-                #print('try: condition act[i] >= next_pos and act[i] < next_pos + lengths_nodelist[init+1]: ', act[i], cluster_action_value, next_pos)
-                print('Before init, init_pos, next_pos, act[i] : ', init, init_pos, next_pos, act[i])
-                init = init + 1
-                init_pos = next_pos
-                next_pos = next_pos + lengths_nodelist[init] 
-                #print('try: after condition act[i] >= next_pos and act[i] < next_pos + lengths_nodelist[init+1]: ', act[i], cluster_action_value, next_pos)
-                print('After init, init_pos, next_pos, act[i] : ', init, init_pos, next_pos, act[i])
-                master_list[init].node_list[act[i] - init_pos].task_queue.append(curr_task[i])
-                continue
-        except:
-            if act[i] >= next_pos and act[i] < cluster_action_value:
-                print('except condition act[i] >= next_pos and act[i] < cluster_action_value: ', act[i], cluster_action_value, next_pos)
-                init = init + 1
-                init_pos = next_pos
-                next_pos = next_pos + lengths_nodelist[init] 
-
-                master_list[init].node_list[act[i] - init_pos].task_queue.append(curr_task[i])
-                continue
-        else:
-            pass
- 
-      
-def update_all_task_queue(master, master_list, cur_time, check_queue, i):
-    
-    master.node_list[i].task_queue, undone, undone_kind = check_queue(master.node_list[i].task_queue, cur_time)
-        
-    for j in undone_kind:
-        master.undone_kind[j] = master.undone_kind[j] + 1
-        
-    for i, master_ in enumerate(master_list):
-        master_.update_undone(undone[i])    
-             
-def update_state_of_task(cur_time, check_queue, cloud, master_list):
-    for master_node in master_list:
-        for i in range(len(master_node.node_list)):
-
-            update_all_task_queue(master_node, master_list, cur_time, check_queue, i)
-            
-    #update_all_task_queue(cloud, master_list, cur_time, check_queue, i)
-    cloud.task_queue, undone, undone_kind = check_queue(cloud.task_queue, cur_time)
-    
-    for i, master_ in enumerate(master_list):
-        master_.update_undone(undone[i]) 
-    #master1.update_undone(undone[0])
-    #master2.update_undone(undone[1]) 
-
-    
-def update_all_dockers(master, master_list, cur_time, i):
-    master.node_list[i], undone, done, done_kind, undone_kind = update_docker(master.node_list[i], cur_time, service_coefficient, POD_CPU)
-        
-    for j in range(len(done_kind)):
-        master.done_kind[done_kind[j]] = master.done_kind[done_kind[j]] + 1
-        
-    for j in range(len(undone_kind)):
-            master.undone_kind[undone_kind[j]] = master.undone_kind[undone_kind[j]] + 1
-                
-    #for j in range(len(undone_kind)):
-    #    master.undone_kind[undone_kind[j]] = master.undone_kind[undone_kind[j]] + 1
-
-    for i, master_ in enumerate(master_list):
-        master_.update_undone(undone[i])  
-        master_.update_done(done[i])
-    
-def update_state_of_dockers(cur_time, cloud, master_list):
-    for master_node in master_list:
-        for i in range(len(master_node.node_list)):
-            update_all_dockers(master_node, master_list, cur_time, i)
-            
-    #update_all_dockers(cloud, master_list, cur_time, i)
-    cloud, undone, done, done_kind, undone_kind = update_docker(cloud, cur_time, service_coefficient, POD_CPU)
-
-    for i, master_ in enumerate(master_list):
-        master_.update_undone(undone[i])  
-        master_.update_done(done[i])
-    return cloud 
+            for iter in range(len(length_list)-1):
+                if change_node[i] < length_list[iter+1] and change_node[i] >= length_list[iter]:
+                    node_index = change_node[i] - length_list[iter]
+                    deploy_new_docker(master_list[iter], POD_MEM, POD_CPU, cur_time, node_index, service_coefficient, service_index, deploy_state)

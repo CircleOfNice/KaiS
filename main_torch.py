@@ -65,53 +65,30 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                         [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
                         [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1]]
 
+        
+        node_list_1 = [[100.0, 4.0], [200.0, 6.0], [100.0, 8.0]]
+        node_list_2 = [[200.0, 8.0], [100.0, 2.0], [200.0, 6.0]]
+        
+        node_param_lists = [node_list_1, node_list_2]
+        
+        master_param_lists = [[200.0, 8.0], [200.0, 8.0]]
+        
+        all_task_list = [all_task1, all_task2]
         # Create clusters based on the hardware resources you need
-        #master1, master2, cloud = create_eAP_and_Cloud(all_task1, all_task2, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time)
-        node_list_1 = [[100.0, 4.0], [200.0, 6.0,], [100.0, 8.0]]
-        node_list_2 = [[200.0, 8.0], [100.0, 2.0,], [200.0, 6.0]]
-        node_lists = [create_node_list(node_list_1), create_node_list(node_list_2)]
 
-        
-        #for i, node_list in enumerate(node_lists):
-        #    print('node_list : ', i, node_list)
-        #    for node in node_list:
-        #        print('node : ' , node.mem)
-        master_values = [[200.0, 8.0], [200.0, 8.0]]
-    
-        all_tasks = [all_task1, all_task2]
-        master_list = []
-        for num in range(number_of_master_nodes):
-            #print('num : ', num)
-            #print(create_master_node(master_values[num],  node_lists[num], all_tasks[num], MAX_TESK_TYPE))
-            master_list.append(create_master_node(master_values[num],  node_lists[num], all_tasks[num], MAX_TESK_TYPE))
-            
-        #a=b
-        '''    
-        for master_ in master_list:
-            print('master_list ', master_.mem)
-            for node in master_.node_list:
-                print('node master: ' , node.mem)'''
-        cloud = create_cloud(POD_MEM, POD_CPU, service_coefficient, cur_time)
-        valid_node = get_valid_nodes(node_lists)
-        #print('valid_node : ', valid_node)
-        #print(cloud)
-        #print(master_list)
-        #print('master_list mem : ',master_list[0].mem, master_list[1].mem)
-        #print('master nodelist node memory', master_list[0].node_list)
-        #print('master nodelist node memory', master_list[0].node_list[0], len(master_list[0].node_list[0]))
-        #
+        master_list, cloud = create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time)
+
+        master1, master2  = master_list
         # Crerate dockers based on deploy_state
-        #create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, num_edge_nodes_per_eAP, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2)
-        create_dockers(valid_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list)
-        
+        create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list)
         ########### Each slot ###########
         for slot in range(BREAK_POINT):
             cur_time = cur_time + SLOT_TIME
             ########### Each frame ###########
             if slot % CHO_CYCLE == 0 and slot != 0:
                 # Get task state, include successful, failed, and unresolved
-                done_tasks, undone_tasks, curr_tasks_in_queue = get_state_characteristics(MAX_TESK_TYPE, master_list) 
-                
+                done_tasks, undone_tasks, curr_tasks_in_queue = get_state_characteristics(MAX_TESK_TYPE, master_list)  
+                   
                 if slot != CHO_CYCLE:
                     exp['reward'].append(float(sum(deploy_reward)) / float(len(deploy_reward)))
                     deploy_reward = []
@@ -135,10 +112,8 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 #    print('Randomising Orchestration')
                 #print('Not Randomising Orchestration')
                 
-                #print(change_service, 'change_service')
-                #print(change_node, 'change_node')
-                execute_orchestration(change_node, change_service, num_edge_nodes_per_eAP,
-                         deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master1, master2)
+                execute_orchestration(change_node, change_service, #num_edge_nodes_per_eAP,
+                         deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list)
                 # Save data
                 if slot > 3 * CHO_CYCLE:
                     exp_tmp = exp
@@ -155,20 +130,15 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 
             # Get current task
             
-            for i, _master in enumerate(master_list):
-                master_list[i] = update_task_queue(_master, cur_time, i)
+            master_list = [master1, master2]
+            for i, master in enumerate(master_list):
+                master_list[i] = update_task_queue(master, cur_time, i)
                 
-                
-            #master1 = update_task_queue(master1, cur_time, 0)
-            #master2 = update_task_queue(master2, cur_time, 1)
             curr_task = []
-            
-            for _master in master_list:
-                curr_task.append(get_current_task(_master))
-            #task1 = get_current_task(master1)
-            #task2 = get_current_task(master2)
+            for master in master_list:
+                curr_task.append(get_current_task(master))
                 
-            #curr_task = [task1, task2]
+            [master1, master2] = master_list  
             ava_node = []
 
             for i in range(len(curr_task)):
@@ -177,23 +147,15 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                     if deploy_state[ii][curr_task[i][0]] == 1:
                         tmp_list.append(ii)
                 ava_node.append(tmp_list)
-            
-            
+
             # Current state of CPU and memory
-            #TODO it is only possible to generalise this after separation of Q estimaters
-            cpu_list1, mem_list1, task_num1 = state_inside_eAP(master_list[0], num_edge_nodes_per_eAP)
-            cpu_list2, mem_list2, task_num2 = state_inside_eAP(master_list[1], num_edge_nodes_per_eAP)
-            
-            
-            #print(task_num1, task_num2)
-            #a=b    
+            cpu_list1, mem_list1, task_num1 = state_inside_eAP(master1, num_edge_nodes_per_eAP)
+            cpu_list2, mem_list2, task_num2 = state_inside_eAP(master2, num_edge_nodes_per_eAP)
+  
             s_grid = np.array([flatten(flatten([deploy_state, [task_num1], cpu_list1, mem_list1, [[latency]], [[num_edge_nodes_per_eAP]]])),
-                               flatten(flatten([deploy_state, [task_num2],  cpu_list2, mem_list2, [[latency]], [[num_edge_nodes_per_eAP]]]))])
+                               flatten(flatten([deploy_state, [task_num2], cpu_list2, mem_list2, [[latency]], [[num_edge_nodes_per_eAP]]]))])
             # Dispatch decision
-            #print(s_grid.shape)
-            
             #TODO Determine the Action Precisely 
-            
             act, valid_action_prob_mat, policy_state, action_choosen_mat, \
             curr_state_value, curr_neighbor_mask, next_state_ids = q_estimator.action(s_grid, ava_node, context,)
             
@@ -205,36 +167,30 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             
             ####
             # Put the current task on the queue based on dispatch decision
-            #act = [2, 5]
             put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, master_list)
-            #put_current_task_on_queue(act, curr_task, cluster_action_value, num_edge_nodes_per_eAP, cloud, master_list[0], master_list[1])
-            
+
             # Update state of task
-            #update_state_of_task(num_edge_nodes_per_eAP, cur_time, check_queue, cloud, master1, master2)
-            #update_state_of_task(num_edge_nodes_per_eAP, cur_time, check_queue, cloud, master_list[0], master_list[1])
-            #TODO update check_queue
             update_state_of_task(cur_time, check_queue, cloud, master_list)
             
             # Update state of dockers in every node
             cloud = update_state_of_dockers(cur_time, cloud, master_list)
-            
-            #cur_done = [master1.done - pre_done[0], master2.done - pre_done[1]]
-            #cur_undone = [master1.undone - pre_undone[0], master2.undone - pre_undone[1]]
+                
+            cur_done = []
+            cur_undone = []
+            ch_pre_done = []
+            ch_pre_undone = []
+            for i, mstr in enumerate(master_list):
+                cur_done.append(mstr.done - pre_done[i])
+                cur_undone.append(mstr.undone - pre_undone[i])
+                
+                ch_pre_done.append(mstr.done)
+                ch_pre_undone.append(mstr.undone)
 
-            #pre_done = [master1.done, master2.done]
-            #pre_undone = [master1.undone, master2.undone]
-            
-            cur_done, cur_undone = [],[]
-            for i, master_ in enumerate(master_list):
-                cur_done.append(master_.done - pre_done[i])
-                cur_undone.append(master_.undone - pre_undone[i])
-                pre_done[i] = master_.done
-                pre_undone[i] = master_.undone
-                #print(master_.done - pre_done[i], master_.undone - pre_undone[i], master_.done, master_.undone)
+            pre_done = ch_pre_done
+            pre_undone = ch_pre_undone
             achieve_num.append(sum(cur_done))
             fail_num.append(sum(cur_undone))
-            #immediate_reward = calculate_reward(master1, master2, cur_done, cur_undone, num_edge_nodes_per_eAP)
-            immediate_reward = calculate_reward(master_list, cur_done, cur_undone, num_edge_nodes_per_eAP)
+            immediate_reward = calculate_reward(master_list, cur_done, cur_undone)
 
             record.append([master_list, cur_done, cur_undone, immediate_reward])
 
@@ -315,7 +271,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 50 # Number of Episodes to run
+    RUN_TIMES = 10 #500 # Number of Episodes to run
     TASK_NUM = 5000 # Time for each Episode Ending
     TRAIN_TIMES = 50 # list containing two elements for tasks done on both master nodes
     CHO_CYCLE = 1000 # Orchestration cycle
