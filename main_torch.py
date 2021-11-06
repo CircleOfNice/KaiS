@@ -66,20 +66,15 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                         [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
                         [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1]]
 
-        
         node_list_1 = [[100.0, 4.0], [200.0, 6.0], [100.0, 8.0]]
         node_list_2 = [[200.0, 8.0], [100.0, 2.0], [200.0, 6.0]]
-        
         node_param_lists = [node_list_1, node_list_2]
-        
         master_param_lists = [[200.0, 8.0], [200.0, 8.0]]
-        
         all_task_list = [all_task1, all_task2]
         # Create clusters based on the hardware resources you need
 
         master_list, cloud = create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time)
-        
-        master1, master2  = master_list
+
         # Crerate dockers based on deploy_state
         create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list)
         ########### Each slot ###########
@@ -106,7 +101,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 change_node, change_service, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE)
                 
                 # Randomising Orchestration
-                
                 #if random.uniform(0, 1)< 0.05:
                 #    change_service = torch.randint(-12, 12, (3,))
                 #    change_node = torch.randint(0, 6, (3,))
@@ -128,34 +122,33 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                                                                    entropy_weight_min, entropy_weight_decay)
                     entropy_weight = decrease_var(entropy_weight,
                                                   entropy_weight_min, entropy_weight_decay)
-
-            # Get current task
             
-            master_list = [master1, master2]
+            # Get current task
             for i, master in enumerate(master_list):
                 master_list[i] = update_task_queue(master, cur_time, i)
                 
             curr_task = []
             for master in master_list:
                 curr_task.append(get_current_task(master))
-                
-            [master1, master2] = master_list  
-            ava_node = []
 
+            ava_node = []
             for i in range(len(curr_task)):
                 tmp_list = [cluster_action_value]  # Cloud is always available
                 for ii in range(len(deploy_state)):
                     if deploy_state[ii][curr_task[i][0]] == 1:
                         tmp_list.append(ii)
                 ava_node.append(tmp_list)
-
-            #print('ava_node : ', ava_node)
+            
             # Current state of CPU and memory
-            cpu_list1, mem_list1, task_num1 = state_inside_eAP(master1, num_edge_nodes_per_eAP)
-            cpu_list2, mem_list2, task_num2 = state_inside_eAP(master2, num_edge_nodes_per_eAP)
-  
-            s_grid = np.array([flatten(flatten([deploy_state, [task_num1], cpu_list1, mem_list1, [[latency]], [[num_edge_nodes_per_eAP]]])),
-                               flatten(flatten([deploy_state, [task_num2], cpu_list2, mem_list2, [[latency]], [[num_edge_nodes_per_eAP]]]))])
+            state_info_list = []
+            for mast in master_list:
+                state_info_list.append(state_inside_eAP(mast, len(mast.node_list)))
+            
+            sub_states = []
+            for i, s_state in enumerate(state_info_list):
+                sub_states.append(flatten(flatten([deploy_state, [s_state[2]], s_state[0], s_state[1], [[latency]], [[len(master_list[i].node_list)]]])))
+            s_grid = np.array(sub_states)
+            
             # Dispatch decision
             #TODO Determine the Action Precisely 
             act, valid_action_prob_mat, policy_state, action_choosen_mat, \
@@ -230,7 +223,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 order_response_rates.append(float(sum(cur_done) / (sum(cur_done) + sum(cur_undone))))
             else:
                 order_response_rates.append(0)
-        #a=b
 
         sum_rewards.append(float(sum(all_rewards)) / float(len(all_rewards)))
         all_rewards = []

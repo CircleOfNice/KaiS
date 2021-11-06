@@ -138,6 +138,22 @@ def state_inside_eAP(master, num_edge_nodes_per_eAP):
     return cpu_list, mem_list, task_num
                       
 def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE,):
+    """Generate Orchestration Decision
+
+    Args:
+        orchestrate_agent ([Orchestration Network Object]): [Orchestration Network]
+        exp ([list]): list of recorded experiences (dictionary)
+        done_tasks (list): List of done tasks
+        undone_tasks: (list): List of undone tasks
+        curr_tasks_in_queue (list): List of tasks currently in queue
+        deploy_state_float(list of lists): List containing the tasks running on all of the Nodes  
+        MAX_TESK_TYPE (int) : Maximum number of task types
+
+    Returns:
+        change_node (list) :  Nodes to be changed
+        change_service (list) : Services to be changed
+        exp (list): updated recorded experiences
+    """
     # Make decision of orchestration
     change_node, change_service, exp = act_offload_agent(orchestrate_agent, exp, done_tasks,
                                                                      undone_tasks, curr_tasks_in_queue,
@@ -145,13 +161,37 @@ def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_t
     return change_node, change_service, exp
 
 def create_node_list(node_specification):
+    """Creates a node list
+
+    Args:
+        node_specification ([list]): [list containing the specifications of node]
+
+    Returns:
+        node_list(List): [list of created nodes]
+    """
     node_list = []
     for node_spec in node_specification:
         node_list.append(Node(node_spec[0], node_spec[1], [], []))
     return node_list
 
 def create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time):
-    
+    """Create Edge Access Points and Cloud
+
+    Args:
+        node_param_lists ([list]): [list of node specifications]
+        master_param_lists ([list]): [list of master specifications]
+        all_task_list (list): [list of all tasks data]
+        MAX_TESK_TYPE (int) : Maximum number of task types
+        POD_MEM: (float): Memory of POD
+        POD_CPU (float): CPU of POD
+        service_coefficient(list): Service Coefficients
+        cur_time (float) : Time
+        
+    Returns:
+        master_list (list) :  List of created Master Nodes
+        cloud (Cloud Object) : Created cloud object
+    """
+
     node_lists = []
     for node_params in node_param_lists:
         node_lists.append(create_node_list(node_params))
@@ -171,6 +211,17 @@ def create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MA
     return master_list, cloud
         
 def put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, master_list): 
+    """Put current tasks on queue
+
+    Args:
+        act ([list]): actions
+        curr_task ([list]): [list of tasks]
+        cluster_action_value (int): Action value
+        cloud (Cloud Object) : Created cloud object
+        master_list (list) :  List of created Master Nodes
+
+    """
+    
     length_list = [0]
     last_length = length_list[0]
     for mstr in master_list:
@@ -189,6 +240,16 @@ def put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, maste
                 
             
 def update_state_of_task( cur_time, check_queue, cloud, master_list):
+    """Update the state of tasks
+
+    Args:
+        cur_time (float) : Time
+        check_queue ([function]): function to calculate queue information (task_queue, undone, undone_kind)
+        cloud (Cloud Object) : Cloud object
+        master_list (list) :  List of created Master Nodes
+
+    """
+    
     for mstr in master_list:
         for i in range(len(mstr.node_list)):
             mstr.node_list[i].task_queue, undone, undone_kind = check_queue(mstr.node_list[i].task_queue, cur_time)
@@ -205,6 +266,14 @@ def update_state_of_task( cur_time, check_queue, cloud, master_list):
         master_entity.update_undone(undone[i])
     
 def update_state_of_dockers(cur_time, cloud, master_list):
+    """Updates the state of dockers
+
+    Args:
+        cur_time (float) : Time
+        cloud (Cloud Object) : Cloud object
+        master_list (list) :  List of created Master Nodes
+
+    """
     for mstr in master_list:
         for i in range(len(mstr.node_list)):
             mstr.node_list[i], undone, done, done_kind, undone_kind = update_docker(mstr.node_list[i], cur_time, service_coefficient, POD_CPU)
@@ -225,7 +294,20 @@ def update_state_of_dockers(cur_time, cloud, master_list):
     return cloud  
 
 def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list):
+    """Creation of dockers
 
+    Args:
+        vaild_node (int) : Number of valid nodes for execution of tasks
+        MAX_TESK_TYPE (int) : Maximum number of task types
+        deploy_state(list of lists): List containing the tasks running on all of the Nodes  
+        service_coefficient(list): Service Coefficients
+        POD_MEM: (float): Memory of POD
+        POD_CPU (float): CPU of POD
+        cur_time (float) : Time
+        master_list (list) :  List of created Master Nodes
+
+    """
+    
     length_list = [0]
     last_length = length_list[0]
     for mstr in master_list:
@@ -281,7 +363,19 @@ def get_state_characteristics(MAX_TESK_TYPE, master_list):
 
 
 def execute_orchestration(change_node, change_service,deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list):
-    
+    """Execute the orchestrated actions
+
+    Args:
+        vaild_node (int) : Number of valid nodes for execution of tasks
+        MAX_TESK_TYPE (int) : Maximum number of task types
+        deploy_state(list of lists): List containing the tasks running on all of the Nodes  
+        service_coefficient(list): Service Coefficients
+        POD_MEM: (float): Memory of POD
+        POD_CPU (float): CPU of POD
+        cur_time (float) : Time
+        master_list (list) :  List of created Master Nodes
+
+    """
     length_list = [0]
     last_length = length_list[0]
     for mstr in master_list:
