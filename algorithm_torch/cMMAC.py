@@ -24,7 +24,7 @@ class Estimator:
         self.number_of_master_nodes = number_of_master_nodes
         self.action_dim = action_dim
         self.state_dim = state_dim
-        print(self.number_of_master_nodes)
+        #print(self.number_of_master_nodes)
         # Initial value for losses
         self.actor_loss = 0
         self.value_loss = 0
@@ -153,13 +153,13 @@ class Estimator:
         
         self.valid_action_mask = np.zeros((self.number_of_master_nodes, self.action_dim))
         #print('grid_ids, self.valid_action_mask : ', grid_ids, self.valid_action_mask)
-        for i in range(len(ava_node)):
-            for j in ava_node[i]:
-                self.valid_action_mask[i][j] = 1
+        for j in ava_node:
+            self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
         curr_neighbor_mask = deepcopy(self.valid_action_mask)
         
-        self.valid_neighbor_node_id = [[i for i in range(self.action_dim)], [i for i in range(self.action_dim)]]
+        self.valid_neighbor_node_id = [[i for i in range(self.action_dim)] for j in range(self.number_of_master_nodes)]
         
+        #print('curr_neighbor_mask, self.valid_neighbor_node_id, grid_ids : ', curr_neighbor_mask, self.valid_neighbor_node_id, grid_ids)
         # compute policy probability.
         self.pm_out =self.pm(s)
         action_probs,_,_ = self.sm_prob( self.pm_out, curr_neighbor_mask) 
@@ -190,7 +190,7 @@ class Estimator:
                     temp_a = np.zeros(self.action_dim)
                     temp_a[curr_action_idx] = 1
                     action_choosen_mat.append(temp_a)
-                    policy_state.append(s[idx])
+                    policy_state.append(s)
                     curr_state_value.append(value_output[idx])
                     next_state_ids.append(self.valid_neighbor_grid_id[grid_valid_idx][curr_action_idx])
                     curr_neighbor_mask_policy.append(curr_neighbor_mask[idx])
@@ -222,7 +222,7 @@ class Estimator:
             advantage.append(temp_adv.detach().numpy())
         return advantage
     
-    def compute_targets(self, valid_prob, next_state, node_reward, gamma):
+    def compute_targets(self, valid_prob, next_state, node_reward, curr_neighbor_mask, gamma):
         """[Method for computation of Targets]
 
         Args:
@@ -239,9 +239,10 @@ class Estimator:
         targets = []
         node_reward = node_reward.flatten()
         qvalue_next = self.vm(next_state).flatten()
-
-        for idx in np.arange(self.number_of_master_nodes):
-            grid_prob = valid_prob[idx][self.valid_action_mask[idx] > 0]
+        #print('len(valid_prob) : ' , len(valid_prob))
+        #for idx in np.arange(self.number_of_master_nodes):
+        for idx in np.arange(len(valid_prob)):
+            grid_prob = valid_prob[idx][curr_neighbor_mask[idx] > 0]
             
             curr_grid_target = np.sum(
                 grid_prob * (sum(node_reward) + gamma * sum(qvalue_next.detach().numpy())))
