@@ -1,6 +1,8 @@
 import time
 import sys
 
+from numpy.lib.index_tricks import s_
+
 from algorithm_torch.cMMAC import *
 from algorithm_torch.GPG import *
 from env.platform import *
@@ -35,22 +37,23 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     episode_rewards = [] # Accumulated reward over episodes
     record_all_order_response_rate = [] # List to record all the throughput rate througout episodes
 
+    all_task1 = get_all_task('./data/Task_1.csv')# processed data [type_list, start_time, end_time, cpu_list, mem_list] fed to eAP 1
+    all_task2 = get_all_task('./data/Task_2.csv')# processed data fed to eAP 2
+    all_task_list = [all_task1, all_task2]
+    
     #q_estimator = Estimator(action_dim, state_dim, number_of_master_nodes) # Definition of cMMAc Agent
     q_estimator_list = []
     ReplayMemory_list = []
     policy_replay_list = []
+    s_grid_len = estimate_state_size(all_task_list)
+
     for i in range(number_of_master_nodes):
-        q_estimator_list.append(Estimator(action_dim, state_dim, 1)) # Definition of cMMAc Agent
+        q_estimator_list.append(Estimator(action_dim, s_grid_len[i], 1)) # Definition of cMMAc Agent
         ReplayMemory_list.append(ReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) # experience Replay for value network for cMMMac Agent
         policy_replay_list.append(policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) #experience Replay for Policy network for cMMMac Agent
-    #q_estimator = Estimator(action_dim, state_dim, 1) # Definition of cMMAc Agent
-    #replay = ReplayMemory(memory_size=1e+6, batch_size=int(3e+3)) # experience Replay for value network for cMMMac Agent
-    #policy_replay = policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3)) #experience Replay for Policy network for cMMMac Agent
 
     global_step1 = 0
     global_step2 = 0
-    all_task1 = get_all_task('./data/Task_1.csv')# processed data [type_list, start_time, end_time, cpu_list, mem_list] fed to eAP 1
-    all_task2 = get_all_task('./data/Task_2.csv')# processed data fed to eAP 2
 
     orchestrate_agent = OrchestrateAgent(node_input_dim, cluster_input_dim, hid_dims, output_dim, max_depth,
                                          range(1, exec_cap + 1), MAX_TESK_TYPE, eps=1e-6, act_fn = nn.functional.leaky_relu,optimizer=torch.optim.Adam)
@@ -70,6 +73,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         ############ Set up according to your own needs  ###########
         # The parameters here are set only to support the operation of the program, and may not be consistent with the actual system
         # At each edge node 1 denotes a kind of service which is running
+        '''
         deploy_state = [[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
                         [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
                         [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1]]
@@ -81,18 +85,16 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         node_param_lists = [node_list_1, node_list_2]
         
         master_param_lists = [[200.0, 8.0], [200.0, 8.0]]
-        
-        all_task_list = [all_task1, all_task2]
+        '''
+        deploy_state, node_param_lists, master_param_lists = return_state_values()
         # Create clusters based on the hardware resources you need
 
         master_list, cloud = create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time)
         
-        #master1, master2  = master_list
         # Crerate dockers based on deploy_state
         valid_node = 0
         for mast in master_list:
             valid_node = valid_node + len(mast.node_list)
-        #print('valid_node : ',valid_node)
         create_dockers(valid_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list)
         ########### Each slot ###########
         for slot in range(BREAK_POINT):
@@ -142,8 +144,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                                                   entropy_weight_min, entropy_weight_decay)
 
             # Get current task
-            
-            #master_list = [master1, master2]
             for i, master in enumerate(master_list):
                 master_list[i] = update_task_queue(master, cur_time, i)
                 
@@ -151,7 +151,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             for master in master_list:
                 curr_task.append(get_current_task(master))
                 
-            [master1, master2] = master_list  
             ava_node = []
 
             for i in range(len(curr_task)):
@@ -159,36 +158,20 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 for ii in range(len(deploy_state)):
                     if deploy_state[ii][curr_task[i][0]] == 1:
                         tmp_list.append(ii)
-                #print('tmp_list : ', tmp_list)
                 ava_node.append(tmp_list)
 
-            #valid_action_mask = np.zeros((1, action_dim))
-            #for i in range(len(ava_node)):
-            #    for j in ava_node[i]:
-            #        valid_action_mask[i][j] = 1
-            #print('ava_node : ', ava_node)
-            # Current state of CPU and memory
-            
-            '''
-            cpu_list1, mem_list1, task_num1 = state_inside_eAP(master1, num_edge_nodes_per_eAP)
-            cpu_list2, mem_list2, task_num2 = state_inside_eAP(master2, num_edge_nodes_per_eAP)
-  
-            s_grid = np.array([flatten(flatten([deploy_state, [task_num1], cpu_list1, mem_list1, [[latency]], [[num_edge_nodes_per_eAP]]])),
-                               flatten(flatten([deploy_state, [task_num2], cpu_list2, mem_list2, [[latency]], [[num_edge_nodes_per_eAP]]]))])
-                               
-                               '''
-            state_list = []
-            for mast in master_list:
-                state_list.append(state_inside_eAP(mast, len(mast.node_list)))
-            #print(state_list)    
-            #a=b
-            
-            #TODO at somepoint the deploy_state may also be needed to split
-            s_state = []
+            #state_list = []
+            #for mast in master_list:
+            #    state_list.append(state_inside_eAP(mast, len(mast.node_list)))
+            state_list = get_state_list(master_list)    
+            last_length, length_list = get_last_length(master_list)
+            s_grid = []
             for i, state in enumerate((state_list)):
-                s_state.append(flatten(flatten([deploy_state, [state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]])))
-            s_grid =np.array(s_state)
-                               
+                sub_deploy_state = deploy_state[length_list[i]:length_list[i+1]]
+                #print('sub_deploy_state : ', sub_deploy_state)
+                sub_elem = flatten(flatten([sub_deploy_state, [state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
+                s_grid.append(sub_elem)
+              
             # Dispatch decision
             #TODO Determine the Action Precisely 
             act = []
@@ -199,10 +182,9 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             curr_neighbor_mask = []
             next_state_ids = []
             for i in range(len(s_grid)):
-                #print('ava_node : ', ava_node[i])
+                #print('s_grid : ', len(s_grid[i]))
                 act_, valid_action_prob_mat_, policy_state_, action_choosen_mat_, \
-                curr_state_value_, curr_neighbor_mask_, next_state_ids_ = q_estimator_list[i].action(s_grid[i], ava_node[i], context,)
-                #print('q_estimator_list), i : ' , len(q_estimator_list), i)
+                curr_state_value_, curr_neighbor_mask_, next_state_ids_ = q_estimator_list[i].action(np.array(s_grid[i]), ava_node[i], context,)
                 act.append(act_[0])
                 valid_action_prob_mat.append(valid_action_prob_mat_[0])
                 policy_state.append(policy_state_[0])
@@ -214,17 +196,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             policy_state = np.array(policy_state)
             action_choosen_mat = np.array(action_choosen_mat)
             curr_neighbor_mask = np.array(curr_neighbor_mask)
-            
-            '''
-            print('act : ', act, type(act) , len(act))
-            print('valid_action_prob_mat : ', valid_action_prob_mat, type(valid_action_prob_mat) , valid_action_prob_mat.shape)
-            print('policy_state : ', policy_state, type(policy_state) , policy_state.shape)
-            print('action_choosen_mat : ', action_choosen_mat, type(action_choosen_mat) , action_choosen_mat.shape)
-            print('curr_state_value : ', curr_state_value, type(curr_state_value) , len(curr_state_value))
-            print('curr_neighbor_mask : ', curr_neighbor_mask, type(curr_neighbor_mask) , curr_neighbor_mask.shape)
-            print('next_state_ids : ', next_state_ids, type(next_state_ids) , len(next_state_ids))
-            '''
-            #a=b
+
             ###### Randomising if 0.05 then it is epsilor exploration
             #if random.uniform(0, 1)< 0.05:
             #    	act = [random.randint(0,6), random.randint(0,6)] 
@@ -265,38 +237,15 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             if slot != 0:
                 
                 r_grid = to_grid_rewards(immediate_reward)
-                #print('r_grid.shape : ', r_grid.shape)
-                #print('action_mat_prev,  s_grid, r_grid, gamma : ',  action_mat_prev.shape, s_grid.shape, r_grid.shape, curr_neighbor_mask_prev.shape,  gamma )
-                #print('r_grid : ', r_grid)
                 for m in range(len(r_grid)):
-                    #print('action_mat_prev[[m],:], s_grid[[m],:], r_grid[[m],:], curr_neighbor_mask_prev[[m],:], gamma : ', state_mat_prev[[m],:].shape, s_grid[[m],:].shape, r_grid[[m],:].shape, curr_neighbor_mask_prev[[m],:].shape, gamma)
-                    targets_batch = q_estimator_list[m].compute_targets(action_mat_prev[[m],:], s_grid[[m],:], r_grid[[m],:], curr_neighbor_mask_prev[[m],:], gamma)
-                    #print('type(curr_state_value_prev), type(next_state_ids_prev) : ', curr_state_value_prev, next_state_ids_prev)
-                    #print('type(curr_state_value_prev), type(next_state_ids_prev) : ', [curr_state_value_prev[m]], [next_state_ids_prev[m]])
-                    #print('curr_state_value_prev[[m],:], next_state_ids_prev[[m],:], s_grid[[m],:], r_grid[[m],:] :  ', type(curr_state_value_prev), type(next_state_ids_prev), type(s_grid), type(r_grid))
-                    #print('policy_state_prev : ', policy_state_prev.shape)
+                    targets_batch = q_estimator_list[m].compute_targets(action_mat_prev[[m],:], np.array([s_grid[m]]), r_grid[[m],:], curr_neighbor_mask_prev[[m],:], gamma)
                     # Advantage for policy network.
                     advantage = q_estimator_list[m].compute_advantage([curr_state_value_prev[m]], [next_state_ids_prev[m]] ,
-                                                            s_grid[[m],:], r_grid[[m],:], gamma)
-                    
-                    #print('targets_batch, targets_batch.shape, type(targets_batch), m, targets_batch[[0],:] : ', targets_batch, targets_batch.shape, type(targets_batch), m, targets_batch[[0],:])                                        
+                                                            np.array([s_grid[m]]), r_grid[[m],:], gamma)
+                                      
                     if curr_task[0][0] != -1 and curr_task[1][0] != -1:
-                        #print('m : ', m)
-                        #print('r_grid : ', r_grid)
-                        #print('state_mat_prev[[m],:].shape : ', state_mat_prev[[m],:].shape)
-                        #print('action_mat_prev[[m],:].shape : ', action_mat_prev[[m],:].shape)
-                        #
-                        # print('targets_batch[[0],:].shape: ', targets_batch[[0],:].shape)
-                        #print('s_grid[[m],:].shape: ', s_grid[[m],:].shape)
-                        #print('state_mat_prev, action_mat_prev, targets_batch, s_grid : ', state_mat_prev[[m],:].shape, action_mat_prev[[m],:].shape, targets_batch[[0],:].shape, s_grid[[m],:].shape)
-                        ReplayMemory_list[m].add(state_mat_prev[[m],:], action_mat_prev[[m],:], targets_batch[[0],:], s_grid[[m],:])
-                        #print('policy_state_prev, action_choosen_mat_prev, advantage, curr_neighbor_mask_prev : ', len(policy_state_prev), action_choosen_mat_prev.shape, len(advantage), curr_neighbor_mask_prev.shape )
-                        #print('(policy_state_prev[[m],:], action_choosen_mat_prev[[m],:], advantage , curr_neighbor_mask_prev[[m],:] : ', policy_state_prev[[m],:].shape, action_choosen_mat_prev[[m],:].shape, advantage , curr_neighbor_mask_prev[[m],:].shape)
+                        ReplayMemory_list[m].add(np.array([state_mat_prev[m]]), action_mat_prev[[m],:], targets_batch[[0],:], np.array([s_grid[m]]))
                         policy_replay_list[m].add(policy_state_prev[[m],:], action_choosen_mat_prev[[m],:], advantage , curr_neighbor_mask_prev[[m],:])
-                    #print()
-                    #print()
-                    #print()    
-                    #a=b
 
             # For updating
             state_mat_prev = s_grid
@@ -318,7 +267,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 order_response_rates.append(float(sum(cur_done) / (sum(cur_done) + sum(cur_undone))))
             else:
                 order_response_rates.append(0)
-        #a=b
 
         sum_rewards.append(float(sum(all_rewards)) / float(len(all_rewards)))
         all_rewards = []
@@ -337,8 +285,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         record_all_order_response_rate.append(order_response_rates)
         # update value network
         for _ in np.arange(TRAIN_TIMES):
-            #batch_s, _, batch_r, _ = replay.sample()
-            #q_estimator.update_value(batch_s, batch_r, 1e-3)
             for m in range(len(master_list)):
                 batch_s, _, batch_r, _ = ReplayMemory_list[m].sample()
                 q_estimator_list[m].update_value(batch_s, batch_r, 1e-3)
@@ -346,9 +292,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 
         # update policy network
         for _ in np.arange(TRAIN_TIMES):
-            #batch_s, batch_a, batch_r, batch_mask = policy_replay.sample()
-            #q_estimator.update_policy(batch_s, batch_r.reshape([-1, 1]), batch_a, batch_mask, learning_rate,)
-            
             for m in range(len(master_list)):
                 batch_s, batch_a, batch_r, batch_mask = policy_replay_list[m].sample()
                 q_estimator_list[m].update_policy(batch_s, batch_r.reshape([-1, 1]), batch_a, batch_mask, learning_rate,)

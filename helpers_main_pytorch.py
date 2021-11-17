@@ -6,6 +6,7 @@ from algorithm_torch.GPG import act_offload_agent
 import sys
 ############ Set up according to your own needs  ###########
 # The parameters are set to support the operation of the program, and may not be consistent with the actual system
+
 vaild_node = 6  # Number of edge nodes available
 SLOT_TIME = 0.5  # Time of one slot
 MAX_TESK_TYPE = 12  # Number of tesk types
@@ -17,7 +18,7 @@ service_coefficient = [0.8, 0.8, 0.9, 0.9, 1.0, 1.0, 1.1, 1.1, 1.2, 1.2, 1.3, 1.
 gamma = 0.9 # Discounting Coefficient
 learning_rate = 1e-3 # Learning Rate
 action_dim = 7 #Number of actions possibly edge nodes 6 plus Cluster
-state_dim = 90#88 #Dimension of state for cMMAC (flattened Deployed state, task num, cpu_list, min_list)
+state_dim = 54#90#88 #Dimension of state for cMMAC (flattened Deployed state, task num, cpu_list, min_list)
 
 node_input_dim = 24 # Input dimension of Node part of the Orchestration Net 
 cluster_input_dim = 24 # Input dimension for Cluster part of the Orchestration Net
@@ -40,6 +41,45 @@ number_of_master_nodes  = 2 # number of eAPs # Only in this case whole thing mak
 num_edge_nodes_per_eAP =3
 cluster_action_value = 6
 latency = 0
+
+def return_state_values():
+    deploy_state = [[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
+                [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
+                [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1]]
+
+    node_list_1 = [[100.0, 4.0], [200.0, 6.0], [100.0, 8.0]]
+    node_list_2 = [[200.0, 8.0], [100.0, 2.0], [200.0, 6.0]]
+
+    node_param_lists = [node_list_1, node_list_2]
+
+    master_param_lists = [[200.0, 8.0], [200.0, 8.0]]
+    return deploy_state, node_param_lists, master_param_lists
+
+def get_state_list(master_list):
+    state_list = []
+    for mast in master_list:
+        state_list.append(state_inside_eAP(mast, len(mast.node_list)))
+    return state_list 
+def estimate_state_size(all_task_list):
+
+    deploy_state, node_param_lists, master_param_lists = return_state_values()
+    
+    master_list = create_master_list(node_param_lists, master_param_lists, all_task_list)
+    '''
+    state_list = []
+    for mast in master_list:
+        state_list.append(state_inside_eAP(mast, len(mast.node_list)))
+    '''                
+    last_length, length_list = get_last_length(master_list)
+    state_list = get_state_list(master_list)
+    s_grid_len = []
+    for i, state in enumerate((state_list)):
+        sub_deploy_state = deploy_state[length_list[i]:length_list[i+1]]
+        #print('sub_deploy_state : ', sub_deploy_state)
+        sub_elem = flatten(flatten([sub_deploy_state, [state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
+        s_grid_len.append(len(sub_elem))
+        
+    return s_grid_len
 
 def flatten(list):
     """Function to serialize sublists inside a given list
@@ -173,6 +213,16 @@ def create_node_list(node_specification):
     for node_spec in node_specification:
         node_list.append(Node(node_spec[0], node_spec[1], [], []))
     return node_list
+def create_master_list(node_param_lists, master_param_lists, all_task_list):
+    node_lists = []
+    for node_params in node_param_lists:
+        node_lists.append(create_node_list(node_params))
+    
+    # (cpu, mem,..., achieve task num, give up task num)
+    master_list = []
+    for i, master_params in enumerate(master_param_lists):
+        master_list.append(Master(master_params[0], master_params[1], node_lists[i], [], all_task_list[i], 0, 0, 0, [0] * MAX_TESK_TYPE, [0] * MAX_TESK_TYPE))
+    return master_list
 
 def create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time):
     """Create Edge Access Points and Cloud
@@ -191,17 +241,7 @@ def create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MA
         master_list (list) :  List of created Master Nodes
         cloud (Cloud Object) : Created cloud object
     """
-
-    node_lists = []
-    for node_params in node_param_lists:
-        node_lists.append(create_node_list(node_params))
-    
-    # (cpu, mem,..., achieve task num, give up task num)
-    master_list = []
-    for i, master_params in enumerate(master_param_lists):
-        master_list.append(Master(master_params[0], master_params[1], node_lists[i], [], all_task_list[i], 0, 0, 0, [0] * MAX_TESK_TYPE, [0] * MAX_TESK_TYPE))
-    
-    
+    master_list = create_master_list(node_param_lists, master_param_lists, all_task_list)
     cloud = Cloud([], [], sys.maxsize, sys.maxsize)  # (..., cpu, mem)
     ################################################################################################
     for i in range(MAX_TESK_TYPE):
@@ -209,6 +249,14 @@ def create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MA
         cloud.service_list.append(docker)
     
     return master_list, cloud
+
+def get_last_length(master_list):
+    length_list = [0]
+    last_length = length_list[0]
+    for mstr in master_list:
+        length_list.append(last_length + len(mstr.node_list))
+        last_length = last_length + len(mstr.node_list)
+    return last_length, length_list
         
 def put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, master_list): 
     """Put current tasks on queue
@@ -221,12 +269,7 @@ def put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, maste
         master_list (list) :  List of created Master Nodes
 
     """
-    
-    length_list = [0]
-    last_length = length_list[0]
-    for mstr in master_list:
-        length_list.append(last_length + len(mstr.node_list))
-        last_length = last_length + len(mstr.node_list)
+    last_length, length_list = get_last_length(master_list)    
     for i in range(len(act)):
         if curr_task[i][0] == -1:
             continue
