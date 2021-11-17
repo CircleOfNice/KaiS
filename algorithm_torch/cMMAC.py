@@ -220,6 +220,7 @@ class Estimator:
         for idx, next_state_id in enumerate(next_state_ids):
             temp_adv = sum(node_reward) + gamma * sum(qvalue_next) - curr_state_value[idx]
             advantage.append(temp_adv.detach().numpy())
+        #print('advantage : ',advantage)
         return advantage
     
     def compute_targets(self, valid_prob, next_state, node_reward, curr_neighbor_mask, gamma):

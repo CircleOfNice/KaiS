@@ -36,9 +36,16 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     record_all_order_response_rate = [] # List to record all the throughput rate througout episodes
 
     #q_estimator = Estimator(action_dim, state_dim, number_of_master_nodes) # Definition of cMMAc Agent
-    q_estimator = Estimator(action_dim, state_dim, 1) # Definition of cMMAc Agent
-    replay = ReplayMemory(memory_size=1e+6, batch_size=int(3e+3)) # experience Replay for value network for cMMMac Agent
-    policy_replay = policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3)) #experience Replay for Policy network for cMMMac Agent
+    q_estimator_list = []
+    ReplayMemory_list = []
+    policy_replay_list = []
+    for i in range(number_of_master_nodes):
+        q_estimator_list.append(Estimator(action_dim, state_dim, 1)) # Definition of cMMAc Agent
+        ReplayMemory_list.append(ReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) # experience Replay for value network for cMMMac Agent
+        policy_replay_list.append(policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) #experience Replay for Policy network for cMMMac Agent
+    #q_estimator = Estimator(action_dim, state_dim, 1) # Definition of cMMAc Agent
+    #replay = ReplayMemory(memory_size=1e+6, batch_size=int(3e+3)) # experience Replay for value network for cMMMac Agent
+    #policy_replay = policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3)) #experience Replay for Policy network for cMMMac Agent
 
     global_step1 = 0
     global_step2 = 0
@@ -194,12 +201,13 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             for i in range(len(s_grid)):
                 #print('ava_node : ', ava_node[i])
                 act_, valid_action_prob_mat_, policy_state_, action_choosen_mat_, \
-                curr_state_value, curr_neighbor_mask_, next_state_ids_ = q_estimator.action(s_grid[i], ava_node[i], context,)
+                curr_state_value_, curr_neighbor_mask_, next_state_ids_ = q_estimator_list[i].action(s_grid[i], ava_node[i], context,)
+                #print('q_estimator_list), i : ' , len(q_estimator_list), i)
                 act.append(act_[0])
                 valid_action_prob_mat.append(valid_action_prob_mat_[0])
                 policy_state.append(policy_state_[0])
                 action_choosen_mat.append(action_choosen_mat_[0])
-                curr_state_value.append(curr_state_value[0])
+                curr_state_value.append(curr_state_value_[0])
                 curr_neighbor_mask.append(curr_neighbor_mask_[0])
                 next_state_ids.append(next_state_ids_[0])
             valid_action_prob_mat = np.array(valid_action_prob_mat)
@@ -255,19 +263,40 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             deploy_reward.append(sum(immediate_reward))
 
             if slot != 0:
+                
                 r_grid = to_grid_rewards(immediate_reward)
-                #print('action_mat_prev,  s_grid, r_grid, gamma : ',  action_mat_prev.shape, s_grid.shape, r_grid.shape, curr_neighbor_mask_prev,  gamma )
-                targets_batch = q_estimator.compute_targets(action_mat_prev, s_grid, r_grid, curr_neighbor_mask_prev, gamma)
-
-                # Advantage for policy network.
-                advantage = q_estimator.compute_advantage(curr_state_value_prev, next_state_ids_prev,
-                                                          s_grid, r_grid, gamma)
-                                                          
-                if curr_task[0][0] != -1 and curr_task[1][0] != -1:
-                    #print('state_mat_prev, action_mat_prev, targets_batch, s_grid : ', state_mat_prev.shape, action_mat_prev.shape, targets_batch.shape, s_grid.shape )
-                    replay.add(state_mat_prev, action_mat_prev, targets_batch, s_grid)
-                    #print('policy_state_prev, action_choosen_mat_prev, advantage, curr_neighbor_mask_prev : ', len(policy_state_prev), action_choosen_mat_prev.shape, len(advantage), curr_neighbor_mask_prev.shape )
-                    policy_replay.add(policy_state_prev, action_choosen_mat_prev, advantage, curr_neighbor_mask_prev)
+                #print('r_grid.shape : ', r_grid.shape)
+                #print('action_mat_prev,  s_grid, r_grid, gamma : ',  action_mat_prev.shape, s_grid.shape, r_grid.shape, curr_neighbor_mask_prev.shape,  gamma )
+                #print('r_grid : ', r_grid)
+                for m in range(len(r_grid)):
+                    #print('action_mat_prev[[m],:], s_grid[[m],:], r_grid[[m],:], curr_neighbor_mask_prev[[m],:], gamma : ', state_mat_prev[[m],:].shape, s_grid[[m],:].shape, r_grid[[m],:].shape, curr_neighbor_mask_prev[[m],:].shape, gamma)
+                    targets_batch = q_estimator_list[m].compute_targets(action_mat_prev[[m],:], s_grid[[m],:], r_grid[[m],:], curr_neighbor_mask_prev[[m],:], gamma)
+                    #print('type(curr_state_value_prev), type(next_state_ids_prev) : ', curr_state_value_prev, next_state_ids_prev)
+                    #print('type(curr_state_value_prev), type(next_state_ids_prev) : ', [curr_state_value_prev[m]], [next_state_ids_prev[m]])
+                    #print('curr_state_value_prev[[m],:], next_state_ids_prev[[m],:], s_grid[[m],:], r_grid[[m],:] :  ', type(curr_state_value_prev), type(next_state_ids_prev), type(s_grid), type(r_grid))
+                    #print('policy_state_prev : ', policy_state_prev.shape)
+                    # Advantage for policy network.
+                    advantage = q_estimator_list[m].compute_advantage([curr_state_value_prev[m]], [next_state_ids_prev[m]] ,
+                                                            s_grid[[m],:], r_grid[[m],:], gamma)
+                    
+                    #print('targets_batch, targets_batch.shape, type(targets_batch), m, targets_batch[[0],:] : ', targets_batch, targets_batch.shape, type(targets_batch), m, targets_batch[[0],:])                                        
+                    if curr_task[0][0] != -1 and curr_task[1][0] != -1:
+                        #print('m : ', m)
+                        #print('r_grid : ', r_grid)
+                        #print('state_mat_prev[[m],:].shape : ', state_mat_prev[[m],:].shape)
+                        #print('action_mat_prev[[m],:].shape : ', action_mat_prev[[m],:].shape)
+                        #
+                        # print('targets_batch[[0],:].shape: ', targets_batch[[0],:].shape)
+                        #print('s_grid[[m],:].shape: ', s_grid[[m],:].shape)
+                        #print('state_mat_prev, action_mat_prev, targets_batch, s_grid : ', state_mat_prev[[m],:].shape, action_mat_prev[[m],:].shape, targets_batch[[0],:].shape, s_grid[[m],:].shape)
+                        ReplayMemory_list[m].add(state_mat_prev[[m],:], action_mat_prev[[m],:], targets_batch[[0],:], s_grid[[m],:])
+                        #print('policy_state_prev, action_choosen_mat_prev, advantage, curr_neighbor_mask_prev : ', len(policy_state_prev), action_choosen_mat_prev.shape, len(advantage), curr_neighbor_mask_prev.shape )
+                        #print('(policy_state_prev[[m],:], action_choosen_mat_prev[[m],:], advantage , curr_neighbor_mask_prev[[m],:] : ', policy_state_prev[[m],:].shape, action_choosen_mat_prev[[m],:].shape, advantage , curr_neighbor_mask_prev[[m],:].shape)
+                        policy_replay_list[m].add(policy_state_prev[[m],:], action_choosen_mat_prev[[m],:], advantage , curr_neighbor_mask_prev[[m],:])
+                    #print()
+                    #print()
+                    #print()    
+                    #a=b
 
             # For updating
             state_mat_prev = s_grid
@@ -308,14 +337,22 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         record_all_order_response_rate.append(order_response_rates)
         # update value network
         for _ in np.arange(TRAIN_TIMES):
-            batch_s, _, batch_r, _ = replay.sample()
-            q_estimator.update_value(batch_s, batch_r, 1e-3)
+            #batch_s, _, batch_r, _ = replay.sample()
+            #q_estimator.update_value(batch_s, batch_r, 1e-3)
+            for m in range(len(master_list)):
+                batch_s, _, batch_r, _ = ReplayMemory_list[m].sample()
+                q_estimator_list[m].update_value(batch_s, batch_r, 1e-3)
             global_step1 += 1
 
         # update policy network
         for _ in np.arange(TRAIN_TIMES):
-            batch_s, batch_a, batch_r, batch_mask = policy_replay.sample()
-            q_estimator.update_policy(batch_s, batch_r.reshape([-1, 1]), batch_a, batch_mask, learning_rate,)
+            #batch_s, batch_a, batch_r, batch_mask = policy_replay.sample()
+            #q_estimator.update_policy(batch_s, batch_r.reshape([-1, 1]), batch_a, batch_mask, learning_rate,)
+            
+            for m in range(len(master_list)):
+                batch_s, batch_a, batch_r, batch_mask = policy_replay_list[m].sample()
+                q_estimator_list[m].update_policy(batch_s, batch_r.reshape([-1, 1]), batch_a, batch_mask, learning_rate,)
+            
             global_step2 += 1
     name = 'full_randomisation_orchestration_no_randomisation_'
     time_str = str(time.time())
