@@ -1,5 +1,5 @@
 # GNN-based Learning for Service Orchestration
-
+from math import exp
 import numpy as np
 import torch
 import torch.optim as optim
@@ -223,4 +223,11 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weig
                                   entropy_weight_min, entropy_weight_decay)
     return entropy_weight, loss
  
-               
+def get_orchestration_reward(master_list, cur_time, check_queue):
+    reward = []
+    for mstr in master_list:
+        for i, node in enumerate(mstr.node_list):
+            _, undone, undone_kind = check_queue(node.task_queue, cur_time, len(master_list))
+            reward.append(len(undone))
+    orchestration_reward = exp(-sum(reward))
+    return orchestration_reward

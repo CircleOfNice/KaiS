@@ -42,7 +42,7 @@ num_edge_nodes_per_eAP =3
 cluster_action_value = 6
 latency = 0
 
-def return_state_values():
+def initial_state_values():
     deploy_state = [[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
                 [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
                 [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1]]
@@ -62,7 +62,7 @@ def get_state_list(master_list):
     return state_list 
 def estimate_state_size(all_task_list):
 
-    deploy_state, node_param_lists, master_param_lists = return_state_values()
+    deploy_state, node_param_lists, master_param_lists = initial_state_values()
     
     master_list = create_master_list(node_param_lists, master_param_lists, all_task_list)
     '''
@@ -295,7 +295,7 @@ def update_state_of_task( cur_time, check_queue, cloud, master_list):
     
     for mstr in master_list:
         for i in range(len(mstr.node_list)):
-            mstr.node_list[i].task_queue, undone, undone_kind = check_queue(mstr.node_list[i].task_queue, cur_time)
+            mstr.node_list[i].task_queue, undone, undone_kind = check_queue(mstr.node_list[i].task_queue, cur_time, len(master_list))
             for j in undone_kind:
                 mstr.undone_kind[j] = mstr.undone_kind[j] + 1
             
@@ -304,7 +304,7 @@ def update_state_of_task( cur_time, check_queue, cloud, master_list):
             for i, master_entity in enumerate(master_list):
                 master_entity.update_undone(undone[i])
 
-    cloud.task_queue, undone, undone_kind = check_queue(cloud.task_queue, cur_time)
+    cloud.task_queue, undone, undone_kind = check_queue(cloud.task_queue, cur_time, len(master_list))
     for i, master_entity in enumerate(master_list):
         master_entity.update_undone(undone[i])
     

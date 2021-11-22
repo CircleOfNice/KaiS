@@ -1,3 +1,4 @@
+
 import time
 import sys
 
@@ -9,6 +10,9 @@ from env.platform import *
 from env.env_run import *
 import pickle,gzip
 from helpers_main_pytorch import *                
+
+
+            
        
 def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     
@@ -40,14 +44,15 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     all_task1 = get_all_task('./data/Task_1.csv')# processed data [type_list, start_time, end_time, cpu_list, mem_list] fed to eAP 1
     all_task2 = get_all_task('./data/Task_2.csv')# processed data fed to eAP 2
     all_task_list = [all_task1, all_task2]
+    _, _, master_param_lists = initial_state_values()
     
-    #q_estimator = Estimator(action_dim, state_dim, number_of_master_nodes) # Definition of cMMAc Agent
+    # Definition of cMMAc Agent
     q_estimator_list = []
     ReplayMemory_list = []
     policy_replay_list = []
     s_grid_len = estimate_state_size(all_task_list)
 
-    for i in range(number_of_master_nodes):
+    for i in range(len(master_param_lists)):
         q_estimator_list.append(Estimator(action_dim, s_grid_len[i], 1)) # Definition of cMMAc Agent
         ReplayMemory_list.append(ReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) # experience Replay for value network for cMMMac Agent
         policy_replay_list.append(policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) #experience Replay for Policy network for cMMMac Agent
@@ -67,26 +72,19 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         entropy_weight = entropy_weight_init
         order_response_rates = []
 
-        pre_done = [0, 0] # list to track tasks done previously
-        pre_undone = [0, 0] # list to track tasks undone (not done) previously
-        context = [1, 1] # Flag
+        pre_done = [] # list to track tasks done previously
+        pre_undone = [] # list to track tasks undone (not done) previously
+        context = [] # Flag
+        for i in range(len(master_param_lists)):
+            pre_done.append(0)
+            pre_undone.append(0)
+            context.append(1)
+
         ############ Set up according to your own needs  ###########
         # The parameters here are set only to support the operation of the program, and may not be consistent with the actual system
         # At each edge node 1 denotes a kind of service which is running
-        '''
-        deploy_state = [[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
-                        [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
-                        [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1]]
 
-        
-        node_list_1 = [[100.0, 4.0], [200.0, 6.0], [100.0, 8.0]]
-        node_list_2 = [[200.0, 8.0], [100.0, 2.0], [200.0, 6.0]]
-        
-        node_param_lists = [node_list_1, node_list_2]
-        
-        master_param_lists = [[200.0, 8.0], [200.0, 8.0]]
-        '''
-        deploy_state, node_param_lists, master_param_lists = return_state_values()
+        deploy_state, node_param_lists, master_param_lists = initial_state_values()
         # Create clusters based on the hardware resources you need
 
         master_list, cloud = create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time)
@@ -105,7 +103,9 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 done_tasks, undone_tasks, curr_tasks_in_queue = get_state_characteristics(MAX_TESK_TYPE, master_list)  
                    
                 if slot != CHO_CYCLE:
-                    exp['reward'].append(float(sum(deploy_reward)) / float(len(deploy_reward)))
+                    #exp['reward'].append(float(sum(deploy_reward)) / float(len(deploy_reward)))
+                    orchestration_reward = get_orchestration_reward(master_list, cur_time, check_queue)
+                    exp['reward'].append(orchestration_reward)
                     deploy_reward = []
                     exp['wall_time'].append(cur_time)
 
@@ -160,9 +160,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                         tmp_list.append(ii)
                 ava_node.append(tmp_list)
 
-            #state_list = []
-            #for mast in master_list:
-            #    state_list.append(state_inside_eAP(mast, len(mast.node_list)))
             state_list = get_state_list(master_list)    
             last_length, length_list = get_last_length(master_list)
             s_grid = []
@@ -182,7 +179,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             curr_neighbor_mask = []
             next_state_ids = []
             for i in range(len(s_grid)):
-                #print('s_grid : ', len(s_grid[i]))
                 act_, valid_action_prob_mat_, policy_state_, action_choosen_mat_, \
                 curr_state_value_, curr_neighbor_mask_, next_state_ids_ = q_estimator_list[i].action(np.array(s_grid[i]), ava_node[i], context,)
                 act.append(act_[0])

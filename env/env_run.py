@@ -95,7 +95,7 @@ def update_task_queue(master, cur_time, master_id):
     return master
 
 
-def check_queue(task_queue, cur_time):
+def check_queue(task_queue, cur_time, length_masterlist):
     """[Check the queue for tasks in queue]
 
     Args:
@@ -105,9 +105,12 @@ def check_queue(task_queue, cur_time):
     Returns:
         [list]: [tasks in the queue, tasks undone(not done), there type(kind)]
     """
-    
+
     task_queue = sorted(task_queue, key=lambda x: (x[2], x[1]))
-    undone = [0, 0]
+    undone =[]
+    for un in range(length_masterlist):
+        undone.append(0)
+        
     undone_kind = []
     # clean task for overtime
     i = 0
@@ -122,6 +125,7 @@ def check_queue(task_queue, cur_time):
             flag = 0
         else:
             i = i + 1
+    #print()
     return task_queue, undone, undone_kind
 
 
