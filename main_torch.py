@@ -2,7 +2,7 @@
 import time
 import sys
 
-from numpy.lib.index_tricks import s_
+#from numpy.lib.index_tricks import s_
 
 from algorithm_torch.cMMAC import *
 from algorithm_torch.GPG import *
@@ -11,9 +11,6 @@ from env.env_run import *
 import pickle,gzip
 from helpers_main_pytorch import *                
 
-
-            
-       
 def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     
     """[Function to execute the KAIS Algorithm ]
@@ -117,8 +114,10 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                     deploy_state_float.append(tmp)
 
                 # Orchestration
-                change_node, change_service, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE)
+                node_choice, service_scaling_choice, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE)
                 
+                
+                #print('node_choice, service_scaling : ', node_choice, service_scaling_choice)
                 # Randomising Orchestration
                 
                 #if random.uniform(0, 1)< 0.05:
@@ -127,7 +126,9 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 #    print('Randomising Orchestration')
                 #print('Not Randomising Orchestration')
                 
-                execute_orchestration(change_node, change_service, #num_edge_nodes_per_eAP,
+                
+                # Here is the code for orchestration and service scaling
+                execute_orchestration(node_choice, service_scaling_choice, #num_edge_nodes_per_eAP,
                          deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list)
                 # Save data
                 if slot > 3 * CHO_CYCLE:
@@ -308,7 +309,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 10 #500 # Number of Episodes to run
+    RUN_TIMES = 5 #500 # Number of Episodes to run
     TASK_NUM = 5000 # Time for each Episode Ending
     TRAIN_TIMES = 50 # list containing two elements for tasks done on both master nodes
     CHO_CYCLE = 1000 # Orchestration cycle

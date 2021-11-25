@@ -1,8 +1,9 @@
 import math
 import numpy as np
+import random
 from env.platform import *
 from env.env_run import update_docker
-from algorithm_torch.GPG import act_offload_agent
+#from algorithm_torch.GPG import act_offload_agent
 import sys
 ############ Set up according to your own needs  ###########
 # The parameters are set to support the operation of the program, and may not be consistent with the actual system
@@ -38,15 +39,35 @@ entropy_weight_min = 0.0001 # Minimum allowed entropy weight
 entropy_weight_decay = 1e-3 # Entropy weight decay rate
 number_of_master_nodes  = 2 # number of eAPs # Only in this case whole thing makes sense
 
-num_edge_nodes_per_eAP =3
+#num_edge_nodes_per_eAP =3
 cluster_action_value = 6
 latency = 0
 
 def initial_state_values():
+    deploy_state = []
+    #print(np.random.randint(low=0, high=2, size=MAX_TESK_TYPE).tolist())
+    for i in range(cluster_action_value):
+        sub_list = []
+        for j in range(MAX_TESK_TYPE):
+            
+            sub_list.append(0)
+            '''
+            if random.random()< 0.25:
+                sub_list.append(1)
+            else:
+                sub_list.append(0)
+            '''
+
+        deploy_state.append(sub_list)
+                    
+        #deploy_state.append(np.random.randint(low=0, high=2, size=MAX_TESK_TYPE).tolist())
+    #print(deploy_state)
+    #a=b
+    
     deploy_state = [[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
                 [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
                 [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1]]
-
+    
     node_list_1 = [[100.0, 4.0], [200.0, 6.0], [100.0, 8.0]]
     node_list_2 = [[200.0, 8.0], [100.0, 2.0], [200.0, 6.0]]
 
@@ -176,29 +197,6 @@ def state_inside_eAP(master, num_edge_nodes_per_eAP):
         mem_list.append([master.node_list[i].mem, master.node_list[i].mem_max])
         task_num.append(len(master.node_list[i].task_queue))
     return cpu_list, mem_list, task_num
-                      
-def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE,):
-    """Generate Orchestration Decision
-
-    Args:
-        orchestrate_agent ([Orchestration Network Object]): [Orchestration Network]
-        exp ([list]): list of recorded experiences (dictionary)
-        done_tasks (list): List of done tasks
-        undone_tasks: (list): List of undone tasks
-        curr_tasks_in_queue (list): List of tasks currently in queue
-        deploy_state_float(list of lists): List containing the tasks running on all of the Nodes  
-        MAX_TESK_TYPE (int) : Maximum number of task types
-
-    Returns:
-        change_node (list) :  Nodes to be changed
-        change_service (list) : Services to be changed
-        exp (list): updated recorded experiences
-    """
-    # Make decision of orchestration
-    change_node, change_service, exp = act_offload_agent(orchestrate_agent, exp, done_tasks,
-                                                                     undone_tasks, curr_tasks_in_queue,
-                                                                     deploy_state_float, MAX_TESK_TYPE)
-    return change_node, change_service, exp
 
 def create_node_list(node_specification):
     """Creates a node list
@@ -405,40 +403,3 @@ def get_state_characteristics(MAX_TESK_TYPE, master_list):
     return done_tasks, undone_tasks, curr_tasks_in_queue
 
 
-def execute_orchestration(change_node, change_service,deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list):
-    """Execute the orchestrated actions
-
-    Args:
-        vaild_node (int) : Number of valid nodes for execution of tasks
-        MAX_TESK_TYPE (int) : Maximum number of task types
-        deploy_state(list of lists): List containing the tasks running on all of the Nodes  
-        service_coefficient(list): Service Coefficients
-        POD_MEM: (float): Memory of POD
-        POD_CPU (float): CPU of POD
-        cur_time (float) : Time
-        master_list (list) :  List of created Master Nodes
-
-    """
-    length_list = [0]
-    last_length = length_list[0]
-    for mstr in master_list:
-        length_list.append(last_length + len(mstr.node_list))
-        last_length = last_length + len(mstr.node_list)
-    # Execute orchestration
-    for i in range(len(change_node)):
-        if change_service[i] < 0:
-            # Delete docker and free memory
-            service_index = -1 * change_service[i] - 1
-            
-            for iter in range(len(length_list)-1):
-                if change_node[i] < length_list[iter+1] and change_node[i] >= length_list[iter]:
-                    node_index = change_node[i] - length_list[iter]
-                    remove_docker_from_master_node(master_list[iter], node_index, service_index, deploy_state)
-        else:
-            # Add docker and tack up memory
-            service_index = change_service[i] - 1
-            
-            for iter in range(len(length_list)-1):
-                if change_node[i] < length_list[iter+1] and change_node[i] >= length_list[iter]:
-                    node_index = change_node[i] - length_list[iter]
-                    deploy_new_docker(master_list[iter], POD_MEM, POD_CPU, cur_time, node_index, service_coefficient, service_index, deploy_state)

@@ -9,7 +9,7 @@ from algorithm_torch.gcn import GraphCNN
 from algorithm_torch.Orchestration_Agent import *
 from algorithm_torch.ReplayMemory import ReplayMemory
 from algorithm_torch.policyReplayMemory import policyReplayMemory
-
+from helpers_main_pytorch import remove_docker_from_master_node, deploy_new_docker
 def discount(x, gamma):
     """Calculate the discounted cumulative reward
         Cumulative Reward = r_t + gamma * r_t+1 + gamma ^2 * r_t+2 + ________
@@ -27,32 +27,37 @@ def discount(x, gamma):
         out[i] = x[i] + gamma * out[i + 1]
     return out
 
-
-
-def invoke_model(orchestrate_agent, obs, exp, MAX_TESK_TYPE):
-    """[Invoke model (propagate the observation through the orchestration model) 
-    and return the chosen node, chosen services and the appended experience, after the orchestration step]
+def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE,):
+    """Generate Orchestration Decision
 
     Args:
-        orchestrate_agent ([OrchestrateAgent Type]): [Instance of Orchestrate Agent]
-        obs ([list]): [Observations containing done tasks, undone tasks, current tasks in queue, deploy state]
-        exp ([dict]): [Experience]
+        orchestrate_agent ([Orchestration Network Object]): [Orchestration Network]
+        exp ([list]): list of recorded experiences (dictionary)
+        done_tasks (list): List of done tasks
+        undone_tasks: (list): List of undone tasks
+        curr_tasks_in_queue (list): List of tasks currently in queue
+        deploy_state_float(list of lists): List containing the tasks running on all of the Nodes  
+        MAX_TESK_TYPE (int) : Maximum number of task types
 
     Returns:
-        [list, list , dictionary]: [chosen node, chosen services and the appended experience]
+        change_node (list) :  Nodes to be changed
+        change_service (list) : Services to be changed
+        exp (list): updated recorded experiences
     """
-    
+    obs = [done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state_float]
+    # Invokes model (propagate the observation through the orchestration model) 
+    #and return the chosen node, chosen services and the appended experience, after the orchestration step]
     # Propagate the observation of the environment and produces
     node_act, cluster_act, node_act_probs, cluster_act_probs, node_inputs, cluster_inputs = \
         orchestrate_agent.invoke_model(obs)
     node_choice = [x for x in node_act[0]]# nodes chosen for deployment
-    server_choice = [] # Server choice here is chosen services
-
+    service_scaling_choice = [] # Server choice here is chosen services
+    
     for x in cluster_act[0][0]: 
         if x >= MAX_TESK_TYPE:
-            server_choice.append(x - MAX_TESK_TYPE - 1)
+            service_scaling_choice.append(x - MAX_TESK_TYPE - 1)
         else:
-            server_choice.append(x - MAX_TESK_TYPE)
+            service_scaling_choice.append(x - MAX_TESK_TYPE)
     
     # For storing node index        
     node_act_vec = np.ones(node_act_probs.shape)
@@ -64,29 +69,8 @@ def invoke_model(orchestrate_agent, obs, exp, MAX_TESK_TYPE):
     exp['cluster_inputs'].append(cluster_inputs)
     exp['node_act_vec'].append(node_act_vec)
     exp['cluster_act_vec'].append(cluster_act_vec)
-    return node_choice, server_choice, exp
+    return node_choice, service_scaling_choice, exp
     
-
-
-def act_offload_agent(orchestrate_agent, exp, done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state, MAX_TESK_TYPE):
-    """Chooses action using the invocation (propagation through) of Orchestrate Agent model
-    Args:
-        orchestrate_agent ([OrchestrateAgent Type]): [Instance of Orchestrate Agent]
-        exp ([dictionary]): [Experience dictionary]
-        done_tasks ([list]): [list of done tasks]
-        undone_tasks ([list]): [lists of undone(not done) tasks]
-        curr_tasks_in_queue ([list]): [list of tasks in queue]
-        deploy_state ([list]): [List of lists containing the deployment of nodes]
-        MAX_TESK_TYPE([int]): Maximum number of tasks in queue
-    Returns:
-        [node, use_exec, exp]: [chosen node, chosen service and the appended experience]
-    """
-    obs = [done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state]
-    # Invokes model (propagate the observation through the orchestration model) 
-    #and return the chosen node, chosen services and the appended experience, after the orchestration step]
-    node, use_exec, exp = invoke_model(orchestrate_agent, obs, exp, MAX_TESK_TYPE)
-    return node, use_exec, exp
-
 
 def get_piecewise_linear_fit_baseline(all_cum_rewards, all_wall_time):
     """Generate a piecewise linear fit for the given reward function along with time
@@ -231,3 +215,41 @@ def get_orchestration_reward(master_list, cur_time, check_queue):
             reward.append(len(undone))
     orchestration_reward = exp(-sum(reward))
     return orchestration_reward
+
+def execute_orchestration(change_node, change_service,deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list):
+    """Execute the orchestrated actions
+
+    Args:
+        vaild_node (int) : Number of valid nodes for execution of tasks
+        MAX_TESK_TYPE (int) : Maximum number of task types
+        deploy_state(list of lists): List containing the tasks running on all of the Nodes  
+        service_coefficient(list): Service Coefficients
+        POD_MEM: (float): Memory of POD
+        POD_CPU (float): CPU of POD
+        cur_time (float) : Time
+        master_list (list) :  List of created Master Nodes
+
+    """
+    length_list = [0]
+    last_length = length_list[0]
+    for mstr in master_list:
+        length_list.append(last_length + len(mstr.node_list))
+        last_length = last_length + len(mstr.node_list)
+    # Execute orchestration
+    for i in range(len(change_node)):
+        if change_service[i] < 0:
+            # Delete docker and free memory
+            service_index = -1 * change_service[i] - 1
+            
+            for iter in range(len(length_list)-1):
+                if change_node[i] < length_list[iter+1] and change_node[i] >= length_list[iter]:
+                    node_index = change_node[i] - length_list[iter]
+                    remove_docker_from_master_node(master_list[iter], node_index, service_index, deploy_state)
+        else:
+            # Add docker and tack up memory
+            service_index = change_service[i] - 1
+            
+            for iter in range(len(length_list)-1):
+                if change_node[i] < length_list[iter+1] and change_node[i] >= length_list[iter]:
+                    node_index = change_node[i] - length_list[iter]
+                    deploy_new_docker(master_list[iter], POD_MEM, POD_CPU, cur_time, node_index, service_coefficient, service_index, deploy_state)
