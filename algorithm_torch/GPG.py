@@ -48,12 +48,12 @@ def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_t
     # Invokes model (propagate the observation through the orchestration model) 
     #and return the chosen node, chosen services and the appended experience, after the orchestration step]
     # Propagate the observation of the environment and produces
-    node_act, cluster_act, node_act_probs, cluster_act_probs, node_inputs, cluster_inputs = \
+    node_act, scale_act, node_act_probs, scale_act_probs, node_inputs, scale_inputs = \
         orchestrate_agent.invoke_model(obs)
     node_choice = [x for x in node_act[0]]# nodes chosen for deployment
     service_scaling_choice = [] # Server choice here is chosen services
     
-    for x in cluster_act[0][0]: 
+    for x in scale_act[0][0]: 
         if x >= MAX_TESK_TYPE:
             service_scaling_choice.append(x - MAX_TESK_TYPE - 1)
         else:
@@ -61,14 +61,14 @@ def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_t
     
     # For storing node index        
     node_act_vec = np.ones(node_act_probs.shape)
-    # For storing cluster index
-    cluster_act_vec = np.ones(cluster_act_probs.shape)
+    # For storing scaling index
+    scale_act_vec = np.ones(scale_act_probs.shape)
     # Both of them are always one just used to allow matrix multiplication
     # Store experience
     exp['node_inputs'].append(node_inputs)
-    exp['cluster_inputs'].append(cluster_inputs)
+    exp['scale_inputs'].append(scale_inputs)
     exp['node_act_vec'].append(node_act_vec)
-    exp['cluster_act_vec'].append(cluster_act_vec)
+    exp['scale_act_vec'].append(scale_act_vec)
     return node_choice, service_scaling_choice, exp
     
 
@@ -131,19 +131,19 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv):
     batch_adv = np.array(batch_adv)
 
     node_inputs = exp['node_inputs']
-    cluster_inputs = exp['cluster_inputs']
+    scale_inputs = exp['scale_inputs']
     node_act_vec = exp['node_act_vec']
-    cluster_act_vec = exp['cluster_act_vec']
+    scale_act_vec = exp['scale_act_vec']
     adv = batch_adv
 
     # Convert to numpy array
     node_inputs = np.array(node_inputs)
-    cluster_inputs = np.array(cluster_inputs)
+    scale_inputs = np.array(scale_inputs)
     node_act_vec = np.array(node_act_vec)
-    cluster_act_vec = np.array(cluster_act_vec)
+    scale_act_vec = np.array(scale_act_vec)
     
     loss = orchestrate_agent.act_loss(
-        node_inputs, cluster_inputs, node_act_vec, cluster_act_vec, adv)
+        node_inputs, scale_inputs, node_act_vec, scale_act_vec, adv)
 
     return loss
 

@@ -41,8 +41,10 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     all_task1 = get_all_task('./data/Task_1.csv')# processed data [type_list, start_time, end_time, cpu_list, mem_list] fed to eAP 1
     all_task2 = get_all_task('./data/Task_2.csv')# processed data fed to eAP 2
     all_task_list = [all_task1, all_task2]
-    _, _, master_param_lists = initial_state_values()
+    _, node_param_lists, master_param_lists = initial_state_values()
     
+    action_dim = get_action_dim(node_param_lists)
+
     # Definition of cMMAc Agent
     q_estimator_list = []
     ReplayMemory_list = []
@@ -57,10 +59,10 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     global_step1 = 0
     global_step2 = 0
 
-    orchestrate_agent = OrchestrateAgent(node_input_dim, cluster_input_dim, hid_dims, output_dim, max_depth,
+    orchestrate_agent = OrchestrateAgent(node_input_dim, scale_input_dim, hid_dims, output_dim, max_depth,
                                          range(1, exec_cap + 1), MAX_TESK_TYPE, eps=1e-6, act_fn = nn.functional.leaky_relu,optimizer=torch.optim.Adam)
-    exp = {'node_inputs': [], 'cluster_inputs': [], 'reward': [], 'wall_time': [], 'node_act_vec': [],
-           'cluster_act_vec': []}
+    exp = {'node_inputs': [], 'scale_inputs': [], 'reward': [], 'wall_time': [], 'node_act_vec': [],
+           'scale_act_vec': []}
 
     for n_iter in np.arange(RUN_TIMES):
         ########### Initialize the setup and repeat the experiment many times ###########
@@ -96,6 +98,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             cur_time = cur_time + SLOT_TIME
             ########### Each frame ###########
             if slot % CHO_CYCLE == 0 and slot != 0:
+                #print('slot % CHO_CYCLE : ', slot % CHO_CYCLE, slot)
                 # Get task state, include successful, failed, and unresolved
                 done_tasks, undone_tasks, curr_tasks_in_queue = get_state_characteristics(MAX_TESK_TYPE, master_list)  
                    
@@ -135,9 +138,9 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                     exp_tmp = exp
 
                     del exp_tmp['node_inputs'][-1]
-                    del exp_tmp['cluster_inputs'][-1]
+                    del exp_tmp['scale_inputs'][-1]
                     del exp_tmp['node_act_vec'][-1]
-                    del exp_tmp['cluster_act_vec'][-1]
+                    del exp_tmp['scale_act_vec'][-1]
                     
                     entropy_weight, loss = train_orchestrate_agent(orchestrate_agent, exp_tmp, entropy_weight,
                                                                    entropy_weight_min, entropy_weight_decay)
@@ -309,7 +312,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 5 #500 # Number of Episodes to run
+    RUN_TIMES = 50 #500 # Number of Episodes to run
     TASK_NUM = 5000 # Time for each Episode Ending
     TRAIN_TIMES = 50 # list containing two elements for tasks done on both master nodes
     CHO_CYCLE = 1000 # Orchestration cycle

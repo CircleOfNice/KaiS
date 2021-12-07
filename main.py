@@ -5,7 +5,7 @@ import sys
 from algorithm.cMMAC import *
 from algorithm.GPG import *
 from env.platform import *
-from env.env_run import *
+from env.env_run_tensorflow import *
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -470,15 +470,15 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     saver.save(sess, "./model/model_before_testing.ckpt")
     tf.reset_default_graph()
     time_str = str(time.time())
-    with open("./result/" + time_str + ".json", "w") as f:
-        json.dump(record, f)
+    #with open("./result/" + time_str + ".json", "w") as f:
+    #    json.dump(record, f)
     return throughput_list
 
 
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 500
+    RUN_TIMES = 5#00
     TASK_NUM = 5000
     TRAIN_TIMES = 50
     CHO_CYCLE = 1000
