@@ -18,12 +18,12 @@ service_coefficient = [0.8, 0.8, 0.9, 0.9, 1.0, 1.0, 1.1, 1.1, 1.2, 1.2, 1.3, 1.
 # Parameters related to DRL
 gamma = 0.9 # Discounting Coefficient
 learning_rate = 1e-3 # Learning Rate
-action_dim = 7 #Number of actions possibly edge nodes 6 plus Cluster
+#action_dim = 7 #Number of actions possibly edge nodes 6 plus Cluster
 state_dim = 54#90#88 #Dimension of state for cMMAC (flattened Deployed state, task num, cpu_list, min_list)
 
 node_input_dim = 24 # Input dimension of Node part of the Orchestration Net 
-cluster_input_dim = 24 # Input dimension for Cluster part of the Orchestration Net
-
+scale_input_dim = 24 # Input dimension for scale part of the Orchestration Net
+high_value_edge_nodes = 2
 # notes on input dimensions
 # node_inputs[i, :12] = curr_tasks_in_queue[i, :12]
 # node_inputs[i, 12:] = deploy_state[i, :12]
@@ -75,6 +75,14 @@ def initial_state_values():
 
     master_param_lists = [[200.0, 8.0], [200.0, 8.0]]
     return deploy_state, node_param_lists, master_param_lists
+
+def get_action_dim(node_param_lists):
+    action_dim = 0
+    for _list in node_param_lists:
+        for node_param in _list:
+            action_dim+=1
+    return action_dim + 1 # +1 because of cluster
+    
 
 def get_state_list(master_list):
     state_list = []

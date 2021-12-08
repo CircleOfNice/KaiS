@@ -104,11 +104,14 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                    
                 if slot != CHO_CYCLE:
                     #exp['reward'].append(float(sum(deploy_reward)) / float(len(deploy_reward)))
-                    orchestration_reward = get_orchestration_reward(master_list, cur_time, check_queue)
-                    exp['reward'].append(orchestration_reward)
+                    #orchestration_reward = get_orchestration_reward(master_list, cur_time, check_queue)
+                    #exp['reward'].append(orchestration_reward)
+                    exp['reward'].append(float(sum(deploy_reward)) / float(len(deploy_reward)))
                     deploy_reward = []
                     exp['wall_time'].append(cur_time)
-
+                #print('n_iter : ', n_iter)
+                #print('slot : ', slot)
+                #print('deploy_state : ', deploy_state)
                 deploy_state_float = []
                 for i in range(len(deploy_state)):
                     tmp = []
@@ -116,6 +119,8 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                         tmp.append(float(deploy_state[i][j]))
                     deploy_state_float.append(tmp)
 
+                #print('deploy_state_float : ', deploy_state_float)
+                #a=b
                 # Orchestration
                 node_choice, service_scaling_choice, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE)
                 
@@ -312,7 +317,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 50 #500 # Number of Episodes to run
+    RUN_TIMES = 10 #500 # Number of Episodes to run
     TASK_NUM = 5000 # Time for each Episode Ending
     TRAIN_TIMES = 50 # list containing two elements for tasks done on both master nodes
     CHO_CYCLE = 1000 # Orchestration cycle

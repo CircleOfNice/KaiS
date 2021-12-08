@@ -8,7 +8,7 @@ from algorithm_torch.Ocn_net import *
 from algorithm_torch.gcn import GraphCNN
 from algorithm_torch.Orchestration_Agent import *
 from algorithm_torch.Agent import Agent
-        
+from helpers_main_pytorch import high_value_edge_nodes
 class OrchestrateAgent(Agent):
     def __init__(self, node_input_dim, scale_input_dim, hid_dims, output_dim,
                  max_depth, executor_levels, MAX_TESK_TYPE, eps, act_fn,optimizer):
@@ -219,13 +219,13 @@ class OrchestrateAgent(Agent):
         noise = torch.rand(logits.shape)
         #print('self.node_act_probs,  logits.shape : ', self.node_act_probs.shape, logits.shape)
         node_val = logits - torch.log(-torch.log(noise))
-        self.node_acts = torch.topk(node_val, k=3).indices
+        self.node_acts = torch.topk(node_val, k=high_value_edge_nodes).indices
 
         # scale_acts
         logits = torch.log(self.scale_act_probs)
         noise = torch.rand(logits.shape)
         scale_val = logits - torch.log(-torch.log(noise))
-        self.scale_acts = torch.topk(scale_val, k=3).indices
+        self.scale_acts = torch.topk(scale_val, k=high_value_edge_nodes).indices
 
         return [self.node_act_probs, self.scale_act_probs, self.node_acts, self.scale_acts]    
 
