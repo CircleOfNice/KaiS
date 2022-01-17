@@ -34,8 +34,11 @@ def get_all_task(path):
         cpu_list[i] = int(cpu_list[i]) / 100.0
         mem_list[i] = float(mem_list[i])
     all_task = [type_list, start_time, end_time, cpu_list, mem_list]
-
-    return all_task
+    #print(type_list)
+    #a=b
+    #print(max(type_list))
+    #a=b
+    return all_task, max(type_list)
 
 
 def put_task(task_queue, task):
@@ -92,6 +95,9 @@ def update_task_queue(master, cur_time, master_id):
             tmp_list.append(master.task_queue[i])
     tmp_list = sorted(tmp_list, key=lambda x: (x[2], x[1]))
     master.task_queue = tmp_list
+    
+    #print('master.task_queue, master.undone, master.done : ', len(master.task_queue), master.undone, master.done)
+    #print('master.task_queue : ', master.task_queue)
     return master
 
 
@@ -149,11 +155,14 @@ def update_docker(node, cur_time, service_coefficient, POD_CPU):
     # find achieved task in current time
     for i in range(len(node.service_list)):
         if node.service_list[i].available_time <= cur_time and len(node.service_list[i].doing_task) > 1:
+            #print('node.service_list[i].doing_task : ', node.service_list[i].doing_task)
             done[node.service_list[i].doing_task[5]] = done[node.service_list[i].doing_task[5]] + 1
             done_kind.append(node.service_list[i].doing_task[0])
             node.service_list[i].doing_task = [-1]
             node.service_list[i].available_time = cur_time
     # execute task in queue
+    #for i in range(len(node.service_list)):
+    #print('Node Service List : ', len(node.service_list))
     i = 0
     while i != len(node.task_queue):
         flag = 0
@@ -185,4 +194,5 @@ def update_docker(node, cur_time, service_coefficient, POD_CPU):
             flag = 0
         else:
             i = i + 1
+    #print()
     return node, undone, done, done_kind, undone_kind

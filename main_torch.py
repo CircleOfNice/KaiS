@@ -38,9 +38,10 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     episode_rewards = [] # Accumulated reward over episodes
     record_all_order_response_rate = [] # List to record all the throughput rate througout episodes
 
-    all_task1 = get_all_task('./data/Task_1.csv')# processed data [type_list, start_time, end_time, cpu_list, mem_list] fed to eAP 1
-    all_task2 = get_all_task('./data/Task_2.csv')# processed data fed to eAP 2
+    all_task1, max_task_type1 = get_all_task('./data/Task_1.csv')# processed data [type_list, start_time, end_time, cpu_list, mem_list] fed to eAP 1
+    all_task2, max_task_type2 = get_all_task('./data/Task_2.csv')# processed data fed to eAP 2
     all_task_list = [all_task1, all_task2]
+    max_tasks = max(max_task_type1, max_task_type2)
     _, node_param_lists, master_param_lists = initial_state_values()
     
     action_dim = get_action_dim(node_param_lists)
@@ -49,7 +50,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     q_estimator_list = []
     ReplayMemory_list = []
     policy_replay_list = []
-    s_grid_len = estimate_state_size(all_task_list)
+    s_grid_len = estimate_state_size(all_task_list, max_tasks)
 
     for i in range(len(master_param_lists)):
         q_estimator_list.append(Estimator(action_dim, s_grid_len[i], 1)) # Definition of cMMAc Agent
@@ -169,13 +170,14 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                         tmp_list.append(ii)
                 ava_node.append(tmp_list)
 
-            state_list = get_state_list(master_list)    
+            state_list = get_state_list(master_list, max_tasks)    
+            #print('state_list : ', state_list)
             last_length, length_list = get_last_length(master_list)
             s_grid = []
             for i, state in enumerate((state_list)):
                 sub_deploy_state = deploy_state[length_list[i]:length_list[i+1]]
                 #print('sub_deploy_state : ', sub_deploy_state)
-                sub_elem = flatten(flatten([sub_deploy_state, [state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
+                sub_elem = flatten(flatten([sub_deploy_state, [[state[4]]], [[state[3]]],[state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
                 s_grid.append(sub_elem)
               
             # Dispatch decision

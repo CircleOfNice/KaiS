@@ -46,24 +46,25 @@ latency = 0
 def initial_state_values():
     deploy_state = []
     #print(np.random.randint(low=0, high=2, size=MAX_TESK_TYPE).tolist())
+    '''
     for i in range(cluster_action_value):
         sub_list = []
         for j in range(MAX_TESK_TYPE):
             
             sub_list.append(0)
-            '''
-            if random.random()< 0.25:
-                sub_list.append(1)
-            else:
-                sub_list.append(0)
-            '''
+            #
+            #if random.random()< 0.25:
+            #    sub_list.append(1)
+            #else:
+            #    sub_list.append(0)
+            #
 
         deploy_state.append(sub_list)
                     
         #deploy_state.append(np.random.randint(low=0, high=2, size=MAX_TESK_TYPE).tolist())
     #print(deploy_state)
     #a=b
-    
+    '''
     deploy_state = [[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
                 [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
                 [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1]]
@@ -84,12 +85,12 @@ def get_action_dim(node_param_lists):
     return action_dim + 1 # +1 because of cluster
     
 
-def get_state_list(master_list):
+def get_state_list(master_list, max_tasks):
     state_list = []
     for mast in master_list:
-        state_list.append(state_inside_eAP(mast, len(mast.node_list)))
+        state_list.append(state_inside_eAP(mast, len(mast.node_list), max_tasks))
     return state_list 
-def estimate_state_size(all_task_list):
+def estimate_state_size(all_task_list, max_tasks):
 
     deploy_state, node_param_lists, master_param_lists = initial_state_values()
     
@@ -100,12 +101,12 @@ def estimate_state_size(all_task_list):
         state_list.append(state_inside_eAP(mast, len(mast.node_list)))
     '''                
     last_length, length_list = get_last_length(master_list)
-    state_list = get_state_list(master_list)
+    state_list = get_state_list(master_list, max_tasks)
     s_grid_len = []
     for i, state in enumerate((state_list)):
         sub_deploy_state = deploy_state[length_list[i]:length_list[i+1]]
         #print('sub_deploy_state : ', sub_deploy_state)
-        sub_elem = flatten(flatten([sub_deploy_state, [state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
+        sub_elem = flatten(flatten([sub_deploy_state, [[state[4]]], [[state[3]]], [state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
         s_grid_len.append(len(sub_elem))
         
     return s_grid_len
@@ -187,7 +188,7 @@ def get_current_task(master):
     
     return task
             
-def state_inside_eAP(master, num_edge_nodes_per_eAP):
+def state_inside_eAP(master, num_edge_nodes_per_eAP, max_tasks):
     """Get the state inside the given the edge nodes per eAP
 
     Args:
@@ -200,11 +201,20 @@ def state_inside_eAP(master, num_edge_nodes_per_eAP):
     cpu_list = []
     mem_list  = []
     task_num  = [len(master.task_queue)]
+    if len(master.task_queue)==0:
+        service_type = max_tasks + 1
+    else:
+        service_type = master.task_queue[0][0]
+        
+    undone_tasks = master.undone
     for i in range(num_edge_nodes_per_eAP):
         cpu_list.append([master.node_list[i].cpu, master.node_list[i].cpu_max])
         mem_list.append([master.node_list[i].mem, master.node_list[i].mem_max])
         task_num.append(len(master.node_list[i].task_queue))
-    return cpu_list, mem_list, task_num
+        #print('master.node_list[i]. : ', master.undone)
+    #a=b
+    #print('service_type : ', service_type)
+    return cpu_list, mem_list, task_num, undone_tasks, service_type
 
 def create_node_list(node_specification):
     """Creates a node list

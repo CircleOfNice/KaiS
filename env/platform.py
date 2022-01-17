@@ -26,7 +26,7 @@ class Node:
 
 class Master:
     """[This class serves as framework for definition of Master Node with properties such as 
-    task queue, service_list, cpu processing, memory, done and undone tasks, Kind of tasks done and undone. all task index]
+    task queue, cpu processing, memory, done and undone tasks, Kind of tasks done and undone. all task index]
     """
     def __init__(self, cpu, mem, node_list, task_queue, all_task, all_task_index, done, undone, done_kind, undone_kind):
         self.cpu = cpu  # GHz
