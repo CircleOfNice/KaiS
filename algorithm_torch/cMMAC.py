@@ -217,6 +217,9 @@ class Estimator:
         advantage = []
         node_reward = node_reward.flatten()
         qvalue_next = self.vm(next_state).flatten()
+        print('qvalue_next : ', qvalue_next.shape)
+        print('next_state : ', next_state.shape)
+        a=b
         for idx, next_state_id in enumerate(next_state_ids):
             temp_adv = sum(node_reward) + gamma * sum(qvalue_next) - curr_state_value[idx]
             advantage.append(temp_adv.detach().numpy())

@@ -106,7 +106,7 @@ def estimate_state_size(all_task_list, max_tasks):
     for i, state in enumerate((state_list)):
         sub_deploy_state = deploy_state[length_list[i]:length_list[i+1]]
         #print('sub_deploy_state : ', sub_deploy_state)
-        sub_elem = flatten(flatten([sub_deploy_state, [[state[4]]], [[state[3]]], [state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
+        sub_elem = flatten(flatten([sub_deploy_state, [[state[5]]],[[state[4]]], [[state[3]]], [state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
         s_grid_len.append(len(sub_elem))
         
     return s_grid_len
@@ -203,8 +203,11 @@ def state_inside_eAP(master, num_edge_nodes_per_eAP, max_tasks):
     task_num  = [len(master.task_queue)]
     if len(master.task_queue)==0:
         service_type = max_tasks + 1
+        delay_requirement = 100000
     else:
         service_type = master.task_queue[0][0]
+        
+        delay_requirement = master.task_queue[0][2]-master.task_queue[0][1]
         
     undone_tasks = master.undone
     for i in range(num_edge_nodes_per_eAP):
@@ -214,7 +217,7 @@ def state_inside_eAP(master, num_edge_nodes_per_eAP, max_tasks):
         #print('master.node_list[i]. : ', master.undone)
     #a=b
     #print('service_type : ', service_type)
-    return cpu_list, mem_list, task_num, undone_tasks, service_type
+    return cpu_list, mem_list, task_num, undone_tasks, service_type, delay_requirement
 
 def create_node_list(node_specification):
     """Creates a node list
