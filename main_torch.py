@@ -59,7 +59,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 
     # Creation of global critic (currently without cloud info of unprocessed requests)
     #print('sum(s_grid_len) : ', sum(s_grid_len))
-    critic, critic_optimizer = build_value_model(sum(s_grid_len))
+    critic, critic_optimizer = build_value_model(sum(s_grid_len)+ 1) # Length of task queue can be only one digit long
     #print(critic)
     
     global_step1 = 0
@@ -184,7 +184,12 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 #print('sub_deploy_state : ', sub_deploy_state)
                 sub_elem = flatten(flatten([sub_deploy_state, [[state[5]]], [[state[4]]], [[state[3]]],[state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
                 s_grid.append(sub_elem)
-              
+            critic_state = flatten(s_grid)
+            #print(len(cloud.task_queue))
+            critic_state.append(len(cloud.task_queue))
+            #print(critic_state)
+            #print(len(critic_state))
+            #a=b
             # Dispatch decision
             #TODO Determine the Action Precisely 
             act = []
@@ -196,7 +201,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             next_state_ids = []
             for i in range(len(s_grid)):
                 act_, valid_action_prob_mat_, policy_state_, action_choosen_mat_, \
-                curr_state_value_, curr_neighbor_mask_, next_state_ids_ = q_estimator_list[i].action(np.array(s_grid[i]), critic, flatten(s_grid), ava_node[i], context,)
+                curr_state_value_, curr_neighbor_mask_, next_state_ids_ = q_estimator_list[i].action(np.array(s_grid[i]), critic, critic_state, ava_node[i], context,)
                 #a=b
                 act.append(act_[0])
                 valid_action_prob_mat.append(valid_action_prob_mat_[0])
@@ -253,20 +258,20 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 for m in range(len(r_grid)):
                     #print(np.array([flatten(s_grid)]).shape)
                     #targets_batch = q_estimator_list[m].compute_targets(action_mat_prev[[m],:], np.array([s_grid[m]]), critic, r_grid[[m],:], curr_neighbor_mask_prev[[m],:], gamma)
-                    targets_batch = q_estimator_list[m].compute_targets(action_mat_prev[[m],:], np.array([flatten(s_grid)]), critic, r_grid[[m],:], curr_neighbor_mask_prev[[m],:], gamma)
+                    targets_batch = q_estimator_list[m].compute_targets(action_mat_prev[[m],:], np.array(critic_state), critic, r_grid[[m],:], curr_neighbor_mask_prev[[m],:], gamma)
                     #print(targets_batch)
                     # Advantage for policy network.
                     advantage = q_estimator_list[m].compute_advantage([curr_state_value_prev[m]], [next_state_ids_prev[m]] ,
-                                                            np.array([flatten(s_grid)]), critic, r_grid[[m],:], gamma)
+                                                            np.array(critic_state), critic, r_grid[[m],:], gamma)
                                       
                     if curr_task[0][0] != -1 and curr_task[1][0] != -1:
                         #print('state_mat_prev] : ' , np.array(state_mat_prev).shape)
                         #print('targets_batch[[0],:] : ' , np.array(targets_batch[[0],:]).shape)
-                        ReplayMemory_list[m].add(np.array([flatten(state_mat_prev)]), action_mat_prev[[m],:], targets_batch[[0],:], np.array([s_grid[m]]))
+                        ReplayMemory_list[m].add(np.array([state_mat_prev]), action_mat_prev[[m],:], targets_batch[[0],:], np.array([s_grid[m]]))
                         policy_replay_list[m].add(policy_state_prev[[m],:], action_choosen_mat_prev[[m],:], advantage , curr_neighbor_mask_prev[[m],:])
 
             # For updating
-            state_mat_prev = s_grid
+            state_mat_prev = critic_state
             action_mat_prev = valid_action_prob_mat
             action_choosen_mat_prev = action_choosen_mat
             curr_neighbor_mask_prev = curr_neighbor_mask
