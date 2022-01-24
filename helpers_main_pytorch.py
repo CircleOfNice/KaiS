@@ -83,7 +83,16 @@ def get_action_dim(node_param_lists):
         for node_param in _list:
             action_dim+=1
     return action_dim + 1 # +1 because of cluster
-    
+
+def set_lr( optimizer, lr):    
+    """Method to set the Learning rate of the given optimizer
+
+    Args:
+        optimizer ([Pytorch optimizer]): [Optimizer]
+        lr ([Float]): [Learning Rate]
+    """
+    for params_group in optimizer.param_groups:
+        params_group['lr'] = lr    
 
 def get_state_list(master_list, max_tasks):
     state_list = []

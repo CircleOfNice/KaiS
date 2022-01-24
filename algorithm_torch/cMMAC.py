@@ -9,6 +9,9 @@ from algorithm_torch.CMMAC_Policy_Model import *
 from algorithm_torch.CMMAC_Value_Model import *
 from algorithm_torch.ReplayMemory import *
 
+from helpers_main_pytorch import set_lr
+
+
 class Estimator:
     """Class to Define the cMMAC (Actor Critic) model
     """
@@ -29,7 +32,7 @@ class Estimator:
         self.actor_loss = 0
         self.value_loss = 0
         self.entropy = 0
-        self._build_value_model()
+        #self._build_value_model()
         self._build_policy()
         
         self.loss = self.actor_loss + .5 * self.value_loss - 10 * self.entropy
@@ -47,18 +50,9 @@ class Estimator:
             [float]: [Calcultated squared_difference_loss]
         """
         loss = torch.sum(target**2 - output**2)
-        return loss    
-    
-    def set_lr(self, optimizer, lr):    
-        """Method to set the Learning rate of the given optimizer
-
-        Args:
-            optimizer ([Pytorch optimizer]): [Optimizer]
-            lr ([Float]): [Learning Rate]
-        """
-        for params_group in optimizer.param_groups:
-            params_group['lr'] = lr
-            
+        return loss      
+     
+    '''
     def _build_value_model(self):
         """[Method to build the value model and assign its loss and optimizers]
         """
@@ -66,6 +60,7 @@ class Estimator:
         
         self.vm_criterion = self.squared_difference_loss
         self.vm_optimizer = optim.Adam(self.vm.parameters(), lr=0.001)
+        '''
         
     def sm_prob(self, policy_net_output, neighbor_mask):
         """[Method to apply policy filtering of edge nodes using neighbor mask and policy output]
@@ -119,7 +114,7 @@ class Estimator:
         self.pm_criterion = self.policy_net_loss
         self.pm_optimizer = optim.Adam(self.pm.parameters(), lr=0.001)
         
-    def action(self, s, ava_node, context):
+    def action(self, s, vm, critic_state, ava_node, context):
         """
 
         Args:
@@ -135,8 +130,8 @@ class Estimator:
                curr_neighbor_mask_policy) : Neighbor masking policy
                next_state_ids : Propagated states
         """
-
-        value_output = self.vm(s)
+        #print(critic_state)
+        value_output = vm(np.array(critic_state))
         value_output = value_output.flatten()
         
         action_tuple = []
@@ -199,7 +194,7 @@ class Estimator:
                np.stack(policy_state), np.stack(action_choosen_mat), curr_state_value, \
                np.stack(curr_neighbor_mask_policy), next_state_ids
     
-    def compute_advantage(self, curr_state_value, next_state_ids, next_state, node_reward, gamma):
+    def compute_advantage(self, curr_state_value, next_state_ids, next_state, vm, node_reward, gamma):
         """[Calculates difference between predicted Q value and ! Value target]
 
         Args:
@@ -214,19 +209,21 @@ class Estimator:
         """
         # compute advantage
         
+        #print(type(next_state))
+        #print(next_state)
         advantage = []
         node_reward = node_reward.flatten()
-        qvalue_next = self.vm(next_state).flatten()
-        print('qvalue_next : ', qvalue_next.shape)
-        print('next_state : ', next_state.shape)
-        a=b
+        qvalue_next = vm(next_state).flatten()
+        #print('qvalue_next : ', qvalue_next.shape)
+        #print('next_state : ', next_state.shape)
+        #a=b
         for idx, next_state_id in enumerate(next_state_ids):
             temp_adv = sum(node_reward) + gamma * sum(qvalue_next) - curr_state_value[idx]
             advantage.append(temp_adv.detach().numpy())
         #print('advantage : ',advantage)
         return advantage
     
-    def compute_targets(self, valid_prob, next_state, node_reward, curr_neighbor_mask, gamma):
+    def compute_targets(self, valid_prob, next_state, vm, node_reward, curr_neighbor_mask, gamma):
         """[Method for computation of Targets]
 
         Args:
@@ -242,7 +239,7 @@ class Estimator:
         
         targets = []
         node_reward = node_reward.flatten()
-        qvalue_next = self.vm(next_state).flatten()
+        qvalue_next = vm(next_state).flatten()
         #print('len(valid_prob) : ' , len(valid_prob))
         #for idx in np.arange(self.number_of_master_nodes):
         for idx in np.arange(len(valid_prob)):
@@ -253,7 +250,7 @@ class Estimator:
             targets.append(curr_grid_target)
 
         return np.array(targets).reshape([-1, 1])
-    
+    '''
     def update_value(self, s, y, learning_rate):
         """[Method to optimize the Value net]
 
@@ -266,10 +263,10 @@ class Estimator:
         value_output = self.vm(s)
         y = torch.tensor(y)
         loss = self.vm_criterion(y, value_output)
-        self.set_lr(self.vm_optimizer, learning_rate)
+        set_lr(self.vm_optimizer, learning_rate)
         loss.backward()
         self.vm_optimizer.step()
-    
+    '''
     def update_policy(self, policy_state, advantage, action_choosen_mat, curr_neighbor_mask, learning_rate):
         """[Optimize Policy net]
 
@@ -283,7 +280,7 @@ class Estimator:
         self.pm_optimizer.zero_grad()
         policy_net_output = self.pm(policy_state)
         loss = self.pm_criterion( policy_net_output, curr_neighbor_mask, advantage, action_choosen_mat)
-        self.set_lr(self.pm_optimizer, learning_rate)
+        set_lr(self.pm_optimizer, learning_rate)
         loss.backward()
         self.pm_optimizer.step()
     
