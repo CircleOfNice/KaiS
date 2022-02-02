@@ -173,7 +173,7 @@ class OrchestrateAgent(Agent):
         Returns:
             [Numpy arrays]: [Node Inputs, scale inputs for next state]
         """
-        done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state = obs
+        done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state, cpu_list, mem_list, task_list = obs
         done_tasks = np.array(done_tasks)
         undone_tasks = np.array(undone_tasks)
         curr_tasks_in_queue = np.array(curr_tasks_in_queue)
@@ -181,14 +181,26 @@ class OrchestrateAgent(Agent):
 
         # Compute total number of nodes
         total_num_nodes = len(curr_tasks_in_queue)
-
+        print('total_num_nodes : ', total_num_nodes)
         # Inputs to feed
-        node_inputs = np.zeros([total_num_nodes, self.node_input_dim])
+        #node_inputs = np.zeros([total_num_nodes, self.node_input_dim])
+        a=B
+        # Add values to the node inputs task_list, mem_list, cpu_list etc
+        node_inputs = np.zeros([total_num_nodes, 2*self.MAX_TESK_TYPE+ 3*total_num_nodes])
         scale_inputs = np.zeros([1, self.scale_input_dim])
-
+        #print('curr_tasks_in_queue : ', curr_tasks_in_queue)
         for i in range(len(node_inputs)):
+            #print('i: ', i)
+            #print('curr_tasks_in_queue[i, :self.MAX_TESK_TYPE] : ', len(curr_tasks_in_queue[i, :self.MAX_TESK_TYPE]))
+            #print('deploy_state[i, :self.MAX_TESK_TYPE] : ', len(deploy_state[i, :self.MAX_TESK_TYPE]))
+            #print('curr_tasks_in_queue : ', len(curr_tasks_in_queue[i, :]))
+            #print('deploy_state : ', len(deploy_state[i, :]))
             node_inputs[i, :self.MAX_TESK_TYPE] = curr_tasks_in_queue[i, :self.MAX_TESK_TYPE]
-            node_inputs[i, self.MAX_TESK_TYPE:] = deploy_state[i, :self.MAX_TESK_TYPE]
+            node_inputs[i, self.MAX_TESK_TYPE: 2*self.MAX_TESK_TYPE] = deploy_state[i, :self.MAX_TESK_TYPE]
+            node_inputs[i, 2*self.MAX_TESK_TYPE: 2*self.MAX_TESK_TYPE+total_num_nodes] = cpu_list
+            node_inputs[i, 2*self.MAX_TESK_TYPE+ total_num_nodes: 2*self.MAX_TESK_TYPE+2* total_num_nodes] = mem_list
+            node_inputs[i, 2*self.MAX_TESK_TYPE+ 2*total_num_nodes: 2*self.MAX_TESK_TYPE+3* total_num_nodes] = task_list
+            
         scale_inputs[0, :self.MAX_TESK_TYPE] = done_tasks[:self.MAX_TESK_TYPE]
         scale_inputs[0, self.MAX_TESK_TYPE:] = undone_tasks[:self.MAX_TESK_TYPE]
         
@@ -240,7 +252,9 @@ class OrchestrateAgent(Agent):
         """
 
         node_inputs, scale_inputs = self.translate_state(obs)
+        #print('node_inputs : ', node_inputs)
         self.gcn(node_inputs)
+        print('self.gcn_outputs : ', self.gcn.outputs.shape)
         node_act_probs, scale_act_probs, node_acts, scale_acts = \
             self.predict((node_inputs, scale_inputs, self.gcn.outputs))
         return node_acts, scale_acts, \
