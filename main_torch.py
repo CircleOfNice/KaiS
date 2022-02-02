@@ -104,9 +104,9 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             cur_time = cur_time + SLOT_TIME
             ########### Each frame ###########
             if slot % CHO_CYCLE == 0 and slot != 0:
-                #print('slot % CHO_CYCLE : ', slot % CHO_CYCLE, slot)
+                print('slot % CHO_CYCLE : ', slot % CHO_CYCLE, slot)
                 # Get task state, include successful, failed, and unresolved
-                done_tasks, undone_tasks, curr_tasks_in_queue = get_state_characteristics(MAX_TESK_TYPE, master_list)  
+                done_tasks, undone_tasks, curr_tasks_in_queue, cpu_list, mem_list, task_list = get_state_characteristics(MAX_TESK_TYPE, master_list)  
                    
                 if slot != CHO_CYCLE:
                     #exp['reward'].append(float(sum(deploy_reward)) / float(len(deploy_reward)))
@@ -128,7 +128,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 #print('deploy_state_float : ', deploy_state_float)
                 #a=b
                 # Orchestration
-                node_choice, service_scaling_choice, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, MAX_TESK_TYPE)
+                node_choice, service_scaling_choice, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, cpu_list, mem_list, task_list, MAX_TESK_TYPE)
                 
                 
                 #print('node_choice, service_scaling : ', node_choice, service_scaling_choice)
@@ -335,7 +335,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 50 #500 # Number of Episodes to run
+    RUN_TIMES = 5 #500 # Number of Episodes to run
     TASK_NUM = 5000 # Time for each Episode Ending
     TRAIN_TIMES = 50 # list containing two elements for tasks done on both master nodes
     CHO_CYCLE = 1000 # Orchestration cycle

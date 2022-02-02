@@ -75,6 +75,7 @@ class GraphCNN(nn.Module):
     def forward(self, x):
         
         x = torch.from_numpy(x)
+        print('x.shape : ', x.shape)
         # Raise x into higher dimension
             
         for l in range(len(self.prep_weights)):

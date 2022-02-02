@@ -430,6 +430,25 @@ def get_state_characteristics(MAX_TESK_TYPE, master_list):
             for j in range(len(master.node_list[i].task_queue)):
                 tmp[master.node_list[i].task_queue[j][0]] = tmp[master.node_list[i].task_queue[j][0]] + 1.0
             curr_tasks_in_queue.append(tmp)
-    return done_tasks, undone_tasks, curr_tasks_in_queue
+            
+    #print('length of curr_tasks_in_queue :', len(curr_tasks_in_queue))
+    #print('curr_tasks_in_queue :', curr_tasks_in_queue)
+    #print('done_tasks : ', done_tasks)
+    #print('undone_tasks : ', undone_tasks)
+    cpu_list = []
+    mem_list = []
+    task_list = []
+    for master in master_list:
+        for i in range(len(master.node_list)):
+            #print('master.node_list[i].service_list, i :', master.node_list[i].service_list, i)
+            #print('master.node_list[i].cpu : ', master.node_list[i].cpu)
+            #print('master.node_list[i].mem : ', master.node_list[i].mem)
+            #print('master.node_list[i].task_queue : ', master.node_list[i].task_queue, len(master.node_list[i].task_queue))
+            cpu_list.append(master.node_list[i].cpu)
+            mem_list.append(master.node_list[i].mem)
+            task_list.append(len(master.node_list[i].task_queue))
+    print('done_tasks, undone_tasks, curr_tasks_in_queue : ', len(done_tasks), len(undone_tasks), len(curr_tasks_in_queue))
+    print('cpu_list, mem_list, task_list : ', len(cpu_list), len(mem_list), len(task_list))
+    return done_tasks, undone_tasks, curr_tasks_in_queue, cpu_list, mem_list, task_list
 
 
