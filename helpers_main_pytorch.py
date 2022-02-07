@@ -1,6 +1,6 @@
-import math
+import torch
 import numpy as np
-import random
+import torch.nn as nn
 from env.platform import *
 from env.env_run import update_docker
 #from algorithm_torch.GPG import act_offload_agent
@@ -43,28 +43,12 @@ number_of_master_nodes  = 2 # number of eAPs # Only in this case whole thing mak
 cluster_action_value = 6
 latency = 0
 
+
+act_function = nn.functional.leaky_relu
+opt_function = torch.optim.Adam
+
 def initial_state_values():
     deploy_state = []
-    #print(np.random.randint(low=0, high=2, size=MAX_TESK_TYPE).tolist())
-    '''
-    for i in range(cluster_action_value):
-        sub_list = []
-        for j in range(MAX_TESK_TYPE):
-            
-            sub_list.append(0)
-            #
-            #if random.random()< 0.25:
-            #    sub_list.append(1)
-            #else:
-            #    sub_list.append(0)
-            #
-
-        deploy_state.append(sub_list)
-                    
-        #deploy_state.append(np.random.randint(low=0, high=2, size=MAX_TESK_TYPE).tolist())
-    #print(deploy_state)
-    #a=b
-    '''
     deploy_state = [[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
                 [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
                 [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1]]
@@ -114,7 +98,6 @@ def estimate_state_size(all_task_list, max_tasks):
     s_grid_len = []
     for i, state in enumerate((state_list)):
         sub_deploy_state = deploy_state[length_list[i]:length_list[i+1]]
-        #print('sub_deploy_state : ', sub_deploy_state)
         sub_elem = flatten(flatten([sub_deploy_state, [[state[5]]],[[state[4]]], [[state[3]]], [state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
         s_grid_len.append(len(sub_elem))
         
@@ -223,9 +206,7 @@ def state_inside_eAP(master, num_edge_nodes_per_eAP, max_tasks):
         cpu_list.append([master.node_list[i].cpu, master.node_list[i].cpu_max])
         mem_list.append([master.node_list[i].mem, master.node_list[i].mem_max])
         task_num.append(len(master.node_list[i].task_queue))
-        #print('master.node_list[i]. : ', master.undone)
-    #a=b
-    #print('service_type : ', service_type)
+
     return cpu_list, mem_list, task_num, undone_tasks, service_type, delay_requirement
 
 def create_node_list(node_specification):
@@ -397,8 +378,15 @@ def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, service_coefficient,
                             master_list[j].add_to_node_attribute(k, 'mem', - POD_MEM * service_coefficient[ii])
                             master_list[j].append_docker_to_node_service_list(k, docker)
                             
-                        
-                        
+def get_node_characteristics(master):
+    cpu_list = []
+    mem_list = []
+    task_list = []
+    for i in range(len(master.node_list)):
+        cpu_list.append(master.node_list[i].cpu)
+        mem_list.append(master.node_list[i].mem)
+        task_list.append(len(master.node_list[i].task_queue))                
+    return cpu_list, mem_list, task_list                    
 def get_state_characteristics(MAX_TESK_TYPE, master_list):
     """Get lists of tasks that are done, undone and current task in queue
 
@@ -430,25 +418,7 @@ def get_state_characteristics(MAX_TESK_TYPE, master_list):
             for j in range(len(master.node_list[i].task_queue)):
                 tmp[master.node_list[i].task_queue[j][0]] = tmp[master.node_list[i].task_queue[j][0]] + 1.0
             curr_tasks_in_queue.append(tmp)
-            
-    #print('length of curr_tasks_in_queue :', len(curr_tasks_in_queue))
-    #print('curr_tasks_in_queue :', curr_tasks_in_queue)
-    #print('done_tasks : ', done_tasks)
-    #print('undone_tasks : ', undone_tasks)
-    cpu_list = []
-    mem_list = []
-    task_list = []
-    for master in master_list:
-        for i in range(len(master.node_list)):
-            #print('master.node_list[i].service_list, i :', master.node_list[i].service_list, i)
-            #print('master.node_list[i].cpu : ', master.node_list[i].cpu)
-            #print('master.node_list[i].mem : ', master.node_list[i].mem)
-            #print('master.node_list[i].task_queue : ', master.node_list[i].task_queue, len(master.node_list[i].task_queue))
-            cpu_list.append(master.node_list[i].cpu)
-            mem_list.append(master.node_list[i].mem)
-            task_list.append(len(master.node_list[i].task_queue))
-    print('done_tasks, undone_tasks, curr_tasks_in_queue : ', len(done_tasks), len(undone_tasks), len(curr_tasks_in_queue))
-    print('cpu_list, mem_list, task_list : ', len(cpu_list), len(mem_list), len(task_list))
-    return done_tasks, undone_tasks, curr_tasks_in_queue, cpu_list, mem_list, task_list
+    
+    return done_tasks, undone_tasks, curr_tasks_in_queue
 
 

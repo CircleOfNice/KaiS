@@ -11,6 +11,8 @@ from env.env_run import *
 import pickle,gzip
 from helpers_main_pytorch import *                
 from algorithm_torch.CMMAC_Value_Model import build_value_model, update_value
+
+
 def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     
     """[Function to execute the KAIS Algorithm ]
@@ -58,15 +60,17 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         policy_replay_list.append(policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) #experience Replay for Policy network for cMMMac Agent
 
     # Creation of global critic (currently without cloud info of unprocessed requests)
-    #print('sum(s_grid_len) : ', sum(s_grid_len))
     critic, critic_optimizer = build_value_model(sum(s_grid_len)+ 1) # Length of task queue can be only one digit long
-    #print(critic)
     
     global_step1 = 0
     global_step2 = 0
 
-    orchestrate_agent = OrchestrateAgent(node_input_dim, scale_input_dim, hid_dims, output_dim, max_depth,
-                                         range(1, exec_cap + 1), MAX_TESK_TYPE, eps=1e-6, act_fn = nn.functional.leaky_relu,optimizer=torch.optim.Adam)
+    orchestrate_agent = OrchestrateAgent(output_dim*len(master_param_lists) + node_input_dim , scale_input_dim, hid_dims, output_dim, max_depth,
+                                         range(1, exec_cap + 1), MAX_TESK_TYPE, eps=1e-6, act_fn = act_function,optimizer=opt_function)
+    
+
+    #orchestrate_agent = OrchestrateAgent(node_input_dim, scale_input_dim, hid_dims, output_dim, max_depth,
+    #                                     range(1, exec_cap + 1), MAX_TESK_TYPE, eps=1e-6, act_fn = act_function,optimizer=opt_function)
     exp = {'node_inputs': [], 'scale_inputs': [], 'reward': [], 'wall_time': [], 'node_act_vec': [],
            'scale_act_vec': []}
 
@@ -94,6 +98,13 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 
         master_list, cloud = create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time)
         
+        # Creation of node Graph CNN
+        graph_cnn_list = []
+        for master in master_list:
+            cpu_list, mem_list, task_list = get_node_characteristics(master) 
+            
+            graph_cnn_list.append(GraphCNN(len(cpu_list)+ len(mem_list) + len(mem_list), hid_dims, output_dim, max_depth, act_function))
+
         # Crerate dockers based on deploy_state
         valid_node = 0
         for mast in master_list:
@@ -104,20 +115,24 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             cur_time = cur_time + SLOT_TIME
             ########### Each frame ###########
             if slot % CHO_CYCLE == 0 and slot != 0:
-                print('slot % CHO_CYCLE : ', slot % CHO_CYCLE, slot)
                 # Get task state, include successful, failed, and unresolved
-                done_tasks, undone_tasks, curr_tasks_in_queue, cpu_list, mem_list, task_list = get_state_characteristics(MAX_TESK_TYPE, master_list)  
-                   
+                done_tasks, undone_tasks, curr_tasks_in_queue,  = get_state_characteristics(MAX_TESK_TYPE, master_list)  
+                
+                cpu_lists =[]
+                mem_lists = []
+                task_lists = []
+                for master in master_list:
+                    cpu_list, mem_list, task_list = get_node_characteristics(master)  
+                    cpu_lists.append(cpu_list)
+                    mem_lists.append(mem_list)
+                    task_lists.append(task_list)
+                
+
                 if slot != CHO_CYCLE:
-                    #exp['reward'].append(float(sum(deploy_reward)) / float(len(deploy_reward)))
-                    #orchestration_reward = get_orchestration_reward(master_list, cur_time, check_queue)
-                    #exp['reward'].append(orchestration_reward)
                     exp['reward'].append(float(sum(deploy_reward)) / float(len(deploy_reward)))
                     deploy_reward = []
                     exp['wall_time'].append(cur_time)
-                #print('n_iter : ', n_iter)
-                #print('slot : ', slot)
-                #print('deploy_state : ', deploy_state)
+
                 deploy_state_float = []
                 for i in range(len(deploy_state)):
                     tmp = []
@@ -125,20 +140,15 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                         tmp.append(float(deploy_state[i][j]))
                     deploy_state_float.append(tmp)
 
-                #print('deploy_state_float : ', deploy_state_float)
-                #a=b
                 # Orchestration
-                node_choice, service_scaling_choice, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, cpu_list, mem_list, task_list, MAX_TESK_TYPE)
+                node_choice, service_scaling_choice, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, cpu_lists, mem_lists, task_lists, graph_cnn_list, MAX_TESK_TYPE)
                 
-                
-                #print('node_choice, service_scaling : ', node_choice, service_scaling_choice)
                 # Randomising Orchestration
                 
                 #if random.uniform(0, 1)< 0.05:
                 #    change_service = torch.randint(-12, 12, (3,))
                 #    change_node = torch.randint(0, 6, (3,))
-                #    print('Randomising Orchestration')
-                #print('Not Randomising Orchestration')
+
                 
                 
                 # Here is the code for orchestration and service scaling
@@ -176,20 +186,17 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 ava_node.append(tmp_list)
 
             state_list = get_state_list(master_list, max_tasks)    
-            #print('state_list : ', state_list)
+
             last_length, length_list = get_last_length(master_list)
             s_grid = []
             for i, state in enumerate((state_list)):
                 sub_deploy_state = deploy_state[length_list[i]:length_list[i+1]]
-                #print('sub_deploy_state : ', sub_deploy_state)
+
                 sub_elem = flatten(flatten([sub_deploy_state, [[state[5]]], [[state[4]]], [[state[3]]],[state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
                 s_grid.append(sub_elem)
             critic_state = flatten(s_grid)
-            #print(len(cloud.task_queue))
+
             critic_state.append(len(cloud.task_queue))
-            #print(critic_state)
-            #print(len(critic_state))
-            #a=b
             # Dispatch decision
             #TODO Determine the Action Precisely 
             act = []
@@ -219,7 +226,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             #if random.uniform(0, 1)< 0.05:
             #    	act = [random.randint(0,6), random.randint(0,6)] 
             #act = [random.randint(0,6), random.randint(0,6)] 
-            #print('act :', act)
             
             ####
             # Put the current task on the queue based on dispatch decision
@@ -256,17 +262,12 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 
                 r_grid = to_grid_rewards(immediate_reward)
                 for m in range(len(r_grid)):
-                    #print(np.array([flatten(s_grid)]).shape)
-                    #targets_batch = q_estimator_list[m].compute_targets(action_mat_prev[[m],:], np.array([s_grid[m]]), critic, r_grid[[m],:], curr_neighbor_mask_prev[[m],:], gamma)
                     targets_batch = q_estimator_list[m].compute_targets(action_mat_prev[[m],:], np.array(critic_state), critic, r_grid[[m],:], curr_neighbor_mask_prev[[m],:], gamma)
-                    #print(targets_batch)
                     # Advantage for policy network.
                     advantage = q_estimator_list[m].compute_advantage([curr_state_value_prev[m]], [next_state_ids_prev[m]] ,
                                                             np.array(critic_state), critic, r_grid[[m],:], gamma)
                                       
                     if curr_task[0][0] != -1 and curr_task[1][0] != -1:
-                        #print('state_mat_prev] : ' , np.array(state_mat_prev).shape)
-                        #print('targets_batch[[0],:] : ' , np.array(targets_batch[[0],:]).shape)
                         ReplayMemory_list[m].add(np.array([state_mat_prev]), action_mat_prev[[m],:], targets_batch[[0],:], np.array([s_grid[m]]))
                         policy_replay_list[m].add(policy_state_prev[[m],:], action_choosen_mat_prev[[m],:], advantage , curr_neighbor_mask_prev[[m],:])
 
@@ -335,7 +336,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 5 #500 # Number of Episodes to run
+    RUN_TIMES = 25 #500 # Number of Episodes to run
     TASK_NUM = 5000 # Time for each Episode Ending
     TRAIN_TIMES = 50 # list containing two elements for tasks done on both master nodes
     CHO_CYCLE = 1000 # Orchestration cycle

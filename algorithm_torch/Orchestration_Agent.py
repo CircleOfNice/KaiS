@@ -8,7 +8,7 @@ from algorithm_torch.Ocn_net import *
 from algorithm_torch.gcn import GraphCNN
 from algorithm_torch.Orchestration_Agent import *
 from algorithm_torch.Agent import Agent
-from helpers_main_pytorch import high_value_edge_nodes
+from helpers_main_pytorch import high_value_edge_nodes, flatten, output_dim
 class OrchestrateAgent(Agent):
     def __init__(self, node_input_dim, scale_input_dim, hid_dims, output_dim,
                  max_depth, executor_levels, MAX_TESK_TYPE, eps, act_fn,optimizer):
@@ -31,7 +31,8 @@ class OrchestrateAgent(Agent):
         self.hid_dims = hid_dims
         self.output_dim = output_dim
         self.max_depth = max_depth
-        self.merge_node_dim_ = 24+ 8 # node_inputs_reshape.shape + gcn_outputs_reshape.shape (along axis 2)
+
+        self.merge_node_dim_ = node_input_dim +  output_dim # node_inputs_reshape.shape + gcn_outputs_reshape.shape (along axis 2)
         self.expanded_state_dim_ = 1 + 24 # node_inputs_reshaped.shape + executor levels range (along axis 2)
         self.executor_levels = executor_levels
         self.eps = eps #=1e-6
@@ -118,11 +119,9 @@ class OrchestrateAgent(Agent):
 
         scale_act_probs, scale_act_vec = torch.tensor(self.scale_act_probs), torch.tensor(scale_act_vec)
         scale_act_vec = torch.squeeze(scale_act_vec, dim= 1)
-        #print('node_prod : ', node_prod)
         selected_node_prob = torch.sum(node_prod,
             dim=(1,), keepdim=True)
-        #print('selected_node_prob : ', selected_node_prob)
-        #a=b
+
         select_scale_prod = torch.mul( self.scale_act_probs, scale_act_vec)
         sum_scale_1 = torch.sum(select_scale_prod, dim=2)
         
@@ -173,7 +172,22 @@ class OrchestrateAgent(Agent):
         Returns:
             [Numpy arrays]: [Node Inputs, scale inputs for next state]
         """
-        done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state, cpu_list, mem_list, task_list = obs
+        done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state, cpu_lists, mem_lists, task_lists, gcnn_list = obs
+        
+        g_out_list = []
+        for i, gcnn in enumerate(gcnn_list):
+            node_input =[]
+            node_input.append(cpu_lists[i][:])
+            node_input.append(mem_lists[i][:])
+            node_input.append(task_lists[i][:])
+            node_input = flatten(node_input)
+
+            node_input = np.asarray(node_input)
+            node_input = np.expand_dims(node_input, axis=0)
+
+            gcnn(node_input)
+            g_out_list.append(gcnn.outputs)
+  
         done_tasks = np.array(done_tasks)
         undone_tasks = np.array(undone_tasks)
         curr_tasks_in_queue = np.array(curr_tasks_in_queue)
@@ -181,25 +195,20 @@ class OrchestrateAgent(Agent):
 
         # Compute total number of nodes
         total_num_nodes = len(curr_tasks_in_queue)
-        print('total_num_nodes : ', total_num_nodes)
+
         # Inputs to feed
-        #node_inputs = np.zeros([total_num_nodes, self.node_input_dim])
-        a=B
+
         # Add values to the node inputs task_list, mem_list, cpu_list etc
-        node_inputs = np.zeros([total_num_nodes, 2*self.MAX_TESK_TYPE+ 3*total_num_nodes])
+        node_inputs = np.zeros([total_num_nodes, 2*self.MAX_TESK_TYPE+ len(gcnn_list)*output_dim])
         scale_inputs = np.zeros([1, self.scale_input_dim])
-        #print('curr_tasks_in_queue : ', curr_tasks_in_queue)
+
         for i in range(len(node_inputs)):
-            #print('i: ', i)
-            #print('curr_tasks_in_queue[i, :self.MAX_TESK_TYPE] : ', len(curr_tasks_in_queue[i, :self.MAX_TESK_TYPE]))
-            #print('deploy_state[i, :self.MAX_TESK_TYPE] : ', len(deploy_state[i, :self.MAX_TESK_TYPE]))
-            #print('curr_tasks_in_queue : ', len(curr_tasks_in_queue[i, :]))
-            #print('deploy_state : ', len(deploy_state[i, :]))
+
             node_inputs[i, :self.MAX_TESK_TYPE] = curr_tasks_in_queue[i, :self.MAX_TESK_TYPE]
             node_inputs[i, self.MAX_TESK_TYPE: 2*self.MAX_TESK_TYPE] = deploy_state[i, :self.MAX_TESK_TYPE]
-            node_inputs[i, 2*self.MAX_TESK_TYPE: 2*self.MAX_TESK_TYPE+total_num_nodes] = cpu_list
-            node_inputs[i, 2*self.MAX_TESK_TYPE+ total_num_nodes: 2*self.MAX_TESK_TYPE+2* total_num_nodes] = mem_list
-            node_inputs[i, 2*self.MAX_TESK_TYPE+ 2*total_num_nodes: 2*self.MAX_TESK_TYPE+3* total_num_nodes] = task_list
+            for j in range(len(gcnn_list)):
+                node_inputs[i, 2*self.MAX_TESK_TYPE + (j)*output_dim: 2*self.MAX_TESK_TYPE+(j+1)*output_dim] = gcnn_list[j].outputs.numpy()
+                #node_inputs[i, 2*self.MAX_TESK_TYPE+ (j+1)*output_dim: 2*self.MAX_TESK_TYPE+(j+2)** output_dim] = gcnn_list[j]
             
         scale_inputs[0, :self.MAX_TESK_TYPE] = done_tasks[:self.MAX_TESK_TYPE]
         scale_inputs[0, self.MAX_TESK_TYPE:] = undone_tasks[:self.MAX_TESK_TYPE]
@@ -229,7 +238,7 @@ class OrchestrateAgent(Agent):
         # Draw action based on the probability
         logits = torch.log(self.node_act_probs)
         noise = torch.rand(logits.shape)
-        #print('self.node_act_probs,  logits.shape : ', self.node_act_probs.shape, logits.shape)
+
         node_val = logits - torch.log(-torch.log(noise))
         self.node_acts = torch.topk(node_val, k=high_value_edge_nodes).indices
 
@@ -252,9 +261,9 @@ class OrchestrateAgent(Agent):
         """
 
         node_inputs, scale_inputs = self.translate_state(obs)
-        #print('node_inputs : ', node_inputs)
+        
         self.gcn(node_inputs)
-        print('self.gcn_outputs : ', self.gcn.outputs.shape)
+
         node_act_probs, scale_act_probs, node_acts, scale_acts = \
             self.predict((node_inputs, scale_inputs, self.gcn.outputs))
         return node_acts, scale_acts, \

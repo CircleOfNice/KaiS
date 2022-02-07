@@ -27,7 +27,7 @@ def discount(x, gamma):
         out[i] = x[i] + gamma * out[i + 1]
     return out
 
-def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue, deploy_state_float, cpu_list, mem_list, task_list,  MAX_TESK_TYPE,):
+def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue, deploy_state_float, cpu_lists, mem_lists, task_lists, gcnn_list,  MAX_TESK_TYPE,):
     """Generate Orchestration Decision
 
     Args:
@@ -44,7 +44,7 @@ def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_t
         change_service (list) : Services to be changed
         exp (list): updated recorded experiences
     """
-    obs = [done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state_float, cpu_list, mem_list, task_list]
+    obs = [done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state_float, cpu_lists, mem_lists, task_lists, gcnn_list]
     # Invokes model (propagate the observation through the orchestration model) 
     #and return the chosen node, chosen services and the appended experience, after the orchestration step]
     # Propagate the observation of the environment and produces
