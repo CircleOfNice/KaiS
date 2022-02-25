@@ -10,6 +10,17 @@ from algorithm_torch.Orchestration_Agent import *
 from algorithm_torch.ReplayMemory import ReplayMemory
 from algorithm_torch.policyReplayMemory import policyReplayMemory
 from helpers_main_pytorch import remove_docker_from_master_node, deploy_new_docker
+
+
+def get_gpg_reward(master_list):
+    task_len = 0
+    for master in master_list:
+        for node in master.node_list:
+            task_len += len(node.task_queue)
+    reward = np.exp(-(task_len))
+       
+    return reward
+
 def discount(x, gamma):
     """Calculate the discounted cumulative reward
         Cumulative Reward = r_t + gamma * r_t+1 + gamma ^2 * r_t+2 + ________
@@ -141,7 +152,6 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv):
     scale_inputs = np.array(scale_inputs)
     node_act_vec = np.array(node_act_vec)
     scale_act_vec = np.array(scale_act_vec)
-    
     loss = orchestrate_agent.act_loss(
         node_inputs, scale_inputs, node_act_vec, scale_act_vec, adv)
 
@@ -184,7 +194,8 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weig
     all_cum_reward = []
     all_rewards = exp['reward']
     batch_time = exp['wall_time']
-
+    #print(exp)
+    #a=b
     rewards = np.array([r for (r, t) in zip(all_rewards, batch_time)])
     cum_reward = discount(rewards, 1)
     all_cum_reward.append(cum_reward)
@@ -194,6 +205,7 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weig
     baselines = get_piecewise_linear_fit_baseline(all_cum_reward, [batch_time])
     # Calculate the advantage
     batch_adv = all_cum_reward[0] - baselines[0]
+    
     batch_adv = np.reshape(batch_adv, [len(batch_adv), 1])
     orchestrate_agent.entropy_weight = entropy_weight
     

@@ -1,8 +1,18 @@
 
 import time
-import sys
+import logging
+logger = logging.getLogger(__name__)  
 
-#from numpy.lib.index_tricks import s_
+# set log level
+logger.setLevel(logging.ERROR)
+
+# define file handler and set formatter
+file_handler = logging.FileHandler('logfile.log', 'w')
+formatter    = logging.Formatter('%(asctime)s : %(levelname)s : %(name)s : %(message)s')
+file_handler.setFormatter(formatter)
+
+# add file handler to logger
+logger.addHandler(file_handler)
 
 from algorithm_torch.cMMAC import *
 from algorithm_torch.GPG import *
@@ -11,6 +21,7 @@ from env.env_run import *
 import pickle,gzip
 from helpers_main_pytorch import *                
 from algorithm_torch.CMMAC_Value_Model import build_value_model, update_value
+
 
 
 def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
@@ -58,17 +69,18 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         q_estimator_list.append(Estimator(action_dim, s_grid_len[i], 1)) # Definition of cMMAc Agent
         ReplayMemory_list.append(ReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) # experience Replay for value network for cMMMac Agent
         policy_replay_list.append(policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) #experience Replay for Policy network for cMMMac Agent
-
+    
+    logger.debug('Multiple Actors initialised')
     # Creation of global critic (currently without cloud info of unprocessed requests)
     critic, critic_optimizer = build_value_model(sum(s_grid_len)+ 1) # Length of task queue can be only one digit long
-    
+    logger.debug('centralised critic initialised')
     global_step1 = 0
     global_step2 = 0
 
     orchestrate_agent = OrchestrateAgent(output_dim*len(master_param_lists) + node_input_dim , scale_input_dim, hid_dims, output_dim, max_depth,
                                          range(1, exec_cap + 1), MAX_TESK_TYPE, eps=1e-6, act_fn = act_function,optimizer=opt_function)
     
-
+    logger.debug('Initialization of orchestration agent complete')
     #orchestrate_agent = OrchestrateAgent(node_input_dim, scale_input_dim, hid_dims, output_dim, max_depth,
     #                                     range(1, exec_cap + 1), MAX_TESK_TYPE, eps=1e-6, act_fn = act_function,optimizer=opt_function)
     exp = {'node_inputs': [], 'scale_inputs': [], 'reward': [], 'wall_time': [], 'node_act_vec': [],
@@ -110,11 +122,13 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         for mast in master_list:
             valid_node = valid_node + len(mast.node_list)
         create_dockers(valid_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list)
+        logger.debug('Outer loop initialization done')
         ########### Each slot ###########
         for slot in range(BREAK_POINT):
             cur_time = cur_time + SLOT_TIME
             ########### Each frame ###########
             if slot % CHO_CYCLE == 0 and slot != 0:
+                logger.info('Orchestration Cycle n_iter, CHO_CYCLE : {} {}', str(n_iter), str(CHO_CYCLE))
                 # Get task state, include successful, failed, and unresolved
                 done_tasks, undone_tasks, curr_tasks_in_queue,  = get_state_characteristics(MAX_TESK_TYPE, master_list)  
                 
@@ -127,11 +141,10 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                     mem_lists.append(mem_list)
                     task_lists.append(task_list)
                 
-
-                if slot != CHO_CYCLE:
-                    exp['reward'].append(float(sum(deploy_reward)) / float(len(deploy_reward)))
-                    deploy_reward = []
-                    exp['wall_time'].append(cur_time)
+                reward_val = float(get_gpg_reward(master_list))
+                exp['reward'].append(reward_val)
+                deploy_reward = []
+                exp['wall_time'].append(cur_time)
 
                 deploy_state_float = []
                 for i in range(len(deploy_state)):
@@ -142,31 +155,35 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 
                 # Orchestration
                 node_choice, service_scaling_choice, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_state_float, cpu_lists, mem_lists, task_lists, graph_cnn_list, MAX_TESK_TYPE)
-                
+
+                logger.info('Orchestration of Decision done ')
                 # Randomising Orchestration
                 
-                #if random.uniform(0, 1)< 0.05:
-                #    change_service = torch.randint(-12, 12, (3,))
-                #    change_node = torch.randint(0, 6, (3,))
+                if random.uniform(0, 1)< 0.05:
+                    service_scaling_choice = torch.randint(-12, 12, (3,))
+                    node_choice = torch.randint(0, 6, (3,))
 
                 
                 
                 # Here is the code for orchestration and service scaling
                 execute_orchestration(node_choice, service_scaling_choice, #num_edge_nodes_per_eAP,
                          deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list)
+                
+                logger.info('Execution orchestration')
                 # Save data
-                if slot > 3 * CHO_CYCLE:
+                if slot > 50 * CHO_CYCLE:
                     exp_tmp = exp
-
-                    del exp_tmp['node_inputs'][-1]
-                    del exp_tmp['scale_inputs'][-1]
-                    del exp_tmp['node_act_vec'][-1]
-                    del exp_tmp['scale_act_vec'][-1]
+                    #print('slot cho check : ', slot)
+                    #del exp_tmp['node_inputs'][-1]
+                    #del exp_tmp['scale_inputs'][-1]
+                    #del exp_tmp['node_act_vec'][-1]
+                    #del exp_tmp['scale_act_vec'][-1]
                     
                     entropy_weight, loss = train_orchestrate_agent(orchestrate_agent, exp_tmp, entropy_weight,
                                                                    entropy_weight_min, entropy_weight_decay)
                     entropy_weight = decrease_var(entropy_weight,
                                                   entropy_weight_min, entropy_weight_decay)
+                    logger.info('Training orchestration agent')
 
             # Get current task
             for i, master in enumerate(master_list):
@@ -209,7 +226,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             for i in range(len(s_grid)):
                 act_, valid_action_prob_mat_, policy_state_, action_choosen_mat_, \
                 curr_state_value_, curr_neighbor_mask_, next_state_ids_ = q_estimator_list[i].action(np.array(s_grid[i]), critic, critic_state, ava_node[i], context,)
-                #a=b
                 act.append(act_[0])
                 valid_action_prob_mat.append(valid_action_prob_mat_[0])
                 policy_state.append(policy_state_[0])
@@ -223,10 +239,8 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             curr_neighbor_mask = np.array(curr_neighbor_mask)
 
             ###### Randomising if 0.05 then it is epsilor exploration
-            #if random.uniform(0, 1)< 0.05:
-            #    	act = [random.randint(0,6), random.randint(0,6)] 
-            #act = [random.randint(0,6), random.randint(0,6)] 
-            
+            if random.uniform(0, 1)< 0.05:
+                	act = [random.randint(0,6), random.randint(0,6)] 
             ####
             # Put the current task on the queue based on dispatch decision
             put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, master_list)
@@ -259,7 +273,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             deploy_reward.append(sum(immediate_reward))
 
             if slot != 0:
-                
+                logger.debug('Computing targets for cMMAC')
                 r_grid = to_grid_rewards(immediate_reward)
                 for m in range(len(r_grid)):
                     targets_batch = q_estimator_list[m].compute_targets(action_mat_prev[[m],:], np.array(critic_state), critic, r_grid[[m],:], curr_neighbor_mask_prev[[m],:], gamma)
@@ -297,6 +311,8 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 
         all_number = sum(achieve_num) + sum(fail_num)
         throughput_list.append(sum(achieve_num) / float(all_number))
+        #logger.info('Logging for run time throughput_list_all =', throughput_list, '\ncurrent_achieve_number =', sum(achieve_num),
+        #      ', current_fail_number =', sum(fail_num))
         print('throughput_list_all =', throughput_list, '\ncurrent_achieve_number =', sum(achieve_num),
               ', current_fail_number =', sum(fail_num))
         achieve_num = []
@@ -309,6 +325,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         record_all_order_response_rate.append(order_response_rates)
         # update value network
         for _ in np.arange(TRAIN_TIMES):
+
             for m in range(len(master_list)):
                 batch_s, _, batch_r, _ = ReplayMemory_list[m].sample()
                 update_value(batch_s, batch_r, 1e-3, critic, critic_optimizer)
@@ -316,11 +333,14 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 
         # update policy network
         for _ in np.arange(TRAIN_TIMES):
+
             for m in range(len(master_list)):
                 batch_s, batch_a, batch_r, batch_mask = policy_replay_list[m].sample()
                 q_estimator_list[m].update_policy(batch_s, batch_r.reshape([-1, 1]), batch_a, batch_mask, learning_rate,)
             
             global_step2 += 1
+            
+        logger.info('Done training for run time {}', str(n_iter))
     name = 'full_randomisation_orchestration_no_randomisation_'
     time_str = str(time.time())
     with gzip.open("./result/torch_out_time_" + name + time_str + ".obj", "wb") as f:
@@ -336,9 +356,9 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 25 #500 # Number of Episodes to run
-    TASK_NUM = 5000 # Time for each Episode Ending
-    TRAIN_TIMES = 50 # list containing two elements for tasks done on both master nodes
+    RUN_TIMES = 10 #500 # Number of Episodes to run
+    TASK_NUM = 10000 # 5000 Time for each Episode Ending
+    TRAIN_TIMES = 50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000 # Orchestration cycle
 
     ##############################################################

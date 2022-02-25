@@ -90,25 +90,6 @@ class OrchestrateAgent(Agent):
         
         # Map gcn_outputs and raw_inputs to action probabilities
         self.node_act_probs, self.scale_act_probs = self.ocn_net((self.node_inputs, self.scale_inputs, self.gcn.outputs) )#
-
-        #Vestige of tensorflow code
-        #### Pay no heed from here 
-        '''
-        # Draw action based on the probability
-        logits = torch.log(self.node_act_probs)
-
-        noise = torch.rand(logits.shape)
-
-        self.node_acts = torch.topk(logits - torch.log(-torch.log(noise)), k=3).indices
-
-        # scale_acts
-        logits = torch.log(self.scale_act_probs)
-
-        noise = torch.rand(logits.shape)
-
-        self.scale_acts = torch.topk(logits - torch.log(-torch.log(noise)), k=3).indices
-        '''
-        #### Pay no heed till here
         
         node_act_probs = torch.tensor(self.node_act_probs)
         node_act_vec = torch.tensor(node_act_vec)
@@ -116,7 +97,7 @@ class OrchestrateAgent(Agent):
 
         node_prod = torch.mul(
             node_act_probs, node_act_vec)
-
+        
         scale_act_probs, scale_act_vec = torch.tensor(self.scale_act_probs), torch.tensor(scale_act_vec)
         scale_act_vec = torch.squeeze(scale_act_vec, dim= 1)
         selected_node_prob = torch.sum(node_prod,
@@ -126,12 +107,11 @@ class OrchestrateAgent(Agent):
         sum_scale_1 = torch.sum(select_scale_prod, dim=2)
         
         selected_scale_prob = torch.sum(sum_scale_1, dim=1, keepdim=True)
-
         torch_log = torch.log(selected_node_prob * selected_scale_prob + \
                    self.eps)
 
         adv = torch.tensor(adv)
-        
+
         torch_log_adv_mul = torch.mul(torch_log, -adv)
 
         # Orchestrate loss due to advantge
@@ -195,7 +175,6 @@ class OrchestrateAgent(Agent):
 
         # Compute total number of nodes
         total_num_nodes = len(curr_tasks_in_queue)
-
         # Inputs to feed
 
         # Add values to the node inputs task_list, mem_list, cpu_list etc
@@ -208,7 +187,6 @@ class OrchestrateAgent(Agent):
             node_inputs[i, self.MAX_TESK_TYPE: 2*self.MAX_TESK_TYPE] = deploy_state[i, :self.MAX_TESK_TYPE]
             for j in range(len(gcnn_list)):
                 node_inputs[i, 2*self.MAX_TESK_TYPE + (j)*output_dim: 2*self.MAX_TESK_TYPE+(j+1)*output_dim] = gcnn_list[j].outputs.numpy()
-                #node_inputs[i, 2*self.MAX_TESK_TYPE+ (j+1)*output_dim: 2*self.MAX_TESK_TYPE+(j+2)** output_dim] = gcnn_list[j]
             
         scale_inputs[0, :self.MAX_TESK_TYPE] = done_tasks[:self.MAX_TESK_TYPE]
         scale_inputs[0, self.MAX_TESK_TYPE:] = undone_tasks[:self.MAX_TESK_TYPE]
