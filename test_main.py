@@ -2,7 +2,7 @@
 import time
 import logging
 logger = logging.getLogger(__name__)  
-
+import random
 # set log level
 logger.setLevel(logging.ERROR)
 
@@ -22,7 +22,54 @@ import pickle,gzip
 from helpers_main_pytorch import *                
 from algorithm_torch.CMMAC_Value_Model import build_value_model, update_value
 
+# Make the initial state for 
+def def_initial_state_values(len_all_task_list=3, list_length_edge_nodes_per_eap=[3, 3, 3]):
+    
+    deploy_state_stack = [[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
+                [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
+                [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1],]
+    node_list_stack = [[100.0, 4.0], [200.0, 6.0], [100.0, 8.0], [200.0, 8.0], [100.0, 2.0], [200.0, 6.0]]
+    master_param_list_stack = [[200.0, 8.0]]
+    
+    length_deploy_state = sum(list_length_edge_nodes_per_eap)
+    deploy_state = []
+    master_param_lists =[]
+    for i in range(length_deploy_state):
+        deploy_state.append(random.choice(deploy_state_stack))
+    for i in range(len_all_task_list):
+        master_param_lists.append(random.choice(master_param_list_stack))
+    
+    node_param_lists = []    
+    for i in range(len_all_task_list):
+        #print(i)
+        node_list = []
+        for k in range(list_length_edge_nodes_per_eap[i]):
+            node_list.append(random.choice(node_list_stack))
+        node_param_lists.append(node_list)
 
+    return deploy_state, node_param_lists, master_param_lists
+
+
+
+def estimate_state_size(all_task_list, max_tasks, edge_list):
+
+    deploy_state, node_param_lists, master_param_lists = def_initial_state_values(len(all_task_list), edge_list)
+    
+    master_list = create_master_list(node_param_lists, master_param_lists, all_task_list)
+    '''
+    state_list = []
+    for mast in master_list:
+        state_list.append(state_inside_eAP(mast, len(mast.node_list)))
+    '''                
+    last_length, length_list = get_last_length(master_list)
+    state_list = get_state_list(master_list, max_tasks)
+    s_grid_len = []
+    for i, state in enumerate((state_list)):
+        sub_deploy_state = deploy_state[length_list[i]:length_list[i+1]]
+        sub_elem = flatten(flatten([sub_deploy_state, [[state[5]]],[[state[4]]], [[state[3]]], [state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
+        s_grid_len.append(len(sub_elem))
+    #print('s_grid_len : ', s_grid_len)    
+    return s_grid_len
 
 def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     
@@ -55,10 +102,29 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     all_task2, max_task_type2 = get_all_task('./data/Task_2.csv')# processed data fed to eAP 2
     
     
-    
+    # Creation of Dummy Data and eAPs and Edge Nodes
     all_task_list = [all_task1, all_task2]
+    max_task_pool = [max_task_type1, max_task_type2]
     max_tasks = max(max_task_type1, max_task_type2)
-    _, node_param_lists, master_param_lists = initial_state_values()
+    extra_eaps = 5 #Enter here
+    nodes_in_cluster = 3+5
+    low_bound_edge_mpde = 2
+    upper_bound_edge_mpde =6
+    for i in range(extra_eaps):
+        val_int = random.randint(0,len(max_task_pool) -1)
+        #print(val_int)
+        all_task_list.append(all_task_list[val_int])
+        
+    # For uniform Edge Nodes per eAP
+    edge_list = [nodes_in_cluster]*len(all_task_list)
+    
+    # For random Edge Nodes per eAP
+    #edge_list = [random.sample(range(low_bound_edge_mpde, upper_bound_edge_mpde), 1)[0] for i in range(len(all_task_list))]
+    
+    #print('edge_list : ', edge_list)
+    #a=B
+    
+    _, node_param_lists, master_param_lists = def_initial_state_values(len(all_task_list), edge_list)
     
     action_dim = get_action_dim(node_param_lists)
 
@@ -66,9 +132,11 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     q_estimator_list = []
     ReplayMemory_list = []
     policy_replay_list = []
-    s_grid_len = estimate_state_size(all_task_list, max_tasks)
-
+    s_grid_len = estimate_state_size(all_task_list, max_tasks, edge_list)
+    print('s_grid_len : ', s_grid_len)
+    #a=b
     for i in range(len(master_param_lists)):
+        #print(i)
         q_estimator_list.append(Estimator(action_dim, s_grid_len[i], 1)) # Definition of cMMAc Agent
         ReplayMemory_list.append(ReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) # experience Replay for value network for cMMMac Agent
         policy_replay_list.append(policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) #experience Replay for Policy network for cMMMac Agent
@@ -108,7 +176,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
         # The parameters here are set only to support the operation of the program, and may not be consistent with the actual system
         # At each edge node 1 denotes a kind of service which is running
 
-        deploy_state, node_param_lists, master_param_lists = initial_state_values()
+        deploy_state, node_param_lists, master_param_lists = def_initial_state_values(len(all_task_list), edge_list)
         # Create clusters based on the hardware resources you need
 
         master_list, cloud = create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time)
@@ -285,6 +353,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                                                             np.array(critic_state), critic, r_grid[[m],:], gamma)
                                       
                     if curr_task[0][0] != -1 and curr_task[1][0] != -1:
+                        #print('m : ', m)
                         ReplayMemory_list[m].add(np.array([state_mat_prev]), action_mat_prev[[m],:], targets_batch[[0],:], np.array([s_grid[m]]))
                         policy_replay_list[m].add(policy_state_prev[[m],:], action_choosen_mat_prev[[m],:], advantage , curr_neighbor_mask_prev[[m],:])
 
@@ -359,7 +428,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 50 #500 # Number of Episodes to run
+    RUN_TIMES = 20 #500 # Number of Episodes to run
     TASK_NUM = 5000 # 5000 Time for each Episode Ending
     TRAIN_TIMES = 50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000 # Orchestration cycle

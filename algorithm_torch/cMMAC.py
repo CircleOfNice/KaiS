@@ -316,20 +316,23 @@ def calculate_reward(master_list, cur_done, cur_undone):
     for i in range(len(master_list)):
         all_task.append(float(cur_done[i] + cur_undone[i]))
         fail_task.append(float(cur_undone[i]))
-        
+    #print('all_task : ', len(all_task))  
+    #print('fail_task : ', len(fail_task))     
     reward = []
     # The ratio of requests that violate delay requirements
     task_fail_rate = []
-    if all_task[0] != 0:
-        task_fail_rate.append(fail_task[0] / all_task[0])
-    else:
-        task_fail_rate.append(0)
-
+    
+    for i in range(len(master_list)):
+        if all_task[i] != 0:
+            task_fail_rate.append(fail_task[i] / all_task[i])
+        else:
+            task_fail_rate.append(0)
+    '''
     if all_task[1] != 0:
         task_fail_rate.append(fail_task[1] / all_task[1])
     else:
         task_fail_rate.append(0)
-
+    '''
     # The standard deviation of the CPU and memory usage
     
     use_rate_dict = {}

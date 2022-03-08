@@ -135,7 +135,7 @@ def check_queue(task_queue, cur_time, length_masterlist):
     return task_queue, undone, undone_kind
 
 
-def update_docker(node, cur_time, service_coefficient, POD_CPU):
+def update_docker(node, master_list, cur_time, service_coefficient, POD_CPU):
     """[Update the docker given the node]
 
     Args:
@@ -147,16 +147,25 @@ def update_docker(node, cur_time, service_coefficient, POD_CPU):
     Returns:
         [list]: [Edge node, undone and done task lists with list of tasks that are done and undone]
     """
-    done = [0, 0]
-    undone = [0, 0]
+    
+    #done = [0, 0]
+    #undone = [0, 0]
+    done = []
+    undone = []
+    for i in range(len(master_list)):
+        done.append(0)
+        undone.append(0)
+        
+    #print(done, undone)
     done_kind = []
     undone_kind = []
 
     # find achieved task in current time
     for i in range(len(node.service_list)):
         if node.service_list[i].available_time <= cur_time and len(node.service_list[i].doing_task) > 1:
-            #print('node.service_list[i].doing_task : ', node.service_list[i].doing_task)
+            #print('node.service_list[i].doing_task : ', node.service_list[i].doing_task[5])
             done[node.service_list[i].doing_task[5]] = done[node.service_list[i].doing_task[5]] + 1
+            #print('done : ', done)
             done_kind.append(node.service_list[i].doing_task[0])
             node.service_list[i].doing_task = [-1]
             node.service_list[i].available_time = cur_time
@@ -184,6 +193,7 @@ def update_docker(node, cur_time, service_coefficient, POD_CPU):
 
                     elif cur_time + to_do > node.task_queue[i][2]:
                         undone[node.task_queue[i][5]] = undone[node.task_queue[i][5]] + 1
+                        print('undone[node.task_queue[i][5]] : ', undone[node.task_queue[i][5]])
                         undone_kind.append(node.task_queue[i][0])
                         del node.task_queue[i]
                         flag = 1
@@ -194,5 +204,6 @@ def update_docker(node, cur_time, service_coefficient, POD_CPU):
             flag = 0
         else:
             i = i + 1
-    #print()
+    #if undone!=[0, 0] or  done!=[0, 0]:
+    #    print('undone, done : ', undone, done)
     return node, undone, done, done_kind, undone_kind

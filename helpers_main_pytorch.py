@@ -328,7 +328,7 @@ def update_state_of_dockers(cur_time, cloud, master_list):
     """
     for mstr in master_list:
         for i in range(len(mstr.node_list)):
-            mstr.node_list[i], undone, done, done_kind, undone_kind = update_docker(mstr.node_list[i], cur_time, service_coefficient, POD_CPU)
+            mstr.node_list[i], undone, done, done_kind, undone_kind = update_docker(mstr.node_list[i], master_list,  cur_time, service_coefficient, POD_CPU)
             for j in range(len(done_kind)):
                 mstr.done_kind[done_kind[j]] = mstr.done_kind[done_kind[j]] + 1
             for j in range(len(undone_kind)):
@@ -337,7 +337,7 @@ def update_state_of_dockers(cur_time, cloud, master_list):
             for i, master_entity in enumerate(master_list):
                 master_entity.update_undone(undone[i])
                 master_entity.update_done(done[i])
-    cloud, undone, done, done_kind, undone_kind = update_docker(cloud, cur_time, service_coefficient, POD_CPU)
+    cloud, undone, done, done_kind, undone_kind = update_docker(cloud, master_list, cur_time, service_coefficient, POD_CPU)
 
     for i, master_entity in enumerate(master_list):
                 master_entity.update_undone(undone[i])
