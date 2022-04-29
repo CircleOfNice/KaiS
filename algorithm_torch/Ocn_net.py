@@ -54,12 +54,21 @@ class OCN(nn.Module):
         node_inputs = torch.from_numpy(node_inputs).float()
         scale_inputs = torch.from_numpy(scale_inputs).float()
 
+        print('propagate node_inputs : ', node_inputs.shape)
+        print('propagate scale_inputs : ', scale_inputs.shape)
+        print('propagate gcn_outputs : ', gcn_outputs.shape)
+        
         node_inputs_reshape = node_inputs.view(self.batch_size, -1, self.node_input_dim)
         scale_inputs_reshape = scale_inputs.view(self.batch_size, -1, self.scale_input_dim)
         gcn_outputs_reshape = gcn_outputs.view(self.batch_size, -1, self.output_dim)
         
+        #print('node_inputs_reshape : ', node_inputs_reshape.shape)
+        #print('gcn_outputs_reshape : ', gcn_outputs_reshape.shape)
         merge_node = torch.cat((node_inputs_reshape, gcn_outputs_reshape), axis=2)
+        #print('merge_node : ', merge_node.shape)
         node_outputs = self.nodenet(merge_node)
+        #print('merge_node : ', merge_node.shape)
+        #print('node_outputs : ', node_outputs.shape)
         node_outputs = node_outputs.view(self.batch_size, -1)
         node_outputs = nn.functional.softmax(node_outputs)
         

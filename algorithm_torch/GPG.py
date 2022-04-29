@@ -248,6 +248,8 @@ def execute_orchestration(change_node, change_service,deploy_state, service_coef
         length_list.append(last_length + len(mstr.node_list))
         last_length = last_length + len(mstr.node_list)
     # Execute orchestration
+    #print('Change node : ', change_node)
+    #print('change_service : ', change_service)
     for i in range(len(change_node)):
         if change_service[i] < 0:
             # Delete docker and free memory

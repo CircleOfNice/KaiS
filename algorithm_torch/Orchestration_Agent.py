@@ -173,6 +173,12 @@ class OrchestrateAgent(Agent):
         curr_tasks_in_queue = np.array(curr_tasks_in_queue)
         deploy_state = np.array(deploy_state)
 
+        
+        print('done_tasks : ', done_tasks.shape)
+        print('undone_tasks : ', undone_tasks.shape)
+        print('curr_tasks_in_queue : ', curr_tasks_in_queue.shape)
+        print('deploy_state : ', deploy_state.shape)
+        
         # Compute total number of nodes
         total_num_nodes = len(curr_tasks_in_queue)
         # Inputs to feed
@@ -241,7 +247,9 @@ class OrchestrateAgent(Agent):
         node_inputs, scale_inputs = self.translate_state(obs)
         
         self.gcn(node_inputs)
-
+        print('invoke_model node_inputs : ', node_inputs.shape)
+        print('invoke_model scale_inputs : ', scale_inputs.shape)
+        print('invoke_model self.gcn.outputs : ', self.gcn.outputs.shape)
         node_act_probs, scale_act_probs, node_acts, scale_acts = \
             self.predict((node_inputs, scale_inputs, self.gcn.outputs))
         return node_acts, scale_acts, \

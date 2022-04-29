@@ -40,7 +40,7 @@ entropy_weight_decay = 1e-3 # Entropy weight decay rate
 number_of_master_nodes  = 2 # number of eAPs # Only in this case whole thing makes sense
 
 #num_edge_nodes_per_eAP =3
-cluster_action_value = 6
+#cluster_action_value = 6
 latency = 0
 
 
@@ -64,6 +64,7 @@ def initial_state_values():
 def get_action_dim(node_param_lists):
     action_dim = 0
     for _list in node_param_lists:
+        print('_list : ', _list)
         for node_param in _list:
             action_dim+=1
     return action_dim + 1 # +1 because of cluster
@@ -206,7 +207,7 @@ def state_inside_eAP(master, num_edge_nodes_per_eAP, max_tasks):
         cpu_list.append([master.node_list[i].cpu, master.node_list[i].cpu_max])
         mem_list.append([master.node_list[i].mem, master.node_list[i].mem_max])
         task_num.append(len(master.node_list[i].task_queue))
-
+    print('cpu_list, mem_list : ', len(cpu_list), len(mem_list))
     return cpu_list, mem_list, task_num, undone_tasks, service_type, delay_requirement
 
 def create_node_list(node_specification):
@@ -267,7 +268,7 @@ def get_last_length(master_list):
         last_length = last_length + len(mstr.node_list)
     return last_length, length_list
         
-def put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, master_list): 
+def put_current_task_on_queue(act, curr_task, action_dims, cloud, master_list): 
     """Put current tasks on queue
 
     Args:
@@ -279,10 +280,14 @@ def put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, maste
 
     """
     last_length, length_list = get_last_length(master_list)    
+    print('len(act) : ', len(act), act)
+    cluster_action_values = [action-1 for action in action_dims]
+    print('cluster_action_values : ', cluster_action_values)
+    #A=b
     for i in range(len(act)):
         if curr_task[i][0] == -1:
             continue
-        if act[i] == cluster_action_value:
+        if act[i] == cluster_action_values[i]:
             cloud.task_queue.append(curr_task[i])
             continue
         
@@ -345,7 +350,7 @@ def update_state_of_dockers(cur_time, cloud, master_list):
 
     return cloud  
 
-def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list):
+def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_states, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list):
     """Creation of dockers
 
     Args:
@@ -365,7 +370,21 @@ def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, service_coefficient,
     for mstr in master_list:
         length_list.append(last_length + len(mstr.node_list))
         last_length = last_length + len(mstr.node_list)
-    
+
+    for i, deploy_state in enumerate(deploy_states):
+            for ii in range(MAX_TESK_TYPE):
+                #print('deploy_state : ', len(deploy_state))
+                dicision = deploy_state[i][ii]
+                #print('deploy_state[i][ii] : ', deploy_state[i][ii])
+                for j in range(len(length_list)-1):
+                    if i>= length_list[j] and i < length_list[j+1] and dicision == 1:
+                        k= i-length_list[j]
+                        if master_list[j].node_list[k].mem >= POD_MEM * service_coefficient[ii]:
+                            docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
+                                            ii, [-1])
+                            master_list[j].add_to_node_attribute(k, 'mem', - POD_MEM * service_coefficient[ii])
+                            master_list[j].append_docker_to_node_service_list(k, docker) 
+'''
     for i in range(vaild_node):
             for ii in range(MAX_TESK_TYPE):
                 dicision = deploy_state[i][ii]
@@ -377,6 +396,8 @@ def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_state, service_coefficient,
                                             ii, [-1])
                             master_list[j].add_to_node_attribute(k, 'mem', - POD_MEM * service_coefficient[ii])
                             master_list[j].append_docker_to_node_service_list(k, docker)
+'''                               
+    
                             
 def get_node_characteristics(master):
     cpu_list = []

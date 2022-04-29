@@ -19,10 +19,11 @@ class NodeNet(nn.Module):
         self.fc4 = fc(node_inp_sizes[2], node_inp_sizes[3])# act=None)
 
     def forward(self, x):
-        
+        #print('x : ', x.shape)
         x = self.fc1(x)
         x = self.fc2(x)
         x = self.fc3(x)
         node_outputs = self.fc4(x)
-
+        #print('node_outputs Nodenet : ', node_outputs.shape)
+        #print('node_outputs : ', node_outputs)
         return node_outputs

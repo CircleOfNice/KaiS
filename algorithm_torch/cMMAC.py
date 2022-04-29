@@ -26,18 +26,16 @@ class Estimator:
         """
         self.number_of_master_nodes = number_of_master_nodes
         self.action_dim = action_dim
+        print('initalising action dim : ', self.action_dim)
         self.state_dim = state_dim
-        #print(self.number_of_master_nodes)
         # Initial value for losses
         self.actor_loss = 0
         self.value_loss = 0
         self.entropy = 0
-        #self._build_value_model()
         self._build_policy()
         
         self.loss = self.actor_loss + .5 * self.value_loss - 10 * self.entropy
         
-        self.neighbors_list = [[0, 1, 2, 3, 4, 5, 6], [0, 1, 2, 3, 4, 5, 6]]
 
     def squared_difference_loss(self, target, output):
         """Calculate squared difference loss
@@ -130,7 +128,8 @@ class Estimator:
                curr_neighbor_mask_policy) : Neighbor masking policy
                next_state_ids : Propagated states
         """
-        #print(critic_state)
+        print('critic_state : ', critic_state)
+        print('len(critic_state) : ', len(critic_state))
         value_output = vm(np.array(critic_state))
         value_output = value_output.flatten()
         
@@ -145,16 +144,27 @@ class Estimator:
         
         
         grid_ids = [x for x in range(self.number_of_master_nodes)]
-        
         self.valid_action_mask = np.zeros((self.number_of_master_nodes, self.action_dim))
-        #print('grid_ids, self.valid_action_mask : ', grid_ids, self.valid_action_mask)
+        print('self.number_of_master_nodes, self.action_dim) : ', self.number_of_master_nodes, self.action_dim)
         for j in ava_node:
-            self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
+            if len(self.valid_action_mask[self.number_of_master_nodes-1]) ==j:
+                print('len(self.valid_action_mask[self.number_of_master_nodes-1]) : ', len(self.valid_action_mask[self.number_of_master_nodes-1]))
+                print('ava_node : ', ava_node)
+                #print('ava_node[j] : ', ava_node[j])
+                print('j :  ', j)
+                print('self.action_dim : ', self.action_dim)
+                print('self.number_of_master_nodes : ', self.number_of_master_nodes)
+                self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
+            else:
+                print('ava_node : ', ava_node)
+                print('self.valid_action_mask : ', self.valid_action_mask)
+                print('self.valid_action_mask[self.number_of_master_nodes-1] : ', self.valid_action_mask[self.number_of_master_nodes-1])
+                print('j : ', j)
+                self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
         curr_neighbor_mask = deepcopy(self.valid_action_mask)
-        
+
         self.valid_neighbor_node_id = [[i for i in range(self.action_dim)] for j in range(self.number_of_master_nodes)]
-        
-        #print('curr_neighbor_mask, self.valid_neighbor_node_id, grid_ids : ', curr_neighbor_mask, self.valid_neighbor_node_id, grid_ids)
+
         # compute policy probability.
         self.pm_out =self.pm(s)
         action_probs,_,_ = self.sm_prob( self.pm_out, curr_neighbor_mask) 
@@ -162,6 +172,7 @@ class Estimator:
         for idx, grid_valid_idx in enumerate(grid_ids):
             action_prob = action_probs[idx]
             # action probability for state value function
+
             action_prob = action_prob.detach().numpy()
             valid_prob.append(action_prob)
             
@@ -171,6 +182,7 @@ class Estimator:
             
             curr_action_indices_temp = np.random.choice(self.action_dim, int(context[idx]),
                                                         p=action_prob / np.sum(action_prob))
+            
             curr_action_indices = [0] * self.action_dim
             for kk in curr_action_indices_temp:
                 curr_action_indices[kk] += 1
@@ -208,19 +220,15 @@ class Estimator:
             [list]: [list containing advantages]
         """
         # compute advantage
-        
-        #print(type(next_state))
-        #print(next_state)
+
         advantage = []
         node_reward = node_reward.flatten()
         qvalue_next = vm(next_state).flatten()
-        #print('qvalue_next : ', qvalue_next.shape)
-        #print('next_state : ', next_state.shape)
-        #a=b
+
         for idx, next_state_id in enumerate(next_state_ids):
             temp_adv = sum(node_reward) + gamma * sum(qvalue_next) - curr_state_value[idx]
             advantage.append(temp_adv.detach().numpy())
-        #print('advantage : ',advantage)
+
         return advantage
     
     def compute_targets(self, valid_prob, next_state, vm, node_reward, curr_neighbor_mask, gamma):
@@ -240,8 +248,9 @@ class Estimator:
         targets = []
         node_reward = node_reward.flatten()
         qvalue_next = vm(next_state).flatten()
-        #print('len(valid_prob) : ' , len(valid_prob))
-        #for idx in np.arange(self.number_of_master_nodes):
+
+        
+        print('curr_neighbor_mask : ', curr_neighbor_mask)
         for idx in np.arange(len(valid_prob)):
             grid_prob = valid_prob[idx][curr_neighbor_mask[idx] > 0]
             
@@ -316,8 +325,7 @@ def calculate_reward(master_list, cur_done, cur_undone):
     for i in range(len(master_list)):
         all_task.append(float(cur_done[i] + cur_undone[i]))
         fail_task.append(float(cur_undone[i]))
-    #print('all_task : ', len(all_task))  
-    #print('fail_task : ', len(fail_task))     
+ 
     reward = []
     # The ratio of requests that violate delay requirements
     task_fail_rate = []
