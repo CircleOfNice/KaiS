@@ -128,8 +128,8 @@ class Estimator:
                curr_neighbor_mask_policy) : Neighbor masking policy
                next_state_ids : Propagated states
         """
-        print('critic_state : ', critic_state)
-        print('len(critic_state) : ', len(critic_state))
+        #print('critic_state : ', critic_state)
+        #print('len(critic_state) : ', len(critic_state))
         value_output = vm(np.array(critic_state))
         value_output = value_output.flatten()
         
@@ -145,21 +145,22 @@ class Estimator:
         
         grid_ids = [x for x in range(self.number_of_master_nodes)]
         self.valid_action_mask = np.zeros((self.number_of_master_nodes, self.action_dim))
-        print('self.number_of_master_nodes, self.action_dim) : ', self.number_of_master_nodes, self.action_dim)
+        #print('self.number_of_master_nodes, self.action_dim) : ', self.number_of_master_nodes, self.action_dim)
         for j in ava_node:
             if len(self.valid_action_mask[self.number_of_master_nodes-1]) ==j:
-                print('len(self.valid_action_mask[self.number_of_master_nodes-1]) : ', len(self.valid_action_mask[self.number_of_master_nodes-1]))
-                print('ava_node : ', ava_node)
+                
+                #print('len(self.valid_action_mask[self.number_of_master_nodes-1]) : ', len(self.valid_action_mask[self.number_of_master_nodes-1]))
+                #print('ava_node : ', ava_node)
                 #print('ava_node[j] : ', ava_node[j])
-                print('j :  ', j)
-                print('self.action_dim : ', self.action_dim)
-                print('self.number_of_master_nodes : ', self.number_of_master_nodes)
+                #print('j :  ', j)
+                #print('self.action_dim : ', self.action_dim)
+                #print('self.number_of_master_nodes : ', self.number_of_master_nodes)
                 self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
             else:
-                print('ava_node : ', ava_node)
-                print('self.valid_action_mask : ', self.valid_action_mask)
-                print('self.valid_action_mask[self.number_of_master_nodes-1] : ', self.valid_action_mask[self.number_of_master_nodes-1])
-                print('j : ', j)
+                #print('ava_node : ', ava_node)
+                #print('self.valid_action_mask : ', self.valid_action_mask)
+                #print('self.valid_action_mask[self.number_of_master_nodes-1] : ', self.valid_action_mask[self.number_of_master_nodes-1])
+                #print('j : ', j)
                 self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
         curr_neighbor_mask = deepcopy(self.valid_action_mask)
 
@@ -250,7 +251,7 @@ class Estimator:
         qvalue_next = vm(next_state).flatten()
 
         
-        print('curr_neighbor_mask : ', curr_neighbor_mask)
+        #print('curr_neighbor_mask : ', curr_neighbor_mask)
         for idx in np.arange(len(valid_prob)):
             grid_prob = valid_prob[idx][curr_neighbor_mask[idx] > 0]
             

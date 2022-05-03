@@ -242,6 +242,8 @@ def execute_orchestration(change_node, change_service,deploy_state, service_coef
         master_list (list) :  List of created Master Nodes
 
     """
+    
+    print('deploy_state : ', deploy_state)
     length_list = [0]
     last_length = length_list[0]
     for mstr in master_list:
@@ -258,7 +260,7 @@ def execute_orchestration(change_node, change_service,deploy_state, service_coef
             for iter in range(len(length_list)-1):
                 if change_node[i] < length_list[iter+1] and change_node[i] >= length_list[iter]:
                     node_index = change_node[i] - length_list[iter]
-                    remove_docker_from_master_node(master_list[iter], node_index, service_index, deploy_state)
+                    remove_docker_from_master_node(master_list[iter], node_index, service_index, deploy_state[iter])
         else:
             # Add docker and tack up memory
             service_index = change_service[i] - 1
@@ -266,4 +268,4 @@ def execute_orchestration(change_node, change_service,deploy_state, service_coef
             for iter in range(len(length_list)-1):
                 if change_node[i] < length_list[iter+1] and change_node[i] >= length_list[iter]:
                     node_index = change_node[i] - length_list[iter]
-                    deploy_new_docker(master_list[iter], POD_MEM, POD_CPU, cur_time, node_index, service_coefficient, service_index, deploy_state)
+                    deploy_new_docker(master_list[iter], POD_MEM, POD_CPU, cur_time, node_index, service_coefficient, service_index, deploy_state[iter])
