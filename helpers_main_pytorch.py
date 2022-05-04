@@ -64,7 +64,6 @@ def initial_state_values():
 def get_action_dim(node_param_lists):
     action_dim = 0
     for _list in node_param_lists:
-        print('_list : ', _list)
         for node_param in _list:
             action_dim+=1
     return action_dim + 1 # +1 because of cluster
@@ -89,11 +88,7 @@ def estimate_state_size(all_task_list, max_tasks):
     deploy_state, node_param_lists, master_param_lists = initial_state_values()
     
     master_list = create_master_list(node_param_lists, master_param_lists, all_task_list)
-    '''
-    state_list = []
-    for mast in master_list:
-        state_list.append(state_inside_eAP(mast, len(mast.node_list)))
-    '''                
+             
     last_length, length_list = get_last_length(master_list)
     state_list = get_state_list(master_list, max_tasks)
     s_grid_len = []
@@ -125,9 +120,7 @@ def remove_docker_from_master_node(master, change_node_idx, service_index, deplo
         service_index ([int]): [Service indexes needed to be changed]
         deploy_state ([list]): [list of lists representing the deployed serices at each edge point]
     """
-    print('deploy_state inside remove docker form master_node', deploy_state)
-    print('master : ',master)
-    print('change_node_idx, service_index, : ', change_node_idx, service_index) 
+
     docker_idx = 0
     while docker_idx < len(master.node_list[change_node_idx].service_list):
         if docker_idx >= len(master.node_list[change_node_idx].service_list):
@@ -210,7 +203,7 @@ def state_inside_eAP(master, num_edge_nodes_per_eAP, max_tasks):
         cpu_list.append([master.node_list[i].cpu, master.node_list[i].cpu_max])
         mem_list.append([master.node_list[i].mem, master.node_list[i].mem_max])
         task_num.append(len(master.node_list[i].task_queue))
-    #print('cpu_list, mem_list : ', len(cpu_list), len(mem_list))
+
     return cpu_list, mem_list, task_num, undone_tasks, service_type, delay_requirement
 
 def create_node_list(node_specification):
@@ -283,10 +276,9 @@ def put_current_task_on_queue(act, curr_task, action_dims, cloud, master_list):
 
     """
     last_length, length_list = get_last_length(master_list)    
-    #print('len(act) : ', len(act), act)
+
     cluster_action_values = [action-1 for action in action_dims]
-    #print('cluster_action_values : ', cluster_action_values)
-    #A=b
+
     for i in range(len(act)):
         if curr_task[i][0] == -1:
             continue
@@ -373,27 +365,11 @@ def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_states, service_coefficient
     for mstr in master_list:
         length_list.append(last_length + len(mstr.node_list))
         last_length = last_length + len(mstr.node_list)
-    #print('inside Create Dockers')
     for i, deploy_state in enumerate(deploy_states):
         for dep in deploy_state:
             
             for ii in range(MAX_TESK_TYPE):
-                #print('deploy_state : ', deploy_state)
-                #print('length of deploy_state : ', len(deploy_state))
-                #for iter, dep in enumerate(deploy_state):
-                #    print('iter, dep : ', iter, dep)
-                #    print('ii , iter : ', ii , iter)
-                #print('Iterator_main i, max_task_iter_ii : ', i, ii)
-                #print('deploy_states : ', deploy_states)
-                #print('i, ii : ', i, ii)
-                #print('deploy_state[i] : ', deploy_state[i], len(deploy_state[i]))
-                
-                #elem = deploy_state[i]
-                #print('elem : ', elem)
-                #print('elem[ii] : ', elem[ii])
-                #print('deploy_state[i][ii] : ', deploy_state[i][ii])
-                #print('dep[ii] : ', dep[ii])
-                #dicision = deploy_state[i][ii]
+
                 dicision = dep[ii]
                 for j in range(len(length_list)-1):
                     if i>= length_list[j] and i < length_list[j+1] and dicision == 1:
@@ -402,20 +378,7 @@ def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_states, service_coefficient
                             docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
                                             ii, [-1])
                             master_list[j].add_to_node_attribute(k, 'mem', - POD_MEM * service_coefficient[ii])
-                            master_list[j].append_docker_to_node_service_list(k, docker) 
-'''
-    for i in range(vaild_node):
-            for ii in range(MAX_TESK_TYPE):
-                dicision = deploy_state[i][ii]
-                for j in range(len(length_list)-1):
-                    if i>= length_list[j] and i < length_list[j+1] and dicision == 1:
-                        k= i-length_list[j]
-                        if master_list[j].node_list[k].mem >= POD_MEM * service_coefficient[ii]:
-                            docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
-                                            ii, [-1])
-                            master_list[j].add_to_node_attribute(k, 'mem', - POD_MEM * service_coefficient[ii])
-                            master_list[j].append_docker_to_node_service_list(k, docker)
-'''                               
+                            master_list[j].append_docker_to_node_service_list(k, docker)                              
     
                             
 def get_node_characteristics(master):
@@ -453,6 +416,7 @@ def get_state_characteristics(MAX_TESK_TYPE, master_list):
         undone_tasks.append(undone_val)     
         
     for master in master_list:
+
         for i in range(len(master.node_list)):
             tmp = [0.0] * MAX_TESK_TYPE
             for j in range(len(master.node_list[i].task_queue)):

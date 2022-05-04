@@ -194,8 +194,7 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weig
     all_cum_reward = []
     all_rewards = exp['reward']
     batch_time = exp['wall_time']
-    #print(exp)
-    #a=b
+
     rewards = np.array([r for (r, t) in zip(all_rewards, batch_time)])
     cum_reward = discount(rewards, 1)
     all_cum_reward.append(cum_reward)
@@ -243,15 +242,13 @@ def execute_orchestration(change_node, change_service,deploy_state, service_coef
 
     """
     
-    print('deploy_state : ', deploy_state)
+    #print('deploy_state : ', deploy_state)
     length_list = [0]
     last_length = length_list[0]
     for mstr in master_list:
         length_list.append(last_length + len(mstr.node_list))
         last_length = last_length + len(mstr.node_list)
     # Execute orchestration
-    #print('Change node : ', change_node)
-    #print('change_service : ', change_service)
     for i in range(len(change_node)):
         if change_service[i] < 0:
             # Delete docker and free memory

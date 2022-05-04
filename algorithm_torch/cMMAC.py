@@ -26,7 +26,6 @@ class Estimator:
         """
         self.number_of_master_nodes = number_of_master_nodes
         self.action_dim = action_dim
-        print('initalising action dim : ', self.action_dim)
         self.state_dim = state_dim
         # Initial value for losses
         self.actor_loss = 0
@@ -99,7 +98,7 @@ class Estimator:
         tfadv = torch.tensor(tfadv)
         neglogprob = - logsoftmaxprob * ACTION
 
-        self.actor_loss = torch.mean(torch.sum(neglogprob * tfadv, axis=1))
+        self.actor_loss = torch.sum(torch.mean(neglogprob * tfadv, axis=0)) # changing it
         self.entropy = - torch.mean(softmaxprob * logsoftmaxprob)
         self.policy_loss = self.actor_loss - 0.01 * self.entropy
         
@@ -128,8 +127,6 @@ class Estimator:
                curr_neighbor_mask_policy) : Neighbor masking policy
                next_state_ids : Propagated states
         """
-        #print('critic_state : ', critic_state)
-        #print('len(critic_state) : ', len(critic_state))
         value_output = vm(np.array(critic_state))
         value_output = value_output.flatten()
         
@@ -145,22 +142,11 @@ class Estimator:
         
         grid_ids = [x for x in range(self.number_of_master_nodes)]
         self.valid_action_mask = np.zeros((self.number_of_master_nodes, self.action_dim))
-        #print('self.number_of_master_nodes, self.action_dim) : ', self.number_of_master_nodes, self.action_dim)
         for j in ava_node:
             if len(self.valid_action_mask[self.number_of_master_nodes-1]) ==j:
-                
-                #print('len(self.valid_action_mask[self.number_of_master_nodes-1]) : ', len(self.valid_action_mask[self.number_of_master_nodes-1]))
-                #print('ava_node : ', ava_node)
-                #print('ava_node[j] : ', ava_node[j])
-                #print('j :  ', j)
-                #print('self.action_dim : ', self.action_dim)
-                #print('self.number_of_master_nodes : ', self.number_of_master_nodes)
+
                 self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
             else:
-                #print('ava_node : ', ava_node)
-                #print('self.valid_action_mask : ', self.valid_action_mask)
-                #print('self.valid_action_mask[self.number_of_master_nodes-1] : ', self.valid_action_mask[self.number_of_master_nodes-1])
-                #print('j : ', j)
                 self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
         curr_neighbor_mask = deepcopy(self.valid_action_mask)
 
@@ -250,8 +236,6 @@ class Estimator:
         node_reward = node_reward.flatten()
         qvalue_next = vm(next_state).flatten()
 
-        
-        #print('curr_neighbor_mask : ', curr_neighbor_mask)
         for idx in np.arange(len(valid_prob)):
             grid_prob = valid_prob[idx][curr_neighbor_mask[idx] > 0]
             
@@ -287,12 +271,14 @@ class Estimator:
             curr_neighbor_mask ([Numpy Array]): [Current Neighbor mask]
             learning_rate ([float]): [Learning Rate]
         """
-        self.pm_optimizer.zero_grad()
-        policy_net_output = self.pm(policy_state)
-        loss = self.pm_criterion( policy_net_output, curr_neighbor_mask, advantage, action_choosen_mat)
-        set_lr(self.pm_optimizer, learning_rate)
-        loss.backward()
-        self.pm_optimizer.step()
+
+        for i in range(len(policy_state)):
+            self.pm_optimizer.zero_grad()
+            policy_net_output = self.pm(policy_state[i])
+            loss = self.pm_criterion( policy_net_output, curr_neighbor_mask[i], advantage[i], action_choosen_mat[i])
+            set_lr(self.pm_optimizer, learning_rate)
+            loss.backward()
+            self.pm_optimizer.step()
     
 def to_grid_rewards(node_reward):
     
@@ -336,12 +322,7 @@ def calculate_reward(master_list, cur_done, cur_undone):
             task_fail_rate.append(fail_task[i] / all_task[i])
         else:
             task_fail_rate.append(0)
-    '''
-    if all_task[1] != 0:
-        task_fail_rate.append(fail_task[1] / all_task[1])
-    else:
-        task_fail_rate.append(0)
-    '''
+
     # The standard deviation of the CPU and memory usage
     
     use_rate_dict = {}

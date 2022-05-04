@@ -172,12 +172,6 @@ class OrchestrateAgent(Agent):
         undone_tasks = np.array(undone_tasks)
         curr_tasks_in_queue = np.array(curr_tasks_in_queue)
         deploy_state = np.array(deploy_state)
-
-        
-        print('done_tasks : ', done_tasks.shape)
-        print('undone_tasks : ', undone_tasks.shape)
-        print('curr_tasks_in_queue : ', curr_tasks_in_queue.shape)
-        print('deploy_state : ', deploy_state.shape)
         
         # Compute total number of nodes
         total_num_nodes = len(curr_tasks_in_queue)
@@ -186,11 +180,18 @@ class OrchestrateAgent(Agent):
         # Add values to the node inputs task_list, mem_list, cpu_list etc
         node_inputs = np.zeros([total_num_nodes, 2*self.MAX_TESK_TYPE+ len(gcnn_list)*output_dim])
         scale_inputs = np.zeros([1, self.scale_input_dim])
+        
+        new_deploy_state = []
+        for element in deploy_state:
+            for elem in element:
+                new_deploy_state.append(elem)
+
+        deploy_state = new_deploy_state
 
         for i in range(len(node_inputs)):
-
-            node_inputs[i, :self.MAX_TESK_TYPE] = curr_tasks_in_queue[i, :self.MAX_TESK_TYPE]
-            node_inputs[i, self.MAX_TESK_TYPE: 2*self.MAX_TESK_TYPE] = deploy_state[i, :self.MAX_TESK_TYPE]
+            ds_int_list = [int(x) for x in deploy_state[i][:][:]] 
+            node_inputs[i, :self.MAX_TESK_TYPE] = ds_int_list
+            node_inputs[i, self.MAX_TESK_TYPE: 2*self.MAX_TESK_TYPE] = deploy_state[i]
             for j in range(len(gcnn_list)):
                 node_inputs[i, 2*self.MAX_TESK_TYPE + (j)*output_dim: 2*self.MAX_TESK_TYPE+(j+1)*output_dim] = gcnn_list[j].outputs.numpy()
             
@@ -247,9 +248,7 @@ class OrchestrateAgent(Agent):
         node_inputs, scale_inputs = self.translate_state(obs)
         
         self.gcn(node_inputs)
-        print('invoke_model node_inputs : ', node_inputs.shape)
-        print('invoke_model scale_inputs : ', scale_inputs.shape)
-        print('invoke_model self.gcn.outputs : ', self.gcn.outputs.shape)
+
         node_act_probs, scale_act_probs, node_acts, scale_acts = \
             self.predict((node_inputs, scale_inputs, self.gcn.outputs))
         return node_acts, scale_acts, \
