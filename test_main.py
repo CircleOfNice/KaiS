@@ -25,64 +25,6 @@ from algorithm_torch.CMMAC_Value_Model import build_value_model, update_value
 
 # Make the initial state for 
 
-def def_initial_state_values(len_all_task_list=3, list_length_edge_nodes_per_eap=[3, 3, 3]):
-    
-    deploy_state_stack = [[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
-                [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
-                [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1],]
-    node_list_stack = [[100.0, 4.0], [200.0, 6.0], [100.0, 8.0], [200.0, 8.0], [100.0, 2.0], [200.0, 6.0]]
-    master_param_list_stack = [[200.0, 8.0]]
-    length_deploy_state = sum(list_length_edge_nodes_per_eap)
-    deploy_states = []
-    master_param_lists =[]
-    for item in list_length_edge_nodes_per_eap:
-        deploy_state = []
-        for i in range(item):
-            deploy_state.append(random.choice(deploy_state_stack))
-        deploy_states.append(deploy_state)
-    
-    
-    for i in range(len_all_task_list):
-        master_param_lists.append(random.choice(master_param_list_stack))
-    
-    node_param_lists = []    
-    for i in range(len_all_task_list):
-
-        node_list = []
-        for k in range(list_length_edge_nodes_per_eap[i]):
-            node_list.append(random.choice(node_list_stack))
-        node_param_lists.append(node_list)
-    return deploy_states, node_param_lists, master_param_lists
-
-def estimate_state_size(all_task_list, max_tasks, edge_list):
-
-    deploy_states, node_param_lists, master_param_lists = def_initial_state_values(len(all_task_list), edge_list)
-    
-    master_list = create_master_list(node_param_lists, master_param_lists, all_task_list)
-             
-    last_length, length_list = get_last_length(master_list)
-    state_list = get_state_list(master_list, max_tasks)
-    s_grid_len = []
-    for i, state in enumerate((state_list)):
-
-        sub_deploy_state = deploy_states[i]#deploy_states[length_list[i]:length_list[i+1]]
-        sub_elem = flatten(flatten([sub_deploy_state, [[state[5]]],[[state[4]]], [[state[3]]], [state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
-
-        s_grid_len.append(len(sub_elem))
- 
-    return s_grid_len
-
-def get_action_dims(node_param_lists):
-    action_dims = []
-    for _list in node_param_lists:
-
-        action_dim = 0
-        for node_param in _list:
-            action_dim+=1
-        action_dim+=1            
-        action_dims.append(action_dim)
-    return action_dims  # because of cluster
-
 def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     
     """[Function to execute the KAIS Algorithm ]
@@ -121,9 +63,9 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     
     nodes_in_cluster =3
     low_bound_edge_mpde = 2
-    upper_bound_edge_mpde =6
+    upper_bound_edge_mpde = 6
     extra_eaps = 0 #random.sample(range(low_bound_edge_mpde, upper_bound_edge_mpde), 1)[0]
-    randomize = True # Change it as per needs
+    randomize = False # Change it as per needs
     
     if extra_eaps !=0:
         for i in range(extra_eaps):
@@ -136,17 +78,11 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     if randomize ==False:
         # For uniform Edge Nodes per eAP
         edge_list = [nodes_in_cluster]*len(all_task_list)
-        print('inside not randomise')
         # For random Edge Nodes per eAP
     else:
-        print('inside randomise')
         edge_list = [random.sample(range(low_bound_edge_mpde, upper_bound_edge_mpde), 1)[0] for i in range(len(all_task_list))]
 
     _, node_param_lists, master_param_lists = def_initial_state_values(len(all_task_list), edge_list)
-
-    action_dim = get_action_dim(node_param_lists)
-    
-    cluster_action_value = action_dim -1
     
     action_dims = get_action_dims(node_param_lists)
 
@@ -158,13 +94,10 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 
     if randomize ==False:
         for i in range(len(master_param_lists)):
-            print('dont randomise')
-            #print('s_grid_len[i] : ', s_grid_len[i])
             q_estimator_list.append(Estimator(action_dims[i], s_grid_len[i], 1)) # Definition of cMMAc Agent
             ReplayMemory_list.append(ReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) # experience Replay for value network for cMMMac Agent
             policy_replay_list.append(policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) #experience Replay for Policy network for cMMMac Agent
     else:
-        print('randomise')
         for i in range(len(master_param_lists)):
             q_estimator_list.append(Estimator(action_dims[i], s_grid_len[i], 1)) # Definition of cMMAc Agent
             ReplayMemory_list.append(ReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) # experience Replay for value network for cMMMac Agent
@@ -216,11 +149,8 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             graph_cnn_list.append(GraphCNN(len(cpu_list)+ len(mem_list) + len(mem_list), hid_dims, output_dim, max_depth, act_function))
 
         # Create dockers based on deploy_state
-        valid_node = 0
-        for mast in master_list:
-            valid_node = valid_node + len(mast.node_list)
 
-        create_dockers(valid_node, MAX_TESK_TYPE, deploy_states, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list)
+        create_dockers( MAX_TESK_TYPE, deploy_states, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list)
         logger.debug('Outer loop initialization done')
         ########### Each slot ###########
         for slot in range(BREAK_POINT):
@@ -248,7 +178,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                  
                 deploy_states_float = []
                 for item, deploy_state in enumerate(deploy_states):
-                    deploy_state_float = []
+
                     elem_list = []
                     for d_state in deploy_state:
                         sub_elem_list = []
@@ -310,7 +240,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 
             state_list = get_state_list(master_list, max_tasks)    
 
-            last_length, length_list = get_last_length(master_list)
             s_grid = []
             for i, state in enumerate((state_list)):
                 sub_deploy_state = deploy_states[i]
@@ -320,7 +249,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 
             critic_state.append(len(cloud.task_queue))
             # Dispatch decision
-            #TODO Determine the Action Precisely 
+
             act = []
             valid_action_prob_mat = []
             policy_state = []
@@ -351,7 +280,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
             ####
             # Put the current task on the queue based on dispatch decision
             
-            #put_current_task_on_queue(act, curr_task, cluster_action_value, cloud, master_list)
             put_current_task_on_queue(act, curr_task, action_dims, cloud, master_list)
             # Update state of task
             update_state_of_task(cur_time, check_queue, cloud, master_list)
@@ -461,7 +389,10 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     with gzip.open("./result/throughput_" + name + time_str + ".obj", "wb") as f:
         pickle.dump(throughput_list, f)
     
-    title =     "Eaps_" + str(len(all_task_list)) + '_nodes in cluster_'+ str(nodes_in_cluster) 
+    if randomize==True:
+        title =     "Total_Eaps_" + str(len(all_task_list)) + '_low_bound_edge_mpde_'+ str(low_bound_edge_mpde) + '_upper_bound_edge_mpde_'+ str(upper_bound_edge_mpde) 
+    else : 
+        title =     "Total_Eaps_" + str(len(all_task_list)) + '_nodes_in_cluster_'+ str(nodes_in_cluster)
     plt.figure(figsize=(15,10))
 
     plt.plot(throughput_list)
@@ -479,7 +410,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 10 #500 # Number of Episodes to run
+    RUN_TIMES = 5 #500 # Number of Episodes to run
     TASK_NUM = 5000 # 5000 Time for each Episode Ending
     TRAIN_TIMES = 50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000 # Orchestration cycle

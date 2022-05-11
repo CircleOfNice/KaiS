@@ -3,6 +3,7 @@ import numpy as np
 import torch.nn as nn
 from env.platform import *
 from env.env_run import update_docker
+import random
 #from algorithm_torch.GPG import act_offload_agent
 import sys
 ############ Set up according to your own needs  ###########
@@ -18,17 +19,12 @@ service_coefficient = [0.8, 0.8, 0.9, 0.9, 1.0, 1.0, 1.1, 1.1, 1.2, 1.2, 1.3, 1.
 # Parameters related to DRL
 gamma = 0.9 # Discounting Coefficient
 learning_rate = 1e-3 # Learning Rate
-#action_dim = 7 #Number of actions possibly edge nodes 6 plus Cluster
+
 state_dim = 54#90#88 #Dimension of state for cMMAC (flattened Deployed state, task num, cpu_list, min_list)
 
 node_input_dim = 24 # Input dimension of Node part of the Orchestration Net 
 scale_input_dim = 24 # Input dimension for scale part of the Orchestration Net
 high_value_edge_nodes = 2
-# notes on input dimensions
-# node_inputs[i, :12] = curr_tasks_in_queue[i, :12]
-# node_inputs[i, 12:] = deploy_state[i, :12]
-# cluster_inputs[0, :12] = done_tasks[:12]
-# cluster_inputs[0, 12:] = undone_tasks[:12] 
 
 hid_dims = [16, 8] # hidden dimensions of the Graph Neural Networks
 output_dim = 8 # Output dimension of Graph Neural Networks
@@ -39,14 +35,98 @@ entropy_weight_min = 0.0001 # Minimum allowed entropy weight
 entropy_weight_decay = 1e-3 # Entropy weight decay rate
 number_of_master_nodes  = 2 # number of eAPs # Only in this case whole thing makes sense
 
-#num_edge_nodes_per_eAP =3
-#cluster_action_value = 6
 latency = 0
 
 
 act_function = nn.functional.leaky_relu
 opt_function = torch.optim.Adam
 
+def def_initial_state_values(len_all_task_list=3, list_length_edge_nodes_per_eap=[3, 3, 3]):
+    """Method to define initial values for the input cluster : 
+
+    Args:
+        len_all_task_list (int) : Number of Master Node data required  (Number of task lists available)
+        list_length_edge_nodes_per_eap ([list]): Number of Edge Node data required 
+        
+    Returns: 
+        deploy_states : Deploy State list Values
+        node_param_lists :  Parameter list for Edge nodes required
+        master_param_lists : Parameter list for Master nodes required
+    """
+    deploy_state_stack = [[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
+                [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
+                [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1],]
+    node_list_stack = [[100.0, 4.0], [200.0, 6.0], [100.0, 8.0], [200.0, 8.0], [100.0, 2.0], [200.0, 6.0]]
+    master_param_list_stack = [[200.0, 8.0]]
+    deploy_states = []
+    master_param_lists =[]
+    for item in list_length_edge_nodes_per_eap:
+        deploy_state = []
+        for i in range(item):
+            deploy_state.append(random.choice(deploy_state_stack))
+        deploy_states.append(deploy_state)
+    
+    
+    for i in range(len_all_task_list):
+        master_param_lists.append(random.choice(master_param_list_stack))
+    
+    node_param_lists = []    
+    for i in range(len_all_task_list):
+
+        node_list = []
+        for k in range(list_length_edge_nodes_per_eap[i]):
+            node_list.append(random.choice(node_list_stack))
+        node_param_lists.append(node_list)
+    return deploy_states, node_param_lists, master_param_lists
+
+def estimate_state_size(all_task_list, max_tasks, edge_list):
+    
+    """Estimate the size of state for the grid : 
+
+    Args:
+        len_all_task_list (int) : Number of Master Node data required  (Number of task lists available)
+        list_length_edge_nodes_per_eap ([list]): Number of Edge Node data required 
+        
+    Returns: 
+        s_grid_len : list of size of state for corresponding all_task_list
+    """
+
+    deploy_states, node_param_lists, master_param_lists = def_initial_state_values(len(all_task_list), edge_list)
+    
+    master_list = create_master_list(node_param_lists, master_param_lists, all_task_list)
+
+    state_list = get_state_list(master_list, max_tasks)
+    s_grid_len = []
+    for i, state in enumerate((state_list)):
+
+        sub_deploy_state = deploy_states[i]
+        sub_elem = flatten(flatten([sub_deploy_state, [[state[5]]],[[state[4]]], [[state[3]]], [state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
+
+        s_grid_len.append(len(sub_elem))
+ 
+    return s_grid_len
+
+def get_action_dims(node_param_lists):
+    """Estimate the size of Action dimensions for for the Node parameters in the given list : 
+
+    Args:
+        node_param_lists (List) : eAP's Node Parameters 
+        
+    Returns: 
+        action_dims : Overall action dimensions
+    """
+
+    action_dims = []
+    for _list in node_param_lists:
+
+        action_dim = 0
+        for node_param in _list:
+            action_dim+=1
+        action_dim+=1            
+        action_dims.append(action_dim)
+    return action_dims  # because of cluster
+
+'''
 def initial_state_values():
     deploy_state = []
     deploy_state = [[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
@@ -62,11 +142,20 @@ def initial_state_values():
     return deploy_state, node_param_lists, master_param_lists
 
 def get_action_dim(node_param_lists):
+    """Estimate the size of Action dimensions for for the Node parameters in the given list : 
+
+    Args:
+        node_param_lists (List) : eAP's Node Parameters 
+        
+    Returns: 
+        action_dim : Overall action dimension
+    """
     action_dim = 0
     for _list in node_param_lists:
         for node_param in _list:
             action_dim+=1
     return action_dim + 1 # +1 because of cluster
+'''
 
 def set_lr( optimizer, lr):    
     """Method to set the Learning rate of the given optimizer
@@ -83,6 +172,8 @@ def get_state_list(master_list, max_tasks):
     for mast in master_list:
         state_list.append(state_inside_eAP(mast, len(mast.node_list), max_tasks))
     return state_list 
+
+'''
 def estimate_state_size(all_task_list, max_tasks):
 
     deploy_state, node_param_lists, master_param_lists = initial_state_values()
@@ -98,7 +189,7 @@ def estimate_state_size(all_task_list, max_tasks):
         s_grid_len.append(len(sub_elem))
         
     return s_grid_len
-
+'''
 def flatten(list):
     """Function to serialize sublists inside a given list
 
@@ -345,7 +436,7 @@ def update_state_of_dockers(cur_time, cloud, master_list):
 
     return cloud  
 
-def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_states, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list):
+def create_dockers(MAX_TESK_TYPE, deploy_states, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list):
     """Creation of dockers
 
     Args:
@@ -370,9 +461,9 @@ def create_dockers(vaild_node, MAX_TESK_TYPE, deploy_states, service_coefficient
             
             for ii in range(MAX_TESK_TYPE):
 
-                dicision = dep[ii]
+                decision = dep[ii]
                 for j in range(len(length_list)-1):
-                    if i>= length_list[j] and i < length_list[j+1] and dicision == 1:
+                    if i>= length_list[j] and i < length_list[j+1] and decision == 1:
                         k= i-length_list[j]
                         if master_list[j].node_list[k].mem >= POD_MEM * service_coefficient[ii]:
                             docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
