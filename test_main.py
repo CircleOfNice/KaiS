@@ -57,24 +57,26 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     
     
     # Creation of Dummy Data and eAPs and Edge Nodes
-    all_task_list = [all_task1, all_task2]
-    max_task_pool = [max_task_type1, max_task_type2]
-    max_tasks = max(max_task_type1, max_task_type2)
+    all_task_list_init = [all_task1, all_task2]
+    max_task_pool_init = [max_task_type1, max_task_type2]
+    max_tasks = max(max_task_type1, max_task_type2) # May need to change it later
     
-    nodes_in_cluster =3
-    low_bound_edge_mpde = 2
-    upper_bound_edge_mpde = 6
-    extra_eaps = 0 #random.sample(range(low_bound_edge_mpde, upper_bound_edge_mpde), 1)[0]
+    nodes_in_cluster =5
+    low_bound_edge_mpde = 20
+    upper_bound_edge_mpde = 30
+    total_eaps = 1 #random.sample(range(low_bound_edge_mpde, upper_bound_edge_mpde), 1)[0]
     randomize = False # Change it as per needs
-    
-    if extra_eaps !=0:
-        for i in range(extra_eaps):
-            val_int = random.randint(0,len(max_task_pool) -1)
-
-            all_task_list.append(all_task_list[val_int])
+    all_task_list = []
+    if total_eaps !=0:
+        for i in range(total_eaps):
+            
+            val_int = random.randint(0,len(max_task_pool_init) -1)
+            print('val_int, i : ', val_int, i)
+            all_task_list.append(all_task_list_init[val_int])
     else:
         pass
-    
+    print('len(all_task_list) : ', len(all_task_list))
+    #a=b 
     if randomize ==False:
         # For uniform Edge Nodes per eAP
         edge_list = [nodes_in_cluster]*len(all_task_list)
@@ -206,7 +208,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 
                 logger.info('Execution orchestration')
                 # Save data
-                if slot > 50 * CHO_CYCLE:
+                if slot % CHO_CYCLE/2==0:
                     exp_tmp = exp
                     
                     entropy_weight, loss = train_orchestrate_agent(orchestrate_agent, exp_tmp, entropy_weight,
@@ -317,8 +319,23 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                     # Advantage for policy network.
                     advantage = q_estimator_list[m].compute_advantage([curr_state_value_prev[m]], [next_state_ids_prev[m]] ,
                                                             np.array(critic_state), critic, r_grid[[m],:], gamma)
-                                      
-                    if curr_task[0][0] != -1 and curr_task[1][0] != -1:
+                    #print('curr_task : ', curr_task) 
+                    
+                    test_cond_list = []
+                    for i, elem in enumerate(curr_task):
+                        test_cond_list.append(elem[0] != -1)# != -1
+                    
+                    cond = test_cond_list[0]
+                    
+                    if len(test_cond_list)>1:
+                        #print('Inside test_cond_list')
+                        for i in range(1,len(test_cond_list)):
+                            cond = cond and test_cond_list[i]
+                    #print('test_cond_list : ', test_cond_list)    
+                    #print('cond : ', cond)   
+                    #a=b
+                    #if curr_task[0][0] != -1 and curr_task[1][0] != -1:
+                    if cond:
 
                         ReplayMemory_list[m].add(np.array([state_mat_prev]), action_mat_prev[[m]], targets_batch[[0]], np.array([s_grid[m]]))
                         policy_replay_list[m].add(policy_state_prev[[m]], action_choosen_mat_prev[[m]], advantage , curr_neighbor_mask_prev[[m]])
@@ -396,7 +413,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     plt.figure(figsize=(15,10))
 
     plt.plot(throughput_list)
-    
+    print('title : ', title)
     plt.title(title)
     plt.xlabel("Number of Episodes")
     plt.ylabel("Throughput rate")
@@ -404,13 +421,13 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     #plt.show()
     plt.savefig('./plots/'+title + '.png') 
     
-    
+    print()
     return throughput_list
     
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 5 #500 # Number of Episodes to run
+    RUN_TIMES = 20 #500 # Number of Episodes to run
     TASK_NUM = 5000 # 5000 Time for each Episode Ending
     TRAIN_TIMES = 50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000 # Orchestration cycle
