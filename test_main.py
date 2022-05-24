@@ -25,7 +25,7 @@ from algorithm_torch.CMMAC_Value_Model import build_value_model, update_value
 
 # Make the initial state for 
 
-def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
+def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mpde, upper_bound_edge_mpde, nodes_in_cluster):
     
     """[Function to execute the KAIS Algorithm ]
 
@@ -55,34 +55,28 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     all_task1, max_task_type1 = get_all_task('./data/Task_1.csv')# processed data [type_list, start_time, end_time, cpu_list, mem_list] fed to eAP 1
     all_task2, max_task_type2 = get_all_task('./data/Task_2.csv')# processed data fed to eAP 2
     
-    
+    #a=b
     # Creation of Dummy Data and eAPs and Edge Nodes
     all_task_list_init = [all_task1, all_task2]
     max_task_pool_init = [max_task_type1, max_task_type2]
     max_tasks = max(max_task_type1, max_task_type2) # May need to change it later
     
-    nodes_in_cluster =5
-    low_bound_edge_mpde = 20
-    upper_bound_edge_mpde = 30
-    total_eaps = 1 #random.sample(range(low_bound_edge_mpde, upper_bound_edge_mpde), 1)[0]
-    randomize = False # Change it as per needs
+    
     all_task_list = []
     if total_eaps !=0:
         for i in range(total_eaps):
             
             val_int = random.randint(0,len(max_task_pool_init) -1)
-            print('val_int, i : ', val_int, i)
             all_task_list.append(all_task_list_init[val_int])
     else:
         pass
-    print('len(all_task_list) : ', len(all_task_list))
-    #a=b 
+
     if randomize ==False:
         # For uniform Edge Nodes per eAP
         edge_list = [nodes_in_cluster]*len(all_task_list)
         # For random Edge Nodes per eAP
     else:
-        edge_list = [random.sample(range(low_bound_edge_mpde, upper_bound_edge_mpde), 1)[0] for i in range(len(all_task_list))]
+        edge_list = [random.sample(range(low_bound_edge_mode, upper_bound_edge_mode), 1)[0] for i in range(len(all_task_list))]
 
     _, node_param_lists, master_param_lists = def_initial_state_values(len(all_task_list), edge_list)
     
@@ -194,7 +188,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                 
                 # Orchestration
                 node_choice, service_scaling_choice, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_states_float, cpu_lists, mem_lists, task_lists, graph_cnn_list, MAX_TESK_TYPE)
-
                 logger.info('Orchestration of Decision done ')
                 # Randomising Orchestration
                 
@@ -319,7 +312,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                     # Advantage for policy network.
                     advantage = q_estimator_list[m].compute_advantage([curr_state_value_prev[m]], [next_state_ids_prev[m]] ,
                                                             np.array(critic_state), critic, r_grid[[m],:], gamma)
-                    #print('curr_task : ', curr_task) 
+
                     
                     test_cond_list = []
                     for i, elem in enumerate(curr_task):
@@ -328,13 +321,8 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
                     cond = test_cond_list[0]
                     
                     if len(test_cond_list)>1:
-                        #print('Inside test_cond_list')
                         for i in range(1,len(test_cond_list)):
                             cond = cond and test_cond_list[i]
-                    #print('test_cond_list : ', test_cond_list)    
-                    #print('cond : ', cond)   
-                    #a=b
-                    #if curr_task[0][0] != -1 and curr_task[1][0] != -1:
                     if cond:
 
                         ReplayMemory_list[m].add(np.array([state_mat_prev]), action_mat_prev[[m]], targets_batch[[0]], np.array([s_grid[m]]))
@@ -421,16 +409,24 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE):
     #plt.show()
     plt.savefig('./plots/'+title + '.png') 
     
-    print()
     return throughput_list
     
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 20 #500 # Number of Episodes to run
-    TASK_NUM = 5000 # 5000 Time for each Episode Ending
-    TRAIN_TIMES = 50 # Training Iterations for policy and value networks (Actor , Critic)
+    RUN_TIMES = 10#20 #500 # Number of Episodes to run
+    TASK_NUM = 5000 # 5000 Time for each Episode Ending # Though episodes are actually longer
+    TRAIN_TIMES = 10#50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000 # Orchestration cycle
 
     ##############################################################
-    execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE)
+    # New configuration settings
+    nodes_in_cluster =3
+    low_bound_edge_mode = 6
+    upper_bound_edge_mode = 10
+    total_eaps = 2 #random.sample(range(low_bound_edge_mpde, upper_bound_edge_mpde), 1)[0]
+    randomize = False #False # Change it as per needs
+    
+    
+    
+    execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster)

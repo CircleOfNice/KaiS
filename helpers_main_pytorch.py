@@ -22,8 +22,8 @@ learning_rate = 1e-3 # Learning Rate
 
 state_dim = 54#90#88 #Dimension of state for cMMAC (flattened Deployed state, task num, cpu_list, min_list)
 
-node_input_dim = 24 # Input dimension of Node part of the Orchestration Net 
-scale_input_dim = 24 # Input dimension for scale part of the Orchestration Net
+node_input_dim = 2*MAX_TESK_TYPE#24 # Input dimension of Node part of the Orchestration Net 
+scale_input_dim = 2*MAX_TESK_TYPE # Input dimension for scale part of the Orchestration Net
 high_value_edge_nodes = 2
 
 hid_dims = [16, 8] # hidden dimensions of the Graph Neural Networks
