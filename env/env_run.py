@@ -3,9 +3,7 @@
 import csv
 import random
 
-
-
-def get_all_task(path):
+def get_all_task(path, randomize = True):
     """Get Processed data from the file given in path
 
     Args:
@@ -44,8 +42,18 @@ def get_all_task(path):
         cpu_list_ = (int(cpu_list[i]) / 100.0)
         mem_list_ = (float(mem_list[i]))
         time_diff = int(end_time_ - start_time_)
-        #if time_diff > 1000:
-        #    end_time_ = end_time_ + random.randint(-10, 10)
+        
+        
+        if randomize:
+        
+            if time_diff > 200:
+                end_time_ = end_time_ + random.randint(-10, 10)
+            if time_diff > 500:
+                end_time_ = end_time_ + random.randint(-50, 50)
+            if time_diff > 1000:
+                end_time_ = end_time_ + random.randint(-100, 100)
+            if time_diff > 1500:
+                end_time_ = end_time_ + random.randint(-200, 200)
 
         if time_diff<0:
             continue
@@ -58,44 +66,7 @@ def get_all_task(path):
     new_all_task = [new_type_list, new_start_time, new_end_time, new_cpu_list, new_mem_list]
     
     return new_all_task, max(new_type_list)
-'''
-def get_all_task(path):
-    """Get Processed data from the file given in path
 
-    Args:
-        path ([str]): [path to the file]
-
-    Returns:
-        [list]: [lists containing type of task , start time & end time of tasks, cpu and memory]
-    """
-    type_list = []
-    start_time = []
-    end_time = []
-    cpu_list = []
-    mem_list = []
-    with open(path, 'r') as f:
-        reader = csv.reader(f)
-        for row in reader:
-            type_list.append(row[3])
-            start_time.append(row[5])
-            end_time.append(row[6])
-            cpu_list.append(row[7])
-            mem_list.append(row[8])
-
-    init_time = int(start_time[0])
-    for i in range(len(start_time)):
-        type_list[i] = int(type_list[i]) - 1
-        start_time[i] = int(start_time[i]) - init_time
-        end_time[i] = int(end_time[i]) - init_time #+ random.randint(-9, 9)
-        cpu_list[i] = int(cpu_list[i]) / 100.0
-        mem_list[i] = float(mem_list[i])
-        #print('end_time[i] - start_time[i] , type_list[i] : ', end_time[i] - start_time[i], type_list[i])
-    all_task = [type_list, start_time, end_time, cpu_list, mem_list]
-    print('new_type_list length, max(new_type_list) : ', len(type_list), max(type_list))
-    return all_task, max(type_list)
-
-
-'''
 
 def put_task(task_queue, task):
     """Puts tasks on the task queue

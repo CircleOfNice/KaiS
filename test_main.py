@@ -25,7 +25,7 @@ from algorithm_torch.CMMAC_Value_Model import build_value_model, update_value
 
 # Make the initial state for 
 
-def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mpde, upper_bound_edge_mpde, nodes_in_cluster):
+def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mpde, upper_bound_edge_mpde, nodes_in_cluster, randomize_data = False):
     
     """[Function to execute the KAIS Algorithm ]
 
@@ -51,16 +51,15 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
     order_response_rate_episode = [] # List to monitor the average throughput rate
     episode_rewards = [] # Accumulated reward over episodes
     record_all_order_response_rate = [] # List to record all the throughput rate througout episodes
-
-    all_task1, max_task_type1 = get_all_task('./data/Task_1.csv')# processed data [type_list, start_time, end_time, cpu_list, mem_list] fed to eAP 1
-    all_task2, max_task_type2 = get_all_task('./data/Task_2.csv')# processed data fed to eAP 2
-    
-    #a=b
-    # Creation of Dummy Data and eAPs and Edge Nodes
-    all_task_list_init = [all_task1, all_task2]
-    max_task_pool_init = [max_task_type1, max_task_type2]
-    max_tasks = max(max_task_type1, max_task_type2) # May need to change it later
-    
+    csv_paths = ['./data/Task_1.csv', './data/Task_2.csv']
+    all_task_list_init = []
+    max_task_pool_init = []
+    for csv_path in csv_paths:
+        all_task, max_task = get_all_task(csv_path, randomize=randomize_data)
+        all_task_list_init.append(all_task)
+        max_task_pool_init.append(max_task)
+        
+    max_tasks = max(max_task_pool_init) 
     
     all_task_list = []
     if total_eaps !=0:
@@ -188,6 +187,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
                 
                 # Orchestration
                 node_choice, service_scaling_choice, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_states_float, cpu_lists, mem_lists, task_lists, graph_cnn_list, MAX_TESK_TYPE)
+
                 logger.info('Orchestration of Decision done ')
                 # Randomising Orchestration
                 
@@ -201,7 +201,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
                 
                 logger.info('Execution orchestration')
                 # Save data
-                if slot % CHO_CYCLE/2==0:
+                if slot % CHO_CYCLE/10==0:
                     exp_tmp = exp
                     
                     entropy_weight, loss = train_orchestrate_agent(orchestrate_agent, exp_tmp, entropy_weight,
@@ -401,7 +401,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
     plt.figure(figsize=(15,10))
 
     plt.plot(throughput_list)
-    print('title : ', title)
     plt.title(title)
     plt.xlabel("Number of Episodes")
     plt.ylabel("Throughput rate")
@@ -414,19 +413,20 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 10#20 #500 # Number of Episodes to run
+    RUN_TIMES = 5#20#0#20 #500 # Number of Episodes to run
     TASK_NUM = 5000 # 5000 Time for each Episode Ending # Though episodes are actually longer
-    TRAIN_TIMES = 10#50 # Training Iterations for policy and value networks (Actor , Critic)
+    TRAIN_TIMES = 50#50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000 # Orchestration cycle
 
     ##############################################################
     # New configuration settings
-    nodes_in_cluster =3
-    low_bound_edge_mode = 6
-    upper_bound_edge_mode = 10
+    nodes_in_cluster =2
+    low_bound_edge_mode = 2
+    upper_bound_edge_mode = 6
     total_eaps = 2 #random.sample(range(low_bound_edge_mpde, upper_bound_edge_mpde), 1)[0]
-    randomize = False #False # Change it as per needs
+    randomize = True #False # Change it as per needs
+    randomize_data = True
     
     
     
-    execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster)
+    execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, randomize_data)

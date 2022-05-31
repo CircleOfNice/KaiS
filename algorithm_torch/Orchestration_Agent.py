@@ -103,7 +103,7 @@ class OrchestrateAgent(Agent):
         selected_node_prob = torch.sum(node_prod,
             dim=(1,), keepdim=True)
 
-        select_scale_prod = torch.mul( self.scale_act_probs, scale_act_vec)
+        select_scale_prod = torch.mul( self.scale_act_probs, scale_act_vec) # both are same
         sum_scale_1 = torch.sum(select_scale_prod, dim=2)
         
         selected_scale_prob = torch.sum(sum_scale_1, dim=1, keepdim=True)
@@ -153,7 +153,7 @@ class OrchestrateAgent(Agent):
             [Numpy arrays]: [Node Inputs, scale inputs for next state]
         """
         done_tasks, undone_tasks, curr_tasks_in_queue, deploy_state, cpu_lists, mem_lists, task_lists, gcnn_list = obs
-        
+
         g_out_list = []
         for i, gcnn in enumerate(gcnn_list):
             node_input =[]
@@ -218,21 +218,17 @@ class OrchestrateAgent(Agent):
         
         # Map gcn_outputs and raw_inputs to action probabilities
         self.node_act_probs, self.scale_act_probs = self.ocn_net.predict((self.node_inputs, self.scale_inputs, self.gcn.outputs) )#
-        
-        
+
         # Draw action based on the probability
         logits = torch.log(self.node_act_probs)
         noise = torch.rand(logits.shape)
-
         node_val = logits - torch.log(-torch.log(noise))
         self.node_acts = torch.topk(node_val, k=high_value_edge_nodes).indices
-
         # scale_acts
         logits = torch.log(self.scale_act_probs)
         noise = torch.rand(logits.shape)
         scale_val = logits - torch.log(-torch.log(noise))
         self.scale_acts = torch.topk(scale_val, k=high_value_edge_nodes).indices
-
         return [self.node_act_probs, self.scale_act_probs, self.node_acts, self.scale_acts]    
 
     def invoke_model(self, obs):

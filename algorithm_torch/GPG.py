@@ -69,11 +69,12 @@ def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_t
             service_scaling_choice.append(x - MAX_TESK_TYPE - 1)
         else:
             service_scaling_choice.append(x - MAX_TESK_TYPE)
-    
+
     # For storing node index        
     node_act_vec = np.ones(node_act_probs.shape)
     # For storing scaling index
     scale_act_vec = np.ones(scale_act_probs.shape)
+    
     # Both of them are always one just used to allow matrix multiplication
     # Store experience
     exp['node_inputs'].append(node_inputs)
@@ -152,8 +153,11 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv):
     scale_inputs = np.array(scale_inputs)
     node_act_vec = np.array(node_act_vec)
     scale_act_vec = np.array(scale_act_vec)
+
     loss = orchestrate_agent.act_loss(
         node_inputs, scale_inputs, node_act_vec, scale_act_vec, adv)
+    
+    #a=b
 
     return loss
 
@@ -241,8 +245,7 @@ def execute_orchestration(change_node, change_service,deploy_state, service_coef
         master_list (list) :  List of created Master Nodes
 
     """
-    
-    #print('deploy_state : ', deploy_state)
+
     length_list = [0]
     last_length = length_list[0]
     for mstr in master_list:

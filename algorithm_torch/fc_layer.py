@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-def fc(inp_dim, output_dim, act=nn.ReLU()):
+def fc(inp_dim, output_dim, act=False):
     """Fully Connected Layer block
 
     Args:
@@ -14,7 +14,11 @@ def fc(inp_dim, output_dim, act=nn.ReLU()):
         Sequential Model: A sequential model which can be used as layer in Functional model
     """
     linear = nn.Linear(inp_dim, output_dim)
-    fc_out = nn.Sequential(linear, act)
+    if act:
+        fc_out = nn.Sequential(linear, act)
+    else:
+        fc_out = nn.Sequential(linear)
+        
     return fc_out 
 
 def expand_act_on_state(state, sub_acts):

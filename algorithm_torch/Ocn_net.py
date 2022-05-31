@@ -54,7 +54,7 @@ class OCN(nn.Module):
         node_inputs = torch.from_numpy(node_inputs).float()
         scale_inputs = torch.from_numpy(scale_inputs).float()
 
-        
+
         node_inputs_reshape = node_inputs.view(self.batch_size, -1, self.node_input_dim)
         scale_inputs_reshape = scale_inputs.view(self.batch_size, -1, self.scale_input_dim)
         gcn_outputs_reshape = gcn_outputs.view(self.batch_size, -1, self.output_dim)
@@ -64,7 +64,7 @@ class OCN(nn.Module):
 
         node_outputs = node_outputs.view(self.batch_size, -1)
         node_outputs = nn.functional.softmax(node_outputs)
-        
+
         merge_scale = torch.cat([scale_inputs_reshape, ], axis=2)
         expanded_state = self.expand_act_on_state(
                 merge_scale, [l / 50.0 for l in self.executor_levels])
@@ -72,9 +72,9 @@ class OCN(nn.Module):
             
         scale_outputs = scale_outputs.view(self.batch_size, -1)
         scale_outputs = scale_outputs.view(self.batch_size, -1, len(self.executor_levels))
-
         # Do softmax
-        scale_outputs = nn.functional.softmax(scale_outputs)
+        scale_outputs = nn.functional.softmax(scale_outputs, dim=2)
+
         return node_outputs, scale_outputs
         
     def predict(self, x):
