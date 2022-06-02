@@ -61,8 +61,10 @@ class OCN(nn.Module):
 
         merge_node = torch.cat((node_inputs_reshape, gcn_outputs_reshape), axis=2)
         node_outputs = self.nodenet(merge_node)
-
+        
+        #print('Before node_outputs prediction in ocn_net ocn shape : ', node_outputs.shape)
         node_outputs = node_outputs.view(self.batch_size, -1)
+
         node_outputs = nn.functional.softmax(node_outputs)
 
         merge_scale = torch.cat([scale_inputs_reshape, ], axis=2)

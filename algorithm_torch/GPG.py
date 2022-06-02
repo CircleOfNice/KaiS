@@ -38,7 +38,7 @@ def discount(x, gamma):
         out[i] = x[i] + gamma * out[i + 1]
     return out
 
-def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue, deploy_state_float, cpu_lists, mem_lists, task_lists, gcnn_list,  MAX_TESK_TYPE,):
+def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue, deploy_state_float, cpu_lists, mem_lists, task_lists, gcnn_list,  MAX_TESK_TYPE, epsilon_exploration):
     """Generate Orchestration Decision
 
     Args:
@@ -60,7 +60,7 @@ def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_t
     #and return the chosen node, chosen services and the appended experience, after the orchestration step]
     # Propagate the observation of the environment and produces
     node_act, scale_act, node_act_probs, scale_act_probs, node_inputs, scale_inputs = \
-        orchestrate_agent.invoke_model(obs)
+        orchestrate_agent.invoke_model(obs, epsilon_exploration)
     node_choice = [x for x in node_act[0]]# nodes chosen for deployment
     service_scaling_choice = [] # Server choice here is chosen services
     

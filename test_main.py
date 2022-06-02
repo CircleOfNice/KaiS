@@ -25,7 +25,7 @@ from algorithm_torch.CMMAC_Value_Model import build_value_model, update_value
 
 # Make the initial state for 
 
-def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mpde, upper_bound_edge_mpde, nodes_in_cluster, randomize_data = False):
+def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mpde, upper_bound_edge_mpde, nodes_in_cluster, randomize_data, epsilon_exploration):
     
     """[Function to execute the KAIS Algorithm ]
 
@@ -42,10 +42,10 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
     ########### Init ###########
     record = [] # list used to dump all the eAPS, tasks in queue, done tasks and undone tasks etcs
     throughput_list = [] # list of the progress of task done / total number of tasks
-    sum_rewards = [] # Used to store average rewards in the list 
+    #sum_rewards = [] # Used to store average rewards in the list 
     achieve_num = [] # List to contain the currently tasks done in the requirement space  
     fail_num = [] # Number of tasks failed to meet the requirement
-    deploy_reward = [] # List of sum of immediate rewards to be stored in experience
+    #deploy_reward = [] # List of sum of immediate rewards to be stored in experience
     
     all_rewards = [] # List to accumulate all rewards 
     order_response_rate_episode = [] # List to monitor the average throughput rate
@@ -167,7 +167,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
                 
                 reward_val = float(get_gpg_reward(master_list))
                 exp['reward'].append(reward_val)
-                deploy_reward = []
+                #deploy_reward = []
                 exp['wall_time'].append(cur_time)
                 deploy_states_float = []
                  
@@ -186,14 +186,15 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
 
                 
                 # Orchestration
-                node_choice, service_scaling_choice, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_states_float, cpu_lists, mem_lists, task_lists, graph_cnn_list, MAX_TESK_TYPE)
+                node_choice, service_scaling_choice, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_states_float, cpu_lists, mem_lists, task_lists, graph_cnn_list, MAX_TESK_TYPE, epsilon_exploration)
 
                 logger.info('Orchestration of Decision done ')
                 # Randomising Orchestration
-                
-                #if random.uniform(0, 1)< 0.05:
-                #    service_scaling_choice = torch.randint(-12, 12, (3,))
-                #    node_choice = torch.randint(0, 6, (3,))
+                if epsilon_exploration:
+                    
+                    if random.uniform(0, 1)< 0.05:
+                        service_scaling_choice = torch.randint(-max_tasks-1, max_tasks+1, (len(service_scaling_choice),))
+                        node_choice = torch.randint(0, sum(action_dims), (len(service_scaling_choice),))
                 
                 # Here is the code for orchestration and service scaling
                 execute_orchestration(node_choice, service_scaling_choice, #num_edge_nodes_per_eAP,
@@ -270,8 +271,9 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
             curr_neighbor_mask = np.array(curr_neighbor_mask)
 
             ###### Randomising if 0.05 then it is epsilor exploration
-            #if random.uniform(0, 1)< 0.05:
-            #    	act = [random.randint(0,6), random.randint(0,6)] 
+            if epsilon_exploration:
+                if random.uniform(0, 1)< 0.05:
+                	act = [random.randint(0,sum(action_dims)), random.randint(0,sum(action_dims))] 
             ####
             # Put the current task on the queue based on dispatch decision
             
@@ -301,7 +303,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
 
             record.append([master_list, cur_done, cur_undone, immediate_reward])
 
-            deploy_reward.append(sum(immediate_reward))
+            #deploy_reward.append(sum(immediate_reward))
 
             if slot != 0:
                 logger.debug('Computing targets for cMMAC')
@@ -348,7 +350,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
             else:
                 order_response_rates.append(0)
 
-        sum_rewards.append(float(sum(all_rewards)) / float(len(all_rewards)))
+        #sum_rewards.append(float(sum(all_rewards)) / float(len(all_rewards)))
         all_rewards = []
 
         all_number = sum(achieve_num) + sum(fail_num)
@@ -383,6 +385,8 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
             global_step2 += 1
             
         logger.info('Done training for run time {}', str(n_iter))
+        
+    print('Average throughput Achieved : ', sum(throughput_list)/len(throughput_list))
     name = 'full_randomisation_orchestration_no_randomisation_'
     time_str = str(time.time())
     with gzip.open("./result/torch_out_time_" + name + time_str + ".obj", "wb") as f:
@@ -413,20 +417,22 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 5#20#0#20 #500 # Number of Episodes to run
+    RUN_TIMES = 10#20#0#20 #500 # Number of Episodes to run
     TASK_NUM = 5000 # 5000 Time for each Episode Ending # Though episodes are actually longer
-    TRAIN_TIMES = 50#50 # Training Iterations for policy and value networks (Actor , Critic)
+    TRAIN_TIMES = 10#50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000 # Orchestration cycle
 
     ##############################################################
     # New configuration settings
-    nodes_in_cluster =2
+    nodes_in_cluster =3
     low_bound_edge_mode = 2
     upper_bound_edge_mode = 6
     total_eaps = 2 #random.sample(range(low_bound_edge_mpde, upper_bound_edge_mpde), 1)[0]
-    randomize = True #False # Change it as per needs
-    randomize_data = True
+    randomize = False #False # Change it as per needs
+    randomize_data = False
+    
+    epsilon_exploration = False # Not the default implementation for this project
     
     
     
-    execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, randomize_data)
+    execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, randomize_data, epsilon_exploration)

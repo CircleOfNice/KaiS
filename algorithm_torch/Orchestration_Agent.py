@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import random
 import torch.nn as nn
 from algorithm_torch.fc_layer import expand_act_on_state
 from algorithm_torch.Nodenet import *
@@ -201,7 +202,7 @@ class OrchestrateAgent(Agent):
         return node_inputs, scale_inputs
     
 
-    def predict(self, x):
+    def predict(self, x, epsilon_exploration):
         """Function to make predictions
 
         Args:
@@ -217,21 +218,44 @@ class OrchestrateAgent(Agent):
         self.gcn(self.node_inputs)
         
         # Map gcn_outputs and raw_inputs to action probabilities
-        self.node_act_probs, self.scale_act_probs = self.ocn_net.predict((self.node_inputs, self.scale_inputs, self.gcn.outputs) )#
+        self.node_act_probs, self.scale_act_probs = self.ocn_net.predict((self.node_inputs, self.scale_inputs, self.gcn.outputs))#
 
         # Draw action based on the probability
         logits = torch.log(self.node_act_probs)
         noise = torch.rand(logits.shape)
-        node_val = logits - torch.log(-torch.log(noise))
+        node_val = logits 
+        if epsilon_exploration:
+                if random.uniform(0, 1)< 0.05:
+                    print('randomisation')
+                    node_val = logits
+                    
+        '''
+        if epsilon_exploration:
+            node_val = logits - torch.log(-torch.log(noise))
+        else:
+            node_val = logits
+        '''
         self.node_acts = torch.topk(node_val, k=high_value_edge_nodes).indices
+        
         # scale_acts
         logits = torch.log(self.scale_act_probs)
         noise = torch.rand(logits.shape)
-        scale_val = logits - torch.log(-torch.log(noise))
+        
+        scale_val = logits 
+        if epsilon_exploration:
+                if random.uniform(0, 1)< 0.05:
+                    print('randomisation')
+                    scale_val = logits - torch.log(-torch.log(noise))
+        '''
+        if epsilon_exploration:
+            scale_val = logits - torch.log(-torch.log(noise))
+        else:
+            scale_val = logits
+        '''    
         self.scale_acts = torch.topk(scale_val, k=high_value_edge_nodes).indices
         return [self.node_act_probs, self.scale_act_probs, self.node_acts, self.scale_acts]    
 
-    def invoke_model(self, obs):
+    def invoke_model(self, obs, epsilon_exploration):
         """[Propagates the model inputs]
 
         Args:
@@ -246,7 +270,7 @@ class OrchestrateAgent(Agent):
         self.gcn(node_inputs)
 
         node_act_probs, scale_act_probs, node_acts, scale_acts = \
-            self.predict((node_inputs, scale_inputs, self.gcn.outputs))
+            self.predict((node_inputs, scale_inputs, self.gcn.outputs), epsilon_exploration)
         return node_acts, scale_acts, \
                node_act_probs, scale_act_probs, \
                node_inputs, scale_inputs   
