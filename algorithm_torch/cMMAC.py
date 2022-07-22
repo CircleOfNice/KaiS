@@ -276,9 +276,11 @@ class Estimator:
             self.pm_optimizer.zero_grad()
             policy_net_output = self.pm(policy_state[i])
             loss = self.pm_criterion( policy_net_output, curr_neighbor_mask[i], advantage[i], action_choosen_mat[i])
+            
             set_lr(self.pm_optimizer, learning_rate)
             loss.backward()
             self.pm_optimizer.step()
+        return loss
     
 def to_grid_rewards(node_reward):
     

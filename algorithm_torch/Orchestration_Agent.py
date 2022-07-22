@@ -138,9 +138,9 @@ class OrchestrateAgent(Agent):
         
         denom = denom.type(torch.FloatTensor)
         self.entropy_loss /= denom
-
+        print('self.adv_loss +  self.entropy_loss  : ', self.adv_loss , self.entropy_loss )
         # Define combined loss
-        self.act_loss_ = self.adv_loss + self.entropy_weight * self.entropy_loss
+        self.act_loss_ = self.adv_loss + self.entropy_weight * self.entropy_loss # self.entropy_weight *
 
         return self.act_loss_
     
