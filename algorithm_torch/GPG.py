@@ -144,18 +144,18 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv):
 
     node_inputs = exp['node_inputs']
     scale_inputs = exp['scale_inputs']
-    node_act_vec = exp['node_act_vec']
-    scale_act_vec = exp['scale_act_vec']
+    #node_act_vec = exp['node_act_vec']
+    #scale_act_vec = exp['scale_act_vec']
     adv = batch_adv
 
     # Convert to numpy array
     node_inputs = np.array(node_inputs)
     scale_inputs = np.array(scale_inputs)
-    node_act_vec = np.array(node_act_vec)
-    scale_act_vec = np.array(scale_act_vec)
+    #node_act_vec = np.array(node_act_vec)
+    #scale_act_vec = np.array(scale_act_vec)
 
     loss = orchestrate_agent.act_loss(
-        node_inputs, scale_inputs, node_act_vec, scale_act_vec, adv)
+        node_inputs, scale_inputs, adv)
     
     #a=b
 
@@ -181,7 +181,7 @@ def decrease_var(var, min_var, decay_rate):
     return var
 
 
-def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weight_min, entropy_weight_decay):
+def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight):
     
     """[Train the orchestration agent]
 
@@ -218,9 +218,9 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight, entropy_weig
         orchestrate_agent, exp, batch_adv)
     loss.backward()
     orchestrate_agent.optimizer.step()
-    entropy_weight = decrease_var(entropy_weight,
-                                  entropy_weight_min, entropy_weight_decay)
-    return entropy_weight, loss
+    #entropy_weight = decrease_var(entropy_weight,
+    #                              entropy_weight_min, entropy_weight_decay)
+    return orchestrate_agent.entropy_weight, loss
  
 def get_orchestration_reward(master_list, cur_time, check_queue):
     reward = []

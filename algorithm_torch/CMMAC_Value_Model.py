@@ -7,6 +7,7 @@ import torch
 from algorithm_torch.CMMAC_fc_layer import fc
 import torch.optim as optim
 from helpers_main_pytorch import set_lr
+from losses import simple_value_loss_2
 
 class Value_Model(nn.Module):
     """Class for defining the value model (Critic part) of the Actor critic Model
@@ -24,7 +25,7 @@ class Value_Model(nn.Module):
         self.fc2 = fc(inp_sizes[0], inp_sizes[1], act=act)
         self.fc3 = fc(inp_sizes[1], inp_sizes[2], act=act)
         self.fc4 = fc(inp_sizes[2], 1, act=act)
-        self.vm_criterion = self.squared_difference_loss
+        self.vm_criterion = simple_value_loss_2
         
 
     def forward(self, x):
@@ -68,7 +69,9 @@ def update_value( s, y, learning_rate, vm, vm_optimizer):
     value_output = vm(s)
     y = torch.tensor(y)
     loss = vm.vm_criterion(y, value_output)
+    
     set_lr(vm_optimizer, learning_rate)
     loss.backward()
     vm_optimizer.step()
+    return loss
     
