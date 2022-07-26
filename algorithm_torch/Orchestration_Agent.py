@@ -66,143 +66,7 @@ class OrchestrateAgent(Agent):
             file_path ([str]): [Path for saving the model]
         """
         torch.save(self.ocn_net, file_path)
-    '''        
-    def act_loss(self, node_inputs, scale_inputs, node_act_vec, scale_act_vec, adv):
-        """Calculation of Orchestration Loss
-
-        Args:
-            node_inputs ([Numpy array]): [Node inputs]
-            scale_inputs ([Numpy array]): [scale inputs]
-            node_act_vec ([Numpy array]): [Node Activation Vectors]
-            scale_act_vec ([Numpy array]): [scale Activation Vectors]
-            adv ([Numpy array]): [Calcualted advantage (difference between Q value predicted and Q value targets)]
-
-        Returns:
-            [Tensor]: [Calculated Loss]
-        """
         
-        self.node_inputs = np.asarray(node_inputs)
-        self.scale_inputs = np.asarray(scale_inputs)
-        
-        node_act_vec = np.asarray(node_act_vec)
-        scale_act_vec = np.asarray(scale_act_vec)
-
-        self.gcn(self.node_inputs)
-        
-        # Map gcn_outputs and raw_inputs to action probabilities
-        self.node_act_probs, self.scale_act_probs = self.ocn_net((self.node_inputs, self.scale_inputs, self.gcn.outputs) )#
-        
-        node_act_probs = torch.tensor(self.node_act_probs)
-        node_act_vec = torch.tensor(node_act_vec)
-        node_act_vec = torch.squeeze(node_act_vec)
-
-        node_prod = torch.mul(
-            node_act_probs, node_act_vec)
-        
-        scale_act_probs, scale_act_vec = torch.tensor(self.scale_act_probs), torch.tensor(scale_act_vec)
-        scale_act_vec = torch.squeeze(scale_act_vec, dim= 1)
-        selected_node_prob = torch.sum(node_prod,
-            dim=(1,), keepdim=True)
-
-        select_scale_prod = torch.mul( self.scale_act_probs, scale_act_vec) # both are same
-        sum_scale_1 = torch.sum(select_scale_prod, dim=2)
-        
-        selected_scale_prob = torch.sum(sum_scale_1, dim=1, keepdim=True)
-        torch_log = torch.log(selected_node_prob * selected_scale_prob + \
-                   self.eps)
-
-        adv = torch.tensor(adv)
-
-        torch_log_adv_mul = torch.mul(torch_log, -adv)
-
-        # Orchestrate loss due to advantge
-        self.adv_loss = torch.sum(torch_log_adv_mul)
-
-        # Node_entropy
-        torch_log_entropy = torch.log(node_act_probs + self.eps)
-
-        torch_mul_dimension = torch.mul(self.node_act_probs, torch_log_entropy)
-        self.node_entropy = torch.sum(torch_mul_dimension)
-
-        # Entropy loss
-        self.entropy_loss = self.node_entropy  # + self.scale_entropy
-
-        # Normalize entropy
-        len_ex = float(len(self.executor_levels))
-        len_ex = torch.tensor(len_ex)
-        node_act_probs_shape = torch.tensor(node_act_probs.shape[1])
-        torch_log_norm = torch.log(len_ex)
-
-        denom = (torch.log(node_act_probs_shape) + \
-             torch_log_norm)
-        
-        denom = denom.type(torch.FloatTensor)
-        self.entropy_loss /= denom
-        print('self.adv_loss +  self.entropy_loss  : ', self.adv_loss , self.entropy_loss )
-        # Define combined loss
-        self.act_loss_ = self.adv_loss + self.entropy_weight * self.entropy_loss # self.entropy_weight *
-
-        return self.act_loss_
-    '''
-    def calculate_log_prob(self, act_probs, eps):
-        return torch.log(act_probs + eps)
-    def mul_act_probs(self, act_probs, adv_or_torch_log):
-        return -torch.mul(act_probs, adv_or_torch_log)
-    def sum_normalise(self, torch_mul_log_prob):
-        return torch.sum(torch_mul_log_prob)/torch_mul_log_prob.shape[0]
-    
-    def act_loss(self, node_inputs, scale_inputs,  adv):
-        """Calculation of Orchestration Loss
-
-        Args:
-            node_inputs ([Numpy array]): [Node inputs]
-            scale_inputs ([Numpy array]): [scale inputs]
-            node_act_vec ([Numpy array]): [Node Activation Vectors]
-            scale_act_vec ([Numpy array]): [scale Activation Vectors]
-            adv ([Numpy array]): [Calcualted advantage (difference between Q value predicted and Q value targets)]
-
-        Returns:
-            [Tensor]: [Calculated Loss]
-        """
-        #print('node_act_vec, scale_act_vec : ', node_act_vec, scale_act_vec)
-        self.node_inputs = np.asarray(node_inputs)
-        self.scale_inputs = np.asarray(scale_inputs)
-        adv = torch.tensor(adv)
-        self.gcn(self.node_inputs)
-        
-        # Map gcn_outputs and raw_inputs to action probabilities
-        self.node_act_probs, self.scale_act_probs = self.ocn_net((self.node_inputs, self.scale_inputs, self.gcn.outputs) )#
-        
-        torch_log_scale = self.calculate_log_prob(self.scale_act_probs , self.eps)
-        torch_log_adv_mul_scale = self.mul_act_probs(torch_log_scale, adv)
-        self.adv_loss = self.sum_normalise(torch_log_adv_mul_scale)
-        
-        
-        # Entropy loss
-        
-        torch_log_node_prob = self.calculate_log_prob(self.node_act_probs, self.eps)
-        torch_mul_log_node_prob = self.mul_act_probs(torch_log_node_prob, adv)
-        self.entropy_loss = self.sum_normalise(torch_mul_log_node_prob)
-        
-    
-        '''
-        torch_log_scale = torch.log(self.scale_act_probs + self.eps)
-        torch_log_adv_mul_scale = -torch.mul(torch_log_scale, adv)
-        self.adv_loss = torch.sum(torch_log_adv_mul_scale)/ self.scale_act_probs.shape[0]
-        
-        # Entropy loss
-        torch_log_node_prob = torch.log(self.node_act_probs + self.eps)
-        torch_mul_log_node_prob = -torch.mul(self.node_act_probs, torch_log_node_prob)
-        self.entropy_loss = torch.sum(torch_mul_log_node_prob)/self.node_act_probs.shape[0]
-        
-        #print('self.adv_loss +  self.entropy_loss, self.entropy_weight   : ', self.adv_loss , self.entropy_loss, self.entropy_weight )
-        # Define combined loss
-        
-        '''
-        print('self.adv_loss +  self.entropy_loss, self.entropy_weight   : ', self.adv_loss , self.entropy_loss, self.entropy_weight )
-        self.act_loss_ = self.adv_loss + self.entropy_weight * self.entropy_loss # self.entropy_weight *
-        return self.act_loss_
-    
     def translate_state(self, obs):
         """Translates the state (from observation environment returns Node and scale inputs)
 
@@ -285,15 +149,8 @@ class OrchestrateAgent(Agent):
         node_val = logits 
         if epsilon_exploration:
                 if random.uniform(0, 1)< 0.05:
-                    print('randomisation')
                     node_val = logits
-                    
-        '''
-        if epsilon_exploration:
-            node_val = logits - torch.log(-torch.log(noise))
-        else:
-            node_val = logits
-        '''
+
         self.node_acts = torch.topk(node_val, k=high_value_edge_nodes).indices
         
         # scale_acts
@@ -303,14 +160,8 @@ class OrchestrateAgent(Agent):
         scale_val = logits 
         if epsilon_exploration:
                 if random.uniform(0, 1)< 0.05:
-                    print('randomisation')
                     scale_val = logits - torch.log(-torch.log(noise))
-        '''
-        if epsilon_exploration:
-            scale_val = logits - torch.log(-torch.log(noise))
-        else:
-            scale_val = logits
-        '''    
+
         self.scale_acts = torch.topk(scale_val, k=high_value_edge_nodes).indices
         return [self.node_act_probs, self.scale_act_probs, self.node_acts, self.scale_acts]    
 

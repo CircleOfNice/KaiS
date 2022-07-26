@@ -49,16 +49,6 @@ class Estimator:
         """
         loss = torch.sum(target**2 - output**2)
         return loss      
-     
-    '''
-    def _build_value_model(self):
-        """[Method to build the value model and assign its loss and optimizers]
-        """
-        self.vm = Value_Model(self.state_dim, inp_sizes = [128, 64, 32])
-        
-        self.vm_criterion = self.squared_difference_loss
-        self.vm_optimizer = optim.Adam(self.vm.parameters(), lr=0.001)
-        '''
         
     def sm_prob(self, policy_net_output, neighbor_mask):
         """[Method to apply policy filtering of edge nodes using neighbor mask and policy output]
@@ -79,32 +69,6 @@ class Estimator:
         softmaxprob = nn.Softmax()
         softmaxprob = softmaxprob(log(valid_logits + 1e-8))
         return softmaxprob, logits, valid_logits
-    '''    
-    def policy_net_loss(self, policy_net_output, neighbor_mask, tfadv, ACTION):
-        """[Method to calculate policy net loss]
-
-        Args:
-            policy_net_output ([Pytorch Tensor]): [Output of Policy Net]
-            neighbor_mask ([Numpy array]): [Neighbor mask denoting availability of nodes]
-            tfadv ([Numpy Array]): [difference between estmated Q value and the target Q value]
-            ACTION ([Numpy Array]): [Actions for the given batch]
-
-        Returns:
-            [Pytorch Tensor]: [description]
-        """
-        softmaxprob, logits, valid_logits = self.sm_prob(policy_net_output, neighbor_mask)
-        logsoftmaxprob = nn.functional.log_softmax(softmaxprob)
-        ACTION = torch.tensor(ACTION)
-        
-        tfadv = torch.tensor(tfadv)
-        neglogprob = - logsoftmaxprob * ACTION
-
-        self.actor_loss = torch.sum(torch.mean(neglogprob * tfadv, axis=0)) # changing it
-        self.entropy = - torch.mean(softmaxprob * logsoftmaxprob)
-        self.policy_loss = self.actor_loss - 0.01 * self.entropy
-        
-        return self.policy_loss 
-        '''
         
     def policy_net_loss(self, softmaxprob, logsoftmaxprob, tfadv, ACTION):
         """[Method to calculate policy net loss]
@@ -118,15 +82,10 @@ class Estimator:
         Returns:
             [Pytorch Tensor]: [description]
         """
-        #softmaxprob, logits, valid_logits = self.sm_prob(policy_net_output, neighbor_mask)
-        #logsoftmaxprob = nn.functional.log_softmax(softmaxprob)
+
         ACTION = tensor(ACTION)
         tfadv = tensor(tfadv)
-        #policy_net_loss(logsoftmaxprob, tfadv, ACTION)
-        #neglogprob = - logsoftmaxprob * ACTION
-        #logsoftmaxprob = log_softmax(softmaxprob)
         self.actor_loss = _policy_net_loss(logsoftmaxprob, tfadv, ACTION)
-        
         
         self.entropy = _entropy_loss(softmaxprob, logsoftmaxprob)#- mean(softmaxprob * logsoftmaxprob)
         self.policy_loss = self.actor_loss - 0.01 * self.entropy
@@ -240,7 +199,7 @@ class Estimator:
         node_reward = node_reward.flatten()
         qvalue_next = vm(next_state).flatten()
 
-        for idx, next_state_id in enumerate(next_state_ids):
+        for idx, _ in enumerate(next_state_ids):
             temp_adv = sum(node_reward) + gamma * sum(qvalue_next) - curr_state_value[idx]
             advantage.append(temp_adv.detach().numpy())
 
@@ -272,23 +231,7 @@ class Estimator:
             targets.append(curr_grid_target)
 
         return np.array(targets).reshape([-1, 1])
-    '''
-    def update_value(self, s, y, learning_rate):
-        """[Method to optimize the Value net]
 
-        Args:
-            s ([Numpy array]): [state]
-            y ([Numpy array]): [target]
-            learning_rate ([float]): [learning rate]
-        """
-        self.vm_optimizer.zero_grad()
-        value_output = self.vm(s)
-        y = torch.tensor(y)
-        loss = self.vm_criterion(y, value_output)
-        set_lr(self.vm_optimizer, learning_rate)
-        loss.backward()
-        self.vm_optimizer.step()
-    '''
     def update_policy(self, policy_state, advantage, action_choosen_mat, curr_neighbor_mask, learning_rate):
         """[Optimize Policy net]
 
@@ -303,9 +246,8 @@ class Estimator:
         for i in range(len(policy_state)):
             self.pm_optimizer.zero_grad()
             policy_net_output = self.pm(policy_state[i])
-            #policy_net_output, curr_neighbor_mask[i], advantage[i], action_choosen_mat[i]
             
-            softmaxprob, logits, valid_logits = self.sm_prob(policy_net_output, curr_neighbor_mask[i])
+            softmaxprob, _, _ = self.sm_prob(policy_net_output, curr_neighbor_mask[i])
             loss = self.pm_criterion(softmaxprob, log_softmax(softmaxprob), advantage, action_choosen_mat )
             
             set_lr(self.pm_optimizer, learning_rate)

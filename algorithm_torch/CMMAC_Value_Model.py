@@ -35,7 +35,7 @@ class Value_Model(nn.Module):
         x = self.fc3(x)
         x = self.fc4(x)
         return x
-
+'''
     def squared_difference_loss(self, target, output):
         """Calculate squared difference loss
 
@@ -48,6 +48,7 @@ class Value_Model(nn.Module):
         """
         loss = torch.sum(target**2 - output**2)
         return loss    
+        '''
     
 def build_value_model(state_dim):
     """[Method to build the value model and assign its loss and optimizers]

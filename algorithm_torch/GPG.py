@@ -1,16 +1,11 @@
 # GNN-based Learning for Service Orchestration
 from math import exp
 import numpy as np
-import torch
-import torch.optim as optim
-import torch.nn as nn
 import bisect
-from algorithm_torch.gcn import GraphCNN
 from algorithm_torch.Orchestration_Agent import *
-from algorithm_torch.ReplayMemory import ReplayMemory
 from algorithm_torch.policyReplayMemory import policyReplayMemory
 from helpers_main_pytorch import remove_docker_from_master_node, deploy_new_docker
-
+from losses import act_loss
 
 def get_gpg_reward(master_list):
     task_len = 0
@@ -59,7 +54,7 @@ def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_t
     # Invokes model (propagate the observation through the orchestration model) 
     #and return the chosen node, chosen services and the appended experience, after the orchestration step]
     # Propagate the observation of the environment and produces
-    node_act, scale_act, node_act_probs, scale_act_probs, node_inputs, scale_inputs = \
+    node_act, scale_act, _, _, node_inputs, scale_inputs = \
         orchestrate_agent.invoke_model(obs, epsilon_exploration)
     node_choice = [x for x in node_act[0]]# nodes chosen for deployment
     service_scaling_choice = [] # Server choice here is chosen services
@@ -69,18 +64,11 @@ def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_t
             service_scaling_choice.append(x - MAX_TESK_TYPE - 1)
         else:
             service_scaling_choice.append(x - MAX_TESK_TYPE)
-
-    # For storing node index        
-    node_act_vec = np.ones(node_act_probs.shape)
-    # For storing scaling index
-    scale_act_vec = np.ones(scale_act_probs.shape)
     
     # Both of them are always one just used to allow matrix multiplication
     # Store experience
     exp['node_inputs'].append(node_inputs)
     exp['scale_inputs'].append(scale_inputs)
-    exp['node_act_vec'].append(node_act_vec)
-    exp['scale_act_vec'].append(scale_act_vec)
     return node_choice, service_scaling_choice, exp
     
 
@@ -144,22 +132,29 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv):
 
     node_inputs = exp['node_inputs']
     scale_inputs = exp['scale_inputs']
-    #node_act_vec = exp['node_act_vec']
-    #scale_act_vec = exp['scale_act_vec']
+
     adv = batch_adv
 
     # Convert to numpy array
     node_inputs = np.array(node_inputs)
     scale_inputs = np.array(scale_inputs)
-    #node_act_vec = np.array(node_act_vec)
-    #scale_act_vec = np.array(scale_act_vec)
-
-    loss = orchestrate_agent.act_loss(
-        node_inputs, scale_inputs, adv)
     
-    #a=b
+    #new 
+    orchestrate_agent.node_inputs = np.asarray(node_inputs)
+    orchestrate_agent.scale_inputs = np.asarray(scale_inputs)
+    adv = torch.tensor(adv)
+    orchestrate_agent.gcn(node_inputs)
+    
+    # Map gcn_outputs and raw_inputs to action probabilities
+    orchestrate_agent.node_act_probs, orchestrate_agent.scale_act_probs = orchestrate_agent.ocn_net((node_inputs, scale_inputs, orchestrate_agent.gcn.outputs) )#
+    #
+    orchestrate_agent.adv_loss, orchestrate_agent.entropy_loss, orchestrate_agent.act_loss_ = act_loss(orchestrate_agent.scale_act_probs, orchestrate_agent.node_act_probs, 
+                                                                                                       orchestrate_agent.eps, adv, orchestrate_agent.entropy_weight)
+    #old
+    #loss = orchestrate_agent.act_loss(
+    #    node_inputs, scale_inputs, adv)
 
-    return loss
+    return orchestrate_agent.act_loss_
 
 
 def decrease_var(var, min_var, decay_rate):
@@ -218,15 +213,13 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight):
         orchestrate_agent, exp, batch_adv)
     loss.backward()
     orchestrate_agent.optimizer.step()
-    #entropy_weight = decrease_var(entropy_weight,
-    #                              entropy_weight_min, entropy_weight_decay)
     return orchestrate_agent.entropy_weight, loss
  
 def get_orchestration_reward(master_list, cur_time, check_queue):
     reward = []
     for mstr in master_list:
         for i, node in enumerate(mstr.node_list):
-            _, undone, undone_kind = check_queue(node.task_queue, cur_time, len(master_list))
+            _, undone, _ = check_queue(node.task_queue, cur_time, len(master_list))
             reward.append(len(undone))
     orchestration_reward = exp(-sum(reward))
     return orchestration_reward
