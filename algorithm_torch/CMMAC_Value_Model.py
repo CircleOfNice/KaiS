@@ -7,12 +7,12 @@ import torch
 from algorithm_torch.CMMAC_fc_layer import fc
 import torch.optim as optim
 from helpers_main_pytorch import set_lr
-from losses import simple_value_loss_2
+from losses import simple_square_loss
 
 class Value_Model(nn.Module):
     """Class for defining the value model (Critic part) of the Actor critic Model
     """
-    def __init__(self, state_dim, inp_sizes = [128, 64, 32], act = nn.ReLU()):
+    def __init__(self, state_dim, inp_sizes = [128, 64, 32], act = nn.ReLU(), loss = simple_square_loss):
         """Initialisation arguments for class
 
         Args:
@@ -25,7 +25,7 @@ class Value_Model(nn.Module):
         self.fc2 = fc(inp_sizes[0], inp_sizes[1], act=act)
         self.fc3 = fc(inp_sizes[1], inp_sizes[2], act=act)
         self.fc4 = fc(inp_sizes[2], 1, act=act)
-        self.vm_criterion = simple_value_loss_2
+        self.vm_criterion = loss
         
 
     def forward(self, x):
@@ -35,25 +35,11 @@ class Value_Model(nn.Module):
         x = self.fc3(x)
         x = self.fc4(x)
         return x
-'''
-    def squared_difference_loss(self, target, output):
-        """Calculate squared difference loss
-
-        Args:
-            target ([float]): [Target Value]
-            output ([float]): [Output Value]
-
-        Returns:
-            [float]: [Calcultated squared_difference_loss]
-        """
-        loss = torch.sum(target**2 - output**2)
-        return loss    
-        '''
     
-def build_value_model(state_dim):
+def build_value_model(state_dim, loss = simple_square_loss):
     """[Method to build the value model and assign its loss and optimizers]
     """
-    vm = Value_Model(state_dim, inp_sizes = [128, 64, 32])
+    vm = Value_Model(state_dim, inp_sizes = [128, 64, 32], loss = loss)
     vm_optimizer = optim.Adam(vm.parameters(), lr=0.001)
     return vm, vm_optimizer
     

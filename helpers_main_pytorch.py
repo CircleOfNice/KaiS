@@ -1,5 +1,5 @@
 import torch
-import numpy as np
+import matplotlib.pyplot as plt
 import torch.nn as nn
 from env.platform import *
 from env.env_run import update_docker
@@ -120,42 +120,11 @@ def get_action_dims(node_param_lists):
     for _list in node_param_lists:
 
         action_dim = 0
-        for node_param in _list:
+        for _ in _list:
             action_dim+=1
         action_dim+=1            
         action_dims.append(action_dim)
     return action_dims  # because of cluster
-
-'''
-def initial_state_values():
-    deploy_state = []
-    deploy_state = [[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
-                [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
-                [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1]]
-    
-    node_list_1 = [[100.0, 4.0], [200.0, 6.0], [100.0, 8.0]]
-    node_list_2 = [[200.0, 8.0], [100.0, 2.0], [200.0, 6.0]]
-
-    node_param_lists = [node_list_1, node_list_2]
-
-    master_param_lists = [[200.0, 8.0], [200.0, 8.0]]
-    return deploy_state, node_param_lists, master_param_lists
-
-def get_action_dim(node_param_lists):
-    """Estimate the size of Action dimensions for for the Node parameters in the given list : 
-
-    Args:
-        node_param_lists (List) : eAP's Node Parameters 
-        
-    Returns: 
-        action_dim : Overall action dimension
-    """
-    action_dim = 0
-    for _list in node_param_lists:
-        for node_param in _list:
-            action_dim+=1
-    return action_dim + 1 # +1 because of cluster
-'''
 
 def set_lr( optimizer, lr):    
     """Method to set the Learning rate of the given optimizer
@@ -173,23 +142,6 @@ def get_state_list(master_list, max_tasks):
         state_list.append(state_inside_eAP(mast, len(mast.node_list), max_tasks))
     return state_list 
 
-'''
-def estimate_state_size(all_task_list, max_tasks):
-
-    deploy_state, node_param_lists, master_param_lists = initial_state_values()
-    
-    master_list = create_master_list(node_param_lists, master_param_lists, all_task_list)
-             
-    last_length, length_list = get_last_length(master_list)
-    state_list = get_state_list(master_list, max_tasks)
-    s_grid_len = []
-    for i, state in enumerate((state_list)):
-        sub_deploy_state = deploy_state[length_list[i]:length_list[i+1]]
-        sub_elem = flatten(flatten([sub_deploy_state, [[state[5]]],[[state[4]]], [[state[3]]], [state[2]], state[0], state[1], [[latency]], [[len(master_list[i].node_list)]]]))
-        s_grid_len.append(len(sub_elem))
-        
-    return s_grid_len
-'''
 def flatten(list):
     """Function to serialize sublists inside a given list
 
@@ -366,7 +318,7 @@ def put_current_task_on_queue(act, curr_task, action_dims, cloud, master_list):
         master_list (list) :  List of created Master Nodes
 
     """
-    last_length, length_list = get_last_length(master_list)    
+    _, length_list = get_last_length(master_list)    
 
     cluster_action_values = [action-1 for action in action_dims]
 
@@ -517,3 +469,13 @@ def get_state_characteristics(MAX_TESK_TYPE, master_list):
     return done_tasks, undone_tasks, curr_tasks_in_queue
 
 
+def plot_list(data_list, title, x_label, y_label):
+        plt.figure(figsize=(15,10))
+
+        plt.plot(data_list)#throughput_list)
+        plt.title(title)
+        plt.xlabel(x_label)#"Number of Episodes")
+        plt.ylabel(y_label)#"Throughput rate")
+        #plt.ylim([0, 100])
+        #plt.show()
+        plt.savefig('./plots/'+title + '.png')

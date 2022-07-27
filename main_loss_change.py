@@ -3,7 +3,7 @@ import time
 import logging
 logger = logging.getLogger(__name__)  
 import random
-import matplotlib.pyplot as plt
+
 # set log level
 logger.setLevel(logging.ERROR)
 
@@ -22,7 +22,7 @@ from env.env_run import *
 import pickle,gzip
 from helpers_main_pytorch import *                
 from algorithm_torch.CMMAC_Value_Model import build_value_model, update_value
-
+from algorithm_torch.CMMAC_Policy_Model import  update_policy
 # Make the initial state for 
 
 def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mpde, upper_bound_edge_mpde, nodes_in_cluster, randomize_data, epsilon_exploration):
@@ -105,7 +105,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
     for i in range(len(q_estimator_list)):
         print(i, q_estimator_list[i],action_dims[i])
         log_estimator_policy_loss.append([])
-    #a=b
+
     logger.debug('Multiple Actors initialised')
     # Creation of global critic (currently without cloud info of unprocessed requests)
     critic, critic_optimizer = build_value_model(sum(s_grid_len)+ 1) # Length of task queue can be only one digit long
@@ -196,7 +196,8 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
 
                 
                 # Orchestration
-                node_choice, service_scaling_choice, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_states_float, cpu_lists, mem_lists, task_lists, graph_cnn_list, MAX_TESK_TYPE, epsilon_exploration)
+                node_choice, service_scaling_choice, exp = orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue,deploy_states_float,
+                                                                                cpu_lists, mem_lists, task_lists, graph_cnn_list, MAX_TESK_TYPE, epsilon_exploration)
 
                 logger.info('Orchestration of Decision done ')
                 # Randomising Orchestration
@@ -217,7 +218,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
                     
                     orchestrate_agent.entropy_weight, loss = train_orchestrate_agent(orchestrate_agent, exp_tmp, orchestrate_agent.entropy_weight)
                     log_orchestration_loss.append(loss.item())
-                    #print('Orchestration loss : ', loss)
+
                     orchestrate_agent.entropy_weight = decrease_var(orchestrate_agent.entropy_weight,
                                                   entropy_weight_min, entropy_weight_decay)
                     logger.info('Training orchestration agent')
@@ -314,8 +315,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
 
             record.append([master_list, cur_done, cur_undone, immediate_reward])
 
-            #deploy_reward.append(sum(immediate_reward))
-
             if slot != 0:
                 logger.debug('Computing targets for cMMAC')
                 r_grid = to_grid_rewards(immediate_reward)
@@ -337,7 +336,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
                         for i in range(1,len(test_cond_list)):
                             cond = cond and test_cond_list[i]
                     if cond:
-
+                        #print('policy_state_prev[[m]].shape, advantage.shape : ', len(policy_state_prev[[m]]), len(advantage))    
                         ReplayMemory_list[m].add(np.array([state_mat_prev]), action_mat_prev[[m]], targets_batch[[0]], np.array([s_grid[m]]))
                         policy_replay_list[m].add(policy_state_prev[[m]], action_choosen_mat_prev[[m]], advantage , curr_neighbor_mask_prev[[m]])
             # For updating
@@ -361,13 +360,11 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
             else:
                 order_response_rates.append(0)
 
-        #sum_rewards.append(float(sum(all_rewards)) / float(len(all_rewards)))
         all_rewards = []
 
         all_number = sum(achieve_num) + sum(fail_num)
         throughput_list.append(sum(achieve_num) / float(all_number))
-        #logger.info('Logging for run time throughput_list_all =', throughput_list, '\ncurrent_achieve_number =', sum(achieve_num),
-        #      ', current_fail_number =', sum(fail_num))
+
         print('throughput_list_all =', throughput_list, '\ncurrent_achieve_number =', sum(achieve_num),
               ', current_fail_number =', sum(fail_num))
         achieve_num = []
@@ -385,7 +382,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
                 batch_s, _, batch_r, _ = ReplayMemory_list[m].sample()
                 value_loss = update_value(batch_s, batch_r, 1e-3, critic, critic_optimizer)
                 log_estimator_value_loss.append(value_loss.item())
-                #print('value_loss : ', value_loss)
             global_step1 += 1
 
         # update policy network
@@ -393,9 +389,10 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
 
             for m in range(len(master_list)):
                 batch_s, batch_a, batch_r, batch_mask = policy_replay_list[m].sample()
-                policy_loss = q_estimator_list[m].update_policy(batch_s, batch_r.reshape([-1, 1]), batch_a, batch_mask, learning_rate,)
+                
+                policy_loss = update_policy(q_estimator_list[m], batch_s, batch_r.reshape([-1, 1]), batch_a, batch_mask, learning_rate,)
                 log_estimator_policy_loss[m].append(policy_loss.item())
-                #print('Policy loss : ', m, policy_loss)
+
             global_step2 += 1
             
         logger.info('Done training for run time {}', str(n_iter))
@@ -417,16 +414,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
     else : 
         title =     "Total_Eaps_" + str(len(all_task_list)) + '_nodes_in_cluster_'+ str(nodes_in_cluster)
         
-    def plot_list(data_list, title, x_label, y_label):
-        plt.figure(figsize=(15,10))
-
-        plt.plot(data_list)#throughput_list)
-        plt.title(title)
-        plt.xlabel(x_label)#"Number of Episodes")
-        plt.ylabel(y_label)#"Throughput rate")
-        #plt.ylim([0, 100])
-        #plt.show()
-        plt.savefig('./plots/'+title + '.png') 
+    
     plot_list(throughput_list, title, "Number of Episodes", "Throughput rate")
     plot_list(log_orchestration_loss, title +'log_orchestration_loss', "Number of Episodes", "Orchestration loss")
     plot_list(log_estimator_value_loss, title + 'log_estimator_value_loss', "Number of Episodes", "Value loss")
@@ -438,7 +426,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 2#3#10#20#0#20 #500 # Number of Episodes to run
+    RUN_TIMES = 5#10#20#0#20 #500 # Number of Episodes to run
     TASK_NUM = 5000 # 5000 Time for each Episode Ending # Though episodes are actually longer
     TRAIN_TIMES = 10#50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000 # Orchestration cycle

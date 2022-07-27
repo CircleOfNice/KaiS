@@ -1,17 +1,10 @@
 # Coordinated Multi-Agent Actor-Critic (cMMAC)
 import math
 import numpy as np
-from torch import tensor, mean, mean, from_numpy, log
-import torch.nn as nn
-import torch.optim as optim
-from torch.nn.functional import log_softmax
 from copy import deepcopy
 from algorithm_torch.CMMAC_Policy_Model import *
 from algorithm_torch.CMMAC_Value_Model import *
 from algorithm_torch.ReplayMemory import *
-from losses import _policy_net_loss, _entropy_loss
-from helpers_main_pytorch import set_lr
-
 
 class Estimator:
     """Class to Define the cMMAC (Actor Critic) model
@@ -32,7 +25,7 @@ class Estimator:
         self.actor_loss = 0
         self.value_loss = 0
         self.entropy = 0
-        self._build_policy()
+        self.pm, self.pm_optimizer = build_policy_model(self.state_dim, self.action_dim)
         
         self.loss = self.actor_loss + .5 * self.value_loss - 10 * self.entropy
         
@@ -49,55 +42,7 @@ class Estimator:
         """
         loss = torch.sum(target**2 - output**2)
         return loss      
-        
-    def sm_prob(self, policy_net_output, neighbor_mask):
-        """[Method to apply policy filtering of edge nodes using neighbor mask and policy output]
 
-        Args:
-            policy_net_output ([Pytorch Tensor]): [Output of Policy Network]
-            neighbor_mask ([Numpy array]): [Mask to determine available network]
-
-        Returns:
-            [Pytorch Tensors]: [Torch Tensor respectively containing softmax probabilities, logits and valid_logits]
-        """
-        neighbor_mask = from_numpy(neighbor_mask)
-        
-        logits = policy_net_output +1 
-        
-        valid_logits = logits * neighbor_mask
-
-        softmaxprob = nn.Softmax()
-        softmaxprob = softmaxprob(log(valid_logits + 1e-8))
-        return softmaxprob, logits, valid_logits
-        
-    def policy_net_loss(self, softmaxprob, logsoftmaxprob, tfadv, ACTION):
-        """[Method to calculate policy net loss]
-
-        Args:
-            policy_net_output ([Pytorch Tensor]): [Output of Policy Net]
-            neighbor_mask ([Numpy array]): [Neighbor mask denoting availability of nodes]
-            tfadv ([Numpy Array]): [difference between estmated Q value and the target Q value]
-            ACTION ([Numpy Array]): [Actions for the given batch]
-
-        Returns:
-            [Pytorch Tensor]: [description]
-        """
-
-        ACTION = tensor(ACTION)
-        tfadv = tensor(tfadv)
-        self.actor_loss = _policy_net_loss(logsoftmaxprob, tfadv, ACTION)
-        
-        self.entropy = _entropy_loss(softmaxprob, logsoftmaxprob)#- mean(softmaxprob * logsoftmaxprob)
-        self.policy_loss = self.actor_loss - 0.01 * self.entropy
-        
-        return self.policy_loss
-    def _build_policy(self):
-        """[Method to build the Policy model and assign its loss and optimizers]
-        """
-        self.pm = Policy_Model(self.state_dim, self.action_dim, inp_sizes = [128, 64, 32], act = nn.ReLU())
-        self.pm_criterion = self.policy_net_loss
-        self.pm_optimizer = optim.Adam(self.pm.parameters(), lr=0.001)
-        
     def action(self, s, vm, critic_state, ava_node, context):
         """
 
@@ -141,7 +86,7 @@ class Estimator:
 
         # compute policy probability.
         self.pm_out =self.pm(s)
-        action_probs,_,_ = self.sm_prob( self.pm_out, curr_neighbor_mask) 
+        action_probs,_,_ = sm_prob(self.pm_out, curr_neighbor_mask) 
         curr_neighbor_mask_policy = []
         for idx, grid_valid_idx in enumerate(grid_ids):
             action_prob = action_probs[idx]
@@ -232,30 +177,6 @@ class Estimator:
 
         return np.array(targets).reshape([-1, 1])
 
-    def update_policy(self, policy_state, advantage, action_choosen_mat, curr_neighbor_mask, learning_rate):
-        """[Optimize Policy net]
-
-        Args:
-            policy_state ([Numpy Array]): [State Policy]
-            advantage ([Numpy Array]): [Calcualted Advantage]
-            action_choosen_mat ([Numpy Array]): [Choose action matrix]
-            curr_neighbor_mask ([Numpy Array]): [Current Neighbor mask]
-            learning_rate ([float]): [Learning Rate]
-        """
-
-        for i in range(len(policy_state)):
-            self.pm_optimizer.zero_grad()
-            policy_net_output = self.pm(policy_state[i])
-            
-            softmaxprob, _, _ = self.sm_prob(policy_net_output, curr_neighbor_mask[i])
-            loss = self.pm_criterion(softmaxprob, log_softmax(softmaxprob), advantage, action_choosen_mat )
-            
-            set_lr(self.pm_optimizer, learning_rate)
-            loss.backward()
-            self.pm_optimizer.step()
-
-        return loss
-    
 def to_grid_rewards(node_reward):
     
     """[Serialises the given node rewards]
