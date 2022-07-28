@@ -4,7 +4,7 @@ import numpy as np
 import bisect
 from algorithm_torch.Orchestration_Agent import *
 from algorithm_torch.policyReplayMemory import policyReplayMemory
-from helpers_main_pytorch import remove_docker_from_master_node, deploy_new_docker
+from helpers_main_pytorch import remove_docker_from_master_node, deploy_new_docker, entropy_weight_min, entropy_weight_decay
 from losses import act_loss
 
 def get_gpg_reward(master_list):
@@ -176,7 +176,7 @@ def decrease_var(var, min_var, decay_rate):
     return var
 
 
-def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight):
+def train_orchestrate_agent(orchestrate_agent, exp):
     
     """[Train the orchestration agent]
 
@@ -197,7 +197,7 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight):
     rewards = np.array([r for (r, t) in zip(all_rewards, batch_time)])
     cum_reward = discount(rewards, 1)
     all_cum_reward.append(cum_reward)
-    orchestrate_agent.entropy_weight = entropy_weight
+    #orchestrate_agent.entropy_weight = entropy_weight
     
     # Compute baseline
     baselines = get_piecewise_linear_fit_baseline(all_cum_reward, [batch_time])
@@ -205,7 +205,7 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight):
     batch_adv = all_cum_reward[0] - baselines[0]
     
     batch_adv = np.reshape(batch_adv, [len(batch_adv), 1])
-    orchestrate_agent.entropy_weight = entropy_weight
+    #orchestrate_agent.entropy_weight = entropy_weight
     
     # Actual training of Orchestrate Net
     orchestrate_agent.optimizer.zero_grad()
@@ -213,6 +213,9 @@ def train_orchestrate_agent(orchestrate_agent, exp, entropy_weight):
         orchestrate_agent, exp, batch_adv)
     loss.backward()
     orchestrate_agent.optimizer.step()
+    
+    orchestrate_agent.entropy_weight = decrease_var(orchestrate_agent.entropy_weight, entropy_weight_min, entropy_weight_decay)
+    
     return orchestrate_agent.entropy_weight, loss
  
 def get_orchestration_reward(master_list, cur_time, check_queue):

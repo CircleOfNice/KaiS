@@ -11,7 +11,7 @@ import sys
 
 vaild_node = 6  # Number of edge nodes available
 SLOT_TIME = 0.5  # Time of one slot
-MAX_TESK_TYPE = 12  # Number of tesk types
+#MAX_TESK_TYPE = 12  # Number of tesk types
 POD_CPU = 15.0  # CPU resources required for a POD
 POD_MEM = 1.0  # Memory resources required for a POD
 # Resource demand coefficients for different types of services
@@ -22,8 +22,8 @@ learning_rate = 1e-3 # Learning Rate
 
 state_dim = 54#90#88 #Dimension of state for cMMAC (flattened Deployed state, task num, cpu_list, min_list)
 
-node_input_dim = 2*MAX_TESK_TYPE#24 # Input dimension of Node part of the Orchestration Net 
-scale_input_dim = 2*MAX_TESK_TYPE # Input dimension for scale part of the Orchestration Net
+#node_input_dim = 2*MAX_TESK_TYPE#24 # Input dimension of Node part of the Orchestration Net 
+#scale_input_dim = 2*MAX_TESK_TYPE # Input dimension for scale part of the Orchestration Net
 high_value_edge_nodes = 2
 
 hid_dims = [16, 8] # hidden dimensions of the Graph Neural Networks
@@ -79,7 +79,7 @@ def def_initial_state_values(len_all_task_list=3, list_length_edge_nodes_per_eap
         node_param_lists.append(node_list)
     return deploy_states, node_param_lists, master_param_lists
 
-def estimate_state_size(all_task_list, max_tasks, edge_list):
+def estimate_state_size(all_task_list, MAX_TASK_TYPE, edge_list):
     
     """Estimate the size of state for the grid : 
 
@@ -93,9 +93,9 @@ def estimate_state_size(all_task_list, max_tasks, edge_list):
 
     deploy_states, node_param_lists, master_param_lists = def_initial_state_values(len(all_task_list), edge_list)
     
-    master_list = create_master_list(node_param_lists, master_param_lists, all_task_list)
+    master_list = create_master_list(node_param_lists, master_param_lists, all_task_list, MAX_TASK_TYPE)
 
-    state_list = get_state_list(master_list, max_tasks)
+    state_list = get_state_list(master_list, MAX_TASK_TYPE)
     s_grid_len = []
     for i, state in enumerate((state_list)):
 
@@ -262,7 +262,7 @@ def create_node_list(node_specification):
     for node_spec in node_specification:
         node_list.append(Node(node_spec[0], node_spec[1], [], []))
     return node_list
-def create_master_list(node_param_lists, master_param_lists, all_task_list):
+def create_master_list(node_param_lists, master_param_lists, all_task_list, MAX_TASK_TYPE):
     node_lists = []
     for node_params in node_param_lists:
         node_lists.append(create_node_list(node_params))
@@ -270,17 +270,17 @@ def create_master_list(node_param_lists, master_param_lists, all_task_list):
     # (cpu, mem,..., achieve task num, give up task num)
     master_list = []
     for i, master_params in enumerate(master_param_lists):
-        master_list.append(Master(master_params[0], master_params[1], node_lists[i], [], all_task_list[i], 0, 0, 0, [0] * MAX_TESK_TYPE, [0] * MAX_TESK_TYPE))
+        master_list.append(Master(master_params[0], master_params[1], node_lists[i], [], all_task_list[i], 0, 0, 0, [0] * MAX_TASK_TYPE, [0] * MAX_TASK_TYPE))
     return master_list
 
-def create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TESK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time):
+def create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TASK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time):
     """Create Edge Access Points and Cloud
 
     Args:
         node_param_lists ([list]): [list of node specifications]
         master_param_lists ([list]): [list of master specifications]
         all_task_list (list): [list of all tasks data]
-        MAX_TESK_TYPE (int) : Maximum number of task types
+        MAX_TASK_TYPE (int) : Maximum number of task types
         POD_MEM: (float): Memory of POD
         POD_CPU (float): CPU of POD
         service_coefficient(list): Service Coefficients
@@ -290,10 +290,10 @@ def create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MA
         master_list (list) :  List of created Master Nodes
         cloud (Cloud Object) : Created cloud object
     """
-    master_list = create_master_list(node_param_lists, master_param_lists, all_task_list)
+    master_list = create_master_list(node_param_lists, master_param_lists, all_task_list, MAX_TASK_TYPE)
     cloud = Cloud([], [], sys.maxsize, sys.maxsize)  # (..., cpu, mem)
     ################################################################################################
-    for i in range(MAX_TESK_TYPE):
+    for i in range(MAX_TASK_TYPE):
         docker = Docker(POD_MEM * service_coefficient[i], POD_CPU * service_coefficient[i], cur_time, i, [-1])
         cloud.service_list.append(docker)
     

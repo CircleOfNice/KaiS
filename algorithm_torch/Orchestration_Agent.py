@@ -11,8 +11,8 @@ from algorithm_torch.Orchestration_Agent import *
 from algorithm_torch.Agent import Agent
 from helpers_main_pytorch import high_value_edge_nodes, flatten, output_dim
 class OrchestrateAgent(Agent):
-    def __init__(self, node_input_dim, scale_input_dim, hid_dims, output_dim,
-                 max_depth, executor_levels, MAX_TESK_TYPE, eps, act_fn,optimizer):
+    def __init__(self,node_input_dim, hid_dims, output_dim,
+                 max_depth, executor_levels, MAX_TASK_TYPE, entropy_weight,eps, act_fn,optimizer):
         """Orchestration Agent initialisation
 
         Args:
@@ -27,19 +27,19 @@ class OrchestrateAgent(Agent):
             optimizer ([Pytorch Optimizer]): [Pytorch Optimizer]
         """
         Agent.__init__(self)
-        self.node_input_dim = node_input_dim
-        self.scale_input_dim = scale_input_dim
+        self.node_input_dim =  node_input_dim
+        self.scale_input_dim =2*MAX_TASK_TYPE# scale_input_dim
         self.hid_dims = hid_dims
         self.output_dim = output_dim
         self.max_depth = max_depth
 
-        self.merge_node_dim_ = node_input_dim +  output_dim # node_inputs_reshape.shape + gcn_outputs_reshape.shape (along axis 2)
+        self.merge_node_dim_ = self.node_input_dim +  output_dim # node_inputs_reshape.shape + gcn_outputs_reshape.shape (along axis 2)
         self.expanded_state_dim_ = 1 + 24 # node_inputs_reshaped.shape + executor levels range (along axis 2)
         self.executor_levels = executor_levels
         self.eps = eps #=1e-6
         self.act_fn = act_fn
-        self.entropy_weight = 1
-        self.MAX_TESK_TYPE = MAX_TESK_TYPE
+        self.entropy_weight = entropy_weight
+        self.MAX_TASK_TYPE = MAX_TASK_TYPE
         self.gcn = GraphCNN(
             self.node_input_dim, self.hid_dims,
             self.output_dim, self.max_depth, self.act_fn)
@@ -102,7 +102,7 @@ class OrchestrateAgent(Agent):
         # Inputs to feed
 
         # Add values to the node inputs task_list, mem_list, cpu_list etc
-        node_inputs = np.zeros([total_num_nodes, 2*self.MAX_TESK_TYPE+ len(gcnn_list)*output_dim])
+        node_inputs = np.zeros([total_num_nodes, 2*self.MAX_TASK_TYPE+ len(gcnn_list)*output_dim])
         scale_inputs = np.zeros([1, self.scale_input_dim])
         
         new_deploy_state = []
@@ -114,13 +114,13 @@ class OrchestrateAgent(Agent):
 
         for i in range(len(node_inputs)):
             ds_int_list = [int(x) for x in deploy_state[i][:][:]] 
-            node_inputs[i, :self.MAX_TESK_TYPE] = ds_int_list
-            node_inputs[i, self.MAX_TESK_TYPE: 2*self.MAX_TESK_TYPE] = deploy_state[i]
+            node_inputs[i, :self.MAX_TASK_TYPE] = ds_int_list
+            node_inputs[i, self.MAX_TASK_TYPE: 2*self.MAX_TASK_TYPE] = deploy_state[i]
             for j in range(len(gcnn_list)):
-                node_inputs[i, 2*self.MAX_TESK_TYPE + (j)*output_dim: 2*self.MAX_TESK_TYPE+(j+1)*output_dim] = gcnn_list[j].outputs.numpy()
+                node_inputs[i, 2*self.MAX_TASK_TYPE + (j)*output_dim: 2*self.MAX_TASK_TYPE+(j+1)*output_dim] = gcnn_list[j].outputs.numpy()
             
-        scale_inputs[0, :self.MAX_TESK_TYPE] = done_tasks[:self.MAX_TESK_TYPE]
-        scale_inputs[0, self.MAX_TESK_TYPE:] = undone_tasks[:self.MAX_TESK_TYPE]
+        scale_inputs[0, :self.MAX_TASK_TYPE] = done_tasks[:self.MAX_TASK_TYPE]
+        scale_inputs[0, self.MAX_TASK_TYPE:] = undone_tasks[:self.MAX_TASK_TYPE]
         
         return node_inputs, scale_inputs
     
