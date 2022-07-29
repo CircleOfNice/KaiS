@@ -12,7 +12,7 @@ from losses import simple_square_loss
 class Value_Model(nn.Module):
     """Class for defining the value model (Critic part) of the Actor critic Model
     """
-    def __init__(self, state_dim, inp_sizes = [128, 64, 32], act = nn.ReLU(), loss = simple_square_loss):
+    def __init__(self, state_dim, inp_sizes = [128, 64, 32], act = nn.LeakyReLU(), loss = simple_square_loss):
         """Initialisation arguments for class
 
         Args:

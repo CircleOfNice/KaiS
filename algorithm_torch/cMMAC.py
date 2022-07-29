@@ -22,12 +22,8 @@ class Estimator:
         self.action_dim = action_dim
         self.state_dim = state_dim
         # Initial value for losses
-        self.actor_loss = 0
-        self.value_loss = 0
-        self.entropy = 0
+        self.entropy = 1
         self.pm, self.pm_optimizer = build_policy_model(self.state_dim, self.action_dim)
-        
-        self.loss = self.actor_loss + .5 * self.value_loss - 10 * self.entropy
         
 
     def squared_difference_loss(self, target, output):

@@ -54,8 +54,6 @@ def initialize_eap_params(csv_paths, total_eaps, nodes_in_cluster,low_bound_edge
 
     return  max_tasks, all_task_list,edge_list, node_param_lists, master_param_lists, action_dims
 
-
-
 def initialize_cmmac_agents(MAX_TASK_TYPE, all_task_list,edge_list, master_param_lists, action_dims, randomize):
     # Definition of cMMAc Agent
     q_estimator_list = []
@@ -281,15 +279,14 @@ def update_exp_replays(immediate_reward, q_estimator_list, ReplayMemory_list, po
             ReplayMemory_list[m].add(np.array([state_mat_prev]), action_mat_prev[[m]], targets_batch[[0]], np.array([s_grid[m]]))
             policy_replay_list[m].add(policy_state_prev[[m]], action_choosen_mat_prev[[m]], advantage , curr_neighbor_mask_prev[[m]])  
 
-def train_critic(TRAIN_TIMES, master_list, ReplayMemory_list, critic, critic_optimizer, log_estimator_value_loss, global_step1):
+def train_critic(TRAIN_TIMES, master_list, ReplayMemory_list, critic, critic_optimizer, log_estimator_value_loss):#, global_step1):
     for _ in np.arange(TRAIN_TIMES):
         for m in range(len(master_list)):
             batch_s, _, batch_r, _ = ReplayMemory_list[m].sample()
             value_loss = update_value(batch_s, batch_r, 1e-3, critic, critic_optimizer)
             log_estimator_value_loss.append(value_loss.item())
-        global_step1 += 1
         
-def train_actors(TRAIN_TIMES, master_list, policy_replay_list, q_estimator_list, log_estimator_policy_loss, global_step2):
+def train_actors(TRAIN_TIMES, master_list, policy_replay_list, q_estimator_list, log_estimator_policy_loss):#, global_step2):
     for _ in np.arange(TRAIN_TIMES):
 
         for m in range(len(master_list)):
@@ -298,14 +295,12 @@ def train_actors(TRAIN_TIMES, master_list, policy_replay_list, q_estimator_list,
             policy_loss = update_policy(q_estimator_list[m], batch_s, batch_r.reshape([-1, 1]), batch_a, batch_mask, learning_rate,)
             log_estimator_policy_loss[m].append(policy_loss.item())
 
-        global_step2 += 1
-        
         
 def train_actor_critic_without_orchestration(ReplayMemory_list, policy_replay_list, master_list, q_estimator_list, critic, critic_optimizer, log_estimator_value_loss, 
-                                             log_estimator_policy_loss, TRAIN_TIMES, global_step1, global_step2):
+                                             log_estimator_policy_loss, TRAIN_TIMES,):
     
-    train_critic(TRAIN_TIMES, master_list, ReplayMemory_list, critic, critic_optimizer, log_estimator_value_loss, global_step1)
-    train_actors(TRAIN_TIMES, master_list, policy_replay_list, q_estimator_list, log_estimator_policy_loss, global_step2)
+    train_critic(TRAIN_TIMES, master_list, ReplayMemory_list, critic, critic_optimizer, log_estimator_value_loss)
+    train_actors(TRAIN_TIMES, master_list, policy_replay_list, q_estimator_list, log_estimator_policy_loss)
 
         
 def check_and_dump(name, time_str, record, throughput_list):
