@@ -15,8 +15,6 @@ def get_gpg_reward(master_list):
         for node in master.node_list:
             task_len += len(node.task_queue)
     reward = np.exp(-(task_len))
-    #print('task_len : ', task_len)
-    #print('orchestration_reward : ', reward)   
     return reward
 
 def discount(x, gamma):
@@ -102,7 +100,6 @@ def get_piecewise_linear_fit_baseline(all_cum_rewards, all_wall_time):
     unique_wall_time = np.unique(np.hstack(all_wall_time))
     # Find baseline value
     baseline_values = {}
-    #baseline_values_as_is = {}
     for t in unique_wall_time:
         baseline = 0
         for i in range(len(all_wall_time)):
@@ -121,22 +118,11 @@ def get_piecewise_linear_fit_baseline(all_cum_rewards, all_wall_time):
                     (t - all_wall_time[i][idx]) + all_cum_rewards[i][idx]
 
         baseline_values[t] = baseline #/ float(len(all_wall_time[0]))
-        
-        #baseline_values_as_is[t] =  baseline 
-    #if len(all_wall_time[0])>3:    
-    #    print('baseline_values : ', baseline_values)
-        #print('baseline_values_as_is : ', baseline_values_as_is)
-        #a=b
     # Output n baselines
     baselines = []
     for wall_time in all_wall_time:
         baseline = np.array([baseline_values[t] for t in wall_time])
         baselines.append(baseline)
-        
-        
-    #if len(baselines[0])>1:
-    #    plot(all_wall_time[0], all_cum_rewards[0],  'all_cum_rewards_without_baseline_' + str(len(all_cum_rewards[0])))
-    #    plot(all_wall_time[0], baselines[0], 'baselines_with_baseline_'+ str(len(baselines[0])) )
     return baselines
 
 
@@ -174,9 +160,6 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv):
     #
     orchestrate_agent.adv_loss, orchestrate_agent.entropy_loss, orchestrate_agent.act_loss_ = act_loss(orchestrate_agent.scale_act_probs, orchestrate_agent.node_act_probs, 
                                                                                                        orchestrate_agent.eps, adv, orchestrate_agent.entropy_weight)
-    #old
-    #loss = orchestrate_agent.act_loss(
-    #    node_inputs, scale_inputs, adv)
 
     return orchestrate_agent.act_loss_
 
@@ -222,37 +205,15 @@ def train_orchestrate_agent(orchestrate_agent, exp, cum_reward_across_episodes =
     cum_reward = discount(rewards, 1)
     
     all_cum_reward.append(cum_reward)
-    #cum_reward_across_episodes=[x.append('a') or x for x in a]
-    #cum_reward_across_episodes.append(cum_reward)
-    #for elem in cum_reward:
-    #print('cum_reward_across_episodes : ', cum_reward_across_episodes)
-    #orchestrate_agent.entropy_weight = entropy_weight
     
     # Compute baseline
-    baselines = get_piecewise_linear_fit_baseline(all_cum_reward, [batch_time])
+    #baselines = get_piecewise_linear_fit_baseline(all_cum_reward, [batch_time])
     average_baseline = statistics.mean(cum_reward_across_episodes)
     # Calculate the advantage
     #batch_adv = all_cum_reward[0] - baselines[0]
     batch_adv = all_cum_reward[0] - average_baseline
     
-    print('average_baseline : ', average_baseline)
-    #print('all_cum_reward[0]: ', all_cum_reward[0] )
-    #print('baselines[0]: ', baselines[0] )
-    print('batch_adv : ', batch_adv)
-    '''
-    if len(batch_time)>1:
-        for i in range(len(all_cum_reward)):
-            print(f'At {i} point of time'.format(i))
-            print('all_cum_reward[0]: ', all_cum_reward[i] )
-            print('baselines[0]: ', baselines[i] )
-            print('batch_adv : ', batch_adv[i])
-            print('batch_time : ', batch_time[i])
-    '''       
-    
     batch_adv = np.reshape(batch_adv, [len(batch_adv), 1])
-    
-    
-    #orchestrate_agent.entropy_weight = entropy_weight
     
     # Actual training of Orchestrate Net
     orchestrate_agent.optimizer.zero_grad()
@@ -264,18 +225,7 @@ def train_orchestrate_agent(orchestrate_agent, exp, cum_reward_across_episodes =
     orchestrate_agent.entropy_weight = decrease_var(orchestrate_agent.entropy_weight, entropy_weight_min, entropy_weight_decay)
     #print('orchestrate_agent.entropy_weight : ', orchestrate_agent.entropy_weight)
     return orchestrate_agent.entropy_weight, loss, all_cum_reward
-    '''
-        def get_orchestration_reward(master_list, cur_time, check_queue):
-            reward = []
-            for mstr in master_list:
-                for i, node in enumerate(mstr.node_list):
-                    _, undone, _ = check_queue(node.task_queue, cur_time, len(master_list))
-                    reward.append(len(undone))
-            orchestration_reward = exp(-sum(reward))
-            
-            print('orchestration_reward : ', orchestration_reward)
-            return orchestration_reward
-    '''
+
 def execute_orchestration(change_node, change_service,deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list):
     """Execute the orchestrated actions
 

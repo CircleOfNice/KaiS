@@ -50,9 +50,6 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
     global_step2 = 0
     exp = {'node_inputs': [], 'scale_inputs': [], 'reward': [], 'wall_time': [] }
     csv_paths = ['./data/Task_1.csv', './data/Task_2.csv']
-    
-    #exp = {'node_inputs': [], 'scale_inputs': [], 'reward': [], 'wall_time': [], 'node_act_vec': [], 'scale_act_vec': []}
-    
     max_tasks, all_task_list,edge_list, _, master_param_lists, action_dims = initialize_eap_params(csv_paths, total_eaps, nodes_in_cluster,
                                                                                                                                   low_bound_edge_mode, upper_bound_edge_mode, randomize_data, randomize)
     MAX_TASK_TYPE = max_tasks +1
@@ -75,11 +72,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
         order_response_rates = []
         if len(all_cum_reward)>0:
             for elem in all_cum_reward[0]:
-                #print('all_cum_reward : ', all_cum_reward)
-                #print('elem : ', elem)
-                
                 cum_reward_across_episodes.append(elem)
-            #a=b
         exp = {'node_inputs': [], 'scale_inputs': [], 'reward': [], 'wall_time': [] }
         ############ Set up according to your own needs  ###########
         # The parameters here are set only to support the operation of the program, and may not be consistent with the actual system
@@ -115,15 +108,8 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
                 
                 # Save data
                 
-                #train_orchestrate_agent_cond = slot % CHO_CYCLE
-                #print(f'train_orchestrate_agent_cond: {train_orchestrate_agent_cond}'.format(train_orchestrate_agent_cond))
-                #if train_orchestrate_agent_cond==0:
-                    
-                    #a=b
                 orchestrate_agent.entropy_weight, loss, all_cum_reward = train_orchestrate_agent(orchestrate_agent, exp,cum_reward_across_episodes)
-                print('Orchestration_loss : ', loss.item())
                 log_orchestration_loss.append(loss.item())
-                #print('Training orchestration agent')
                 logger.info('Training orchestration agent')
                     
             master_list, curr_task, ava_node, s_grid, critic_state = get_updated_tasks_ava_node_states(master_list, cloud, deploy_states, action_dims, cur_time, max_tasks, randomize)
@@ -195,7 +181,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 50#10#20#0#20 #500 # Number of Episodes to run
+    RUN_TIMES = 20#10#20#0#20 #500 # Number of Episodes to run
     TASK_NUM = 5000 # 5000 Time for each Episode Ending # Though episodes are actually longer
     TRAIN_TIMES = 1#0#50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000#1000 # Orchestration cycle

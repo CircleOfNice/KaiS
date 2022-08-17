@@ -215,7 +215,6 @@ def calculate_reward(master_list, cur_done, cur_undone):
             task_fail_rate.append(fail_task[i] / all_task[i])
         else:
             task_fail_rate.append(0)
-    #print('task_fail_rate : ', task_fail_rate)
     # The standard deviation of the CPU and memory usage
     
     use_rate_dict = {}
@@ -230,14 +229,11 @@ def calculate_reward(master_list, cur_done, cur_undone):
     standard_list_dict = {}
     for i in range(len(master_list)):
         standard_list_dict[i] = np.std(use_rate_dict[i], ddof=1)
-    #print('standard_list_dict : ', standard_list_dict)
     reward_dict = {}
     for i in range(len(master_list)):
         reward_dict[i] = math.exp(-task_fail_rate[i]) + weight * math.exp(-standard_list_dict[i])
 
-    #reward = []
     for r in range(len(master_list)):
         reward.append(reward_dict[r])
     # Immediate reward   e^(-lambda - weight_of_load_balancing *standard_deviation_of_cpu_memory)
-    #print('CMMAC reward : ', reward)
     return reward

@@ -58,7 +58,6 @@ class GraphCNN(nn.Module):
         bias = []
         curr_in_dim = input_dim
         
-        
         # Hidden Layers
         for hid_dim in hid_dims:
             
@@ -73,9 +72,7 @@ class GraphCNN(nn.Module):
         return weights, bias
         
     def forward(self, x):
-        
         x = torch.from_numpy(x)
-        #print('x.shape : ', x.shape)
         # Raise x into higher dimension
             
         for l in range(len(self.prep_weights)):

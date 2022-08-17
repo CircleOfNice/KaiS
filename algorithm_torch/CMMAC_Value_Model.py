@@ -12,7 +12,6 @@ from algorithm_torch.losses import simple_square_loss
 class Value_Model(nn.Module):
     """Class for defining the value model (Critic part) of the Actor critic Model
     """
-    #LeakyReLU()
     def __init__(self, state_dim, inp_sizes = [128, 64, 32], act = nn.Softsign(), loss = simple_square_loss):
         """Initialisation arguments for class
 
@@ -31,12 +30,10 @@ class Value_Model(nn.Module):
 
     def forward(self, x):
         x = torch.from_numpy(x)
-        #print('torch balue : ', x)
         x = self.fc1(x.float())
         x = self.fc2(x)
         x = self.fc3(x)
         x = self.fc4(x)
-        #print('Value Model output : ', x)
         return x
     
 def build_value_model(state_dim, loss = simple_square_loss):
