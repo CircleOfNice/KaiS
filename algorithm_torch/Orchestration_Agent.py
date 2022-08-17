@@ -9,7 +9,7 @@ from algorithm_torch.Ocn_net import *
 from algorithm_torch.gcn import GraphCNN
 from algorithm_torch.Orchestration_Agent import *
 from algorithm_torch.Agent import Agent
-from helpers_main_pytorch import high_value_edge_nodes, flatten, output_dim
+from algorithm_torch.helpers_main_pytorch import high_value_edge_nodes, flatten, output_dim
 class OrchestrateAgent(Agent):
     def __init__(self,node_input_dim, hid_dims, output_dim,
                  max_depth, executor_levels, MAX_TASK_TYPE, entropy_weight,eps, act_fn,optimizer):

@@ -2,10 +2,10 @@ import torch.nn as nn
 import torch
 from torch import from_numpy, log
 from algorithm_torch.CMMAC_fc_layer import fc
-from torch.nn.functional import log_softmax
-from losses import policy_net_loss
+from torch.nn.functional import softmax
+from algorithm_torch.losses import policy_net_loss
 import torch.optim as optim
-from helpers_main_pytorch import set_lr
+#from algorithm_torch.helpers_main_pytorch import set_lr
 
 class Policy_Model(nn.Module):
     """Class for defining Policy model (Actor part) of the Actor Critic Model
@@ -25,7 +25,7 @@ class Policy_Model(nn.Module):
         self.fc1 = fc(self.policy_state, inp_sizes[0], act=act)
         self.fc2 = fc(inp_sizes[0], inp_sizes[1], act=act)
         self.fc3 = fc(inp_sizes[1], inp_sizes[2], act=act)
-        self.fc4 = fc(inp_sizes[2], self.action_dim, act=act)
+        self.fc4 = fc(inp_sizes[2], self.action_dim, act=act)#nn.Softmax())
         self.pm_criterion = loss
     def forward(self, x):
         x = torch.from_numpy(x)
@@ -34,7 +34,7 @@ class Policy_Model(nn.Module):
         x = self.fc2(x)
         x = self.fc3(x)
         x = self.fc4(x) 
-        
+        #print('Policy Model output : ', x)
         return x 
     
     
@@ -56,16 +56,22 @@ def sm_prob( policy_net_output, neighbor_mask):
         [Pytorch Tensors]: [Torch Tensor respectively containing softmax probabilities, logits and valid_logits]
     """
     neighbor_mask = from_numpy(neighbor_mask)
+    #print('policy_net_output : ', policy_net_output)
     
     logits = policy_net_output +1 
-    
+    #print('logits : ', logits)
     valid_logits = logits * neighbor_mask
-
-    softmaxprob = nn.Softmax()
-    softmaxprob = softmaxprob(log(valid_logits + 1e-8))
+    #print('valid_logits : ', valid_logits)
+    #softmaxprob = nn.Softmax()
+    softmaxprob = softmax(log(valid_logits + 1e-8))
+    #softmaxprob = softmax(valid_logits + 1e-8)
+    #print('softmaxprob without log: ', softmaxprob)
+    #print('softmaxprob : ', softmaxprob)#logits, valid_logits
+    #print('logits : ', logits)
+    #print('valid_logits : ', valid_logits)
     return softmaxprob, logits, valid_logits
     
-def update_policy(q_estim, policy_state, advantage, action_choosen_mat, curr_neighbor_mask, learning_rate):
+def update_policy(q_estim, policy_state, advantage, action_choosen_mat, curr_neighbor_mask):#, learning_rate):
     """[Optimize Policy net]
 
     Args:
@@ -75,19 +81,27 @@ def update_policy(q_estim, policy_state, advantage, action_choosen_mat, curr_nei
         curr_neighbor_mask ([Numpy Array]): [Current Neighbor mask]
         learning_rate ([float]): [Learning Rate]
     """
-
+    #print('q_estim.pm.fc2 : ', q_estim.pm.fc2)
     q_estim.pm_optimizer.zero_grad()
     policy_net_output = q_estim.pm(policy_state)
     
-    softmaxprob, _, _ = sm_prob(policy_net_output, curr_neighbor_mask)
-    
+    softmaxprob, logits, valid_logits = sm_prob(policy_net_output, curr_neighbor_mask)
+    #print('logits : ', logits)
+    #
+    # print('valid_logits : ', valid_logits)
+    #print('softmaxprob : ', softmaxprob)
     action_choosen_mat = torch.tensor(action_choosen_mat)
     adv = torch.tensor(advantage)
-    
-    loss = q_estim.pm.pm_criterion(softmaxprob, log_softmax(softmaxprob), adv, action_choosen_mat , q_estim.entropy)
-    
-    set_lr(q_estim.pm_optimizer, learning_rate)
+    #model_weights_before = list(q_estim.pm.fc2.parameters())[0].clone()
+    loss = q_estim.pm.pm_criterion(softmaxprob, adv, action_choosen_mat , q_estim.entropy)
+    #print('Loss : ', loss)
+    #a=b
+    #print('learning_rate : ', learning_rate)
+    #set_lr(q_estim.pm_optimizer, learning_rate)
     loss.backward()
     q_estim.pm_optimizer.step()
-
+    #model_weights_after = list(q_estim.pm.fc2.parameters())[0].clone()
+    
+    #print('weights equal : ', torch.equal(model_weights_before.data, model_weights_after.data))
+    #a=b
     return loss

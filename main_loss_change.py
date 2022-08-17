@@ -19,10 +19,10 @@ from algorithm_torch.cMMAC import *
 from algorithm_torch.GPG import *
 from env.platform import *
 from env.env_run import *
-from helpers_main_pytorch import *                
+from algorithm_torch.helpers_main_pytorch import *                
 
-from major_functions import initialize_eap_params, initialize_cmmac_agents, initialize_episode_params, get_task_state_deploy_state_and_exp, generate_plots
-from major_functions import get_updated_tasks_ava_node_states, get_estimators_output, put_and_update_tasks, update_exp_replays, train_actor_critic_without_orchestration, check_and_dump
+from algorithm_torch.major_functions import initialize_eap_params, initialize_cmmac_agents, initialize_episode_params, get_task_state_deploy_state_and_exp, generate_plots
+from algorithm_torch.major_functions import get_updated_tasks_ava_node_states, get_estimators_output, put_and_update_tasks, update_exp_replays, train_actor_critic_without_orchestration, check_and_dump
 
 def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mpde, upper_bound_edge_mpde, nodes_in_cluster, randomize_data, epsilon_exploration):
     """[Function to execute the KAIS Algorithm ]
@@ -43,14 +43,15 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
     fail_num = [] # Number of tasks failed to meet the requirement
     order_response_rate_episode = [] # List to monitor the average throughput rate
     episode_rewards = [] # Accumulated reward over episodes
-    
+    cum_reward_across_episodes = [0] # For calculation of baselines
+    all_cum_reward = []
     log_orchestration_loss, log_estimator_value_loss, log_estimator_policy_loss = [], [], []
     global_step1 = 0
     global_step2 = 0
-    
+    exp = {'node_inputs': [], 'scale_inputs': [], 'reward': [], 'wall_time': [] }
     csv_paths = ['./data/Task_1.csv', './data/Task_2.csv']
     
-    exp = {'node_inputs': [], 'scale_inputs': [], 'reward': [], 'wall_time': [], 'node_act_vec': [], 'scale_act_vec': []}
+    #exp = {'node_inputs': [], 'scale_inputs': [], 'reward': [], 'wall_time': [], 'node_act_vec': [], 'scale_act_vec': []}
     
     max_tasks, all_task_list,edge_list, _, master_param_lists, action_dims = initialize_eap_params(csv_paths, total_eaps, nodes_in_cluster,
                                                                                                                                   low_bound_edge_mode, upper_bound_edge_mode, randomize_data, randomize)
@@ -72,7 +73,14 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
         batch_reward = []
         cur_time = 0
         order_response_rates = []
-        
+        if len(all_cum_reward)>0:
+            for elem in all_cum_reward[0]:
+                #print('all_cum_reward : ', all_cum_reward)
+                #print('elem : ', elem)
+                
+                cum_reward_across_episodes.append(elem)
+            #a=b
+        exp = {'node_inputs': [], 'scale_inputs': [], 'reward': [], 'wall_time': [] }
         ############ Set up according to your own needs  ###########
         # The parameters here are set only to support the operation of the program, and may not be consistent with the actual system
         # At each edge node 1 denotes a kind of service which is running
@@ -83,6 +91,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
             cur_time = cur_time + SLOT_TIME
             ########### Each frame ###########
             if slot % CHO_CYCLE == 0 and slot != 0:
+                #print(f'Orchestration Cycle: {CHO_CYCLE}, slot: {slot}'.format(CHO_CYCLE, slot))
                 logger.info('Orchestration Cycle n_iter, CHO_CYCLE : {} {}', str(n_iter), str(CHO_CYCLE))
                 
                 # Get task state, include successful, failed, and unresolved
@@ -105,10 +114,17 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
                 logger.info('Execution orchestration')
                 
                 # Save data
-                if slot % CHO_CYCLE/10==0:
-                    orchestrate_agent.entropy_weight, loss = train_orchestrate_agent(orchestrate_agent, exp)
-                    log_orchestration_loss.append(loss.item())
-                    logger.info('Training orchestration agent')
+                
+                #train_orchestrate_agent_cond = slot % CHO_CYCLE
+                #print(f'train_orchestrate_agent_cond: {train_orchestrate_agent_cond}'.format(train_orchestrate_agent_cond))
+                #if train_orchestrate_agent_cond==0:
+                    
+                    #a=b
+                orchestrate_agent.entropy_weight, loss, all_cum_reward = train_orchestrate_agent(orchestrate_agent, exp,cum_reward_across_episodes)
+                print('Orchestration_loss : ', loss.item())
+                log_orchestration_loss.append(loss.item())
+                #print('Training orchestration agent')
+                logger.info('Training orchestration agent')
                     
             master_list, curr_task, ava_node, s_grid, critic_state = get_updated_tasks_ava_node_states(master_list, cloud, deploy_states, action_dims, cur_time, max_tasks, randomize)
             
@@ -118,12 +134,13 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
             if epsilon_exploration:
                 if random.uniform(0, 1)< 0.05:
                 	act = [random.randint(0,sum(action_dims)), random.randint(0,sum(action_dims))] 
-
+ 
             pre_done, pre_undone, cur_done, cur_undone, cloud  = put_and_update_tasks(act, curr_task, action_dims, cloud, master_list,check_queue, cur_time, pre_done, pre_undone)
             achieve_num.append(sum(cur_done))
             fail_num.append(sum(cur_undone))
 
             immediate_reward = calculate_reward(master_list, cur_done, cur_undone)
+            #print('CMMAC reward :, ', immediate_reward )
             record.append([master_list, cur_done, cur_undone, immediate_reward])
 
             if slot != 0:
@@ -178,10 +195,10 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 5#10#20#0#20 #500 # Number of Episodes to run
+    RUN_TIMES = 50#10#20#0#20 #500 # Number of Episodes to run
     TASK_NUM = 5000 # 5000 Time for each Episode Ending # Though episodes are actually longer
-    TRAIN_TIMES = 10#50 # Training Iterations for policy and value networks (Actor , Critic)
-    CHO_CYCLE = 1000 # Orchestration cycle
+    TRAIN_TIMES = 1#0#50 # Training Iterations for policy and value networks (Actor , Critic)
+    CHO_CYCLE = 1000#1000 # Orchestration cycle
 
     ##############################################################
     # New configuration settings

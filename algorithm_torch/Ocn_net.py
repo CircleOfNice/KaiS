@@ -36,8 +36,8 @@ class OCN(nn.Module):
         self.batch_size = batch_size
         self.executor_levels = executor_levels
         self.scale_inp_sizes = scale_inp_sizes
-        self.nodenet = NodeNet(merge_node_dim, node_inp_sizes = node_inp_sizes, act = nn.ReLU())
-        self.scalenet = ScaleNet(expanded_state_dim, scale_inp_sizes = self.scale_inp_sizes, act = nn.ReLU())
+        self.nodenet = NodeNet(merge_node_dim, node_inp_sizes = node_inp_sizes, act = nn.LeakyReLU())
+        self.scalenet = ScaleNet(expanded_state_dim, scale_inp_sizes = self.scale_inp_sizes, act = nn.LeakyReLU())
 
     def propagate(self, x):
         """Common function to propagate the input through the OCN network
