@@ -24,7 +24,8 @@ from algorithm_torch.helpers_main_pytorch import *
 from algorithm_torch.major_functions import initialize_eap_params, initialize_cmmac_agents, initialize_episode_params, get_task_state_deploy_state_and_exp, generate_plots
 from algorithm_torch.major_functions import get_updated_tasks_ava_node_states, get_estimators_output, put_and_update_tasks, update_exp_replays, train_actor_critic_without_orchestration, check_and_dump
 
-def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mpde, upper_bound_edge_mpde, nodes_in_cluster, randomize_data, epsilon_exploration):
+def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, randomize: bool, total_eaps: int, 
+              low_bound_edge_mode: int, upper_bound_edge_mode : int, nodes_in_cluster: int, randomize_data: bool, epsilon_exploration: bool)-> float:
     """[Function to execute the KAIS Algorithm ]
 
     Args:
@@ -32,7 +33,13 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
         BREAK_POINT ([int]): [Time for each Episode Ending]
         TRAIN_TIMES ([list]): [list containing two elements for tasks done on both master nodes]
         CHO_CYCLE ([list]): Orchestration cycle
-        
+        randomize: If random Edge Nodes per eAP are to be simulated
+        total_eaps: Number of eAPs to be simulated
+        low_bound_edge_mode: Lower bound for number of edge nodes under an eAP if randomize is True
+        upper_bound_edge_mode: Upper bound for number of edge nodes under an eAP if randomize is True
+        nodes_in_cluster: Average of cluster nodes under each eAp if randomize is false
+        randomize_data: To introduce slight variation in the incoming data 
+        epsilon_exploration: Turn Epsilon Exploration (on or off while training)
     Returns:
         [List]: [Throughput List (Achieved task/ total number of tasks)]
     """
@@ -53,7 +60,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
     max_tasks, all_task_list,edge_list, _, master_param_lists, action_dims = initialize_eap_params(csv_paths, total_eaps, nodes_in_cluster,
                                                                                                                                   low_bound_edge_mode, upper_bound_edge_mode, randomize_data, randomize)
     MAX_TASK_TYPE = max_tasks +1
-    critic, critic_optimizer, q_estimator_list, ReplayMemory_list, ReplayMemory_list, policy_replay_list = initialize_cmmac_agents(MAX_TASK_TYPE, all_task_list,edge_list, master_param_lists, action_dims, randomize)
+    critic, critic_optimizer, q_estimator_list, ReplayMemory_list, policy_replay_list = initialize_cmmac_agents(MAX_TASK_TYPE, all_task_list,edge_list, master_param_lists, action_dims, randomize)
     
     logger.debug('Multiple Actors initialised')
     logger.debug('centralised critic initialised')
@@ -131,7 +138,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
 
             if slot != 0:
                 logger.debug('Computing targets for cMMAC')
-                update_exp_replays(immediate_reward, q_estimator_list, ReplayMemory_list, policy_replay_list, action_mat_prev, critic_state, critic, s_grid, curr_task, 
+                ReplayMemory_list, policy_replay_list = update_exp_replays(immediate_reward, q_estimator_list, ReplayMemory_list, policy_replay_list, action_mat_prev, critic_state, critic, s_grid, curr_task, 
                                    state_mat_prev, curr_neighbor_mask_prev, curr_state_value_prev, next_state_ids_prev, policy_state_prev, action_choosen_mat_prev)      
             # For updating
             state_mat_prev = critic_state
@@ -164,7 +171,7 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
         n_iter_order_response_rate = np.mean(order_response_rates[1:])
         order_response_rate_episode.append(n_iter_order_response_rate)
         
-        train_actor_critic_without_orchestration(ReplayMemory_list, policy_replay_list, master_list, q_estimator_list, critic, critic_optimizer, 
+        log_estimator_value_loss, log_estimator_policy_loss = train_actor_critic_without_orchestration(ReplayMemory_list, policy_replay_list, master_list, q_estimator_list, critic, critic_optimizer, 
                                                  log_estimator_value_loss, log_estimator_policy_loss, TRAIN_TIMES)
         logger.info('Done training for run time {}', str(n_iter))
         
@@ -172,16 +179,16 @@ def execution(RUN_TIMES, BREAK_POINT, TRAIN_TIMES, CHO_CYCLE, randomize, total_e
     
     name = 'full_randomisation_orchestration_no_randomisation_'
     time_str = str(time.time())
-    check_and_dump(name, time_str, record, throughput_list)
+    done_dumping  = check_and_dump(name, time_str, record, throughput_list)
     
-    generate_plots(all_task_list, throughput_list, log_orchestration_loss, log_estimator_value_loss, log_estimator_policy_loss, randomize, low_bound_edge_mpde, upper_bound_edge_mpde, nodes_in_cluster)
-    print('dumped')
+    generate_plots(all_task_list, throughput_list, log_orchestration_loss, log_estimator_value_loss, log_estimator_policy_loss, randomize, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster)
+    print('dumped Experiment Data: ', done_dumping)
     return throughput_list
     
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 20#10#20#0#20 #500 # Number of Episodes to run
+    RUN_TIMES = 1#10#20#0#20 #500 # Number of Episodes to run
     TASK_NUM = 5000 # 5000 Time for each Episode Ending # Though episodes are actually longer
     TRAIN_TIMES = 1#0#50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000#1000 # Orchestration cycle
@@ -196,4 +203,4 @@ if __name__ == "__main__":
     randomize_data = False
     epsilon_exploration = False # Not the default implementation for this project
 
-    execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, randomize_data, epsilon_exploration)
+    throughput_list = execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, randomize_data, epsilon_exploration)

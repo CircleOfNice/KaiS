@@ -5,7 +5,7 @@ from algorithm_torch.fc_layer import fc
 class ScaleNet(nn.Module):
     """Service Scaling part of the orchestrate neural network
     """
-    def __init__(self, expanded_state, scale_inp_sizes = [32, 16, 8 ,1], act = nn.ReLU()):
+    def __init__(self, expanded_state:int, scale_inp_sizes:list = [32, 16, 8 ,1], act:nn = nn.ReLU()):
         """Initialisation
 
         Args:

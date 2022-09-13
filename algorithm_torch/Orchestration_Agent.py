@@ -1,3 +1,4 @@
+from typing import Tuple
 import torch
 import numpy as np
 import random
@@ -11,8 +12,8 @@ from algorithm_torch.Orchestration_Agent import *
 from algorithm_torch.Agent import Agent
 from algorithm_torch.helpers_main_pytorch import high_value_edge_nodes, flatten, output_dim
 class OrchestrateAgent(Agent):
-    def __init__(self,node_input_dim, hid_dims, output_dim,
-                 max_depth, executor_levels, MAX_TASK_TYPE, entropy_weight,eps, act_fn,optimizer):
+    def __init__(self,node_input_dim:int, hid_dims:int, output_dim:int,
+                 max_depth:int, executor_levels:int, MAX_TASK_TYPE:int, entropy_weight:float, eps:float, act_fn: torch.nn ,optimizer:torch.optim):
         """Orchestration Agent initialisation
 
         Args:
@@ -34,7 +35,7 @@ class OrchestrateAgent(Agent):
         self.max_depth = max_depth
 
         self.merge_node_dim_ = self.node_input_dim +  output_dim # node_inputs_reshape.shape + gcn_outputs_reshape.shape (along axis 2)
-        self.expanded_state_dim_ = 1 + 24 # node_inputs_reshaped.shape + executor levels range (along axis 2)
+        self.expanded_state_dim_ = 1 + 2*MAX_TASK_TYPE # node_inputs_reshaped.shape + executor levels range (along axis 2)
         self.executor_levels = executor_levels
         self.eps = eps #=1e-6
         self.act_fn = act_fn
@@ -47,7 +48,7 @@ class OrchestrateAgent(Agent):
         self.orchestrate_network( act_fn = self.act_fn)
         self.optimizer = optimizer(self.ocn_net.parameters(), lr = 0.001)
         
-    def orchestrate_network(self, act_fn):
+    def orchestrate_network(self, act_fn:torch.nn)->None:
         """Initialize and orchestrate the agent
 
         Args:
@@ -59,7 +60,7 @@ class OrchestrateAgent(Agent):
     self.scale_input_dim, self.output_dim, expand_act_on_state, self.executor_levels,
     node_inp_sizes = [32, 16, 8 ,1], scale_inp_sizes = [32, 16, 8 ,1], act = nn.ReLU(), batch_size = batch_size)
     
-    def save_model(self, file_path):
+    def save_model(self, file_path:str)->None:
         """Saving the model at desired path
 
         Args:
@@ -67,7 +68,7 @@ class OrchestrateAgent(Agent):
         """
         torch.save(self.ocn_net, file_path)
         
-    def translate_state(self, obs):
+    def translate_state(self, obs:list)->Tuple[list, list]:
         """Translates the state (from observation environment returns Node and scale inputs)
 
         Args:
@@ -111,7 +112,7 @@ class OrchestrateAgent(Agent):
                 new_deploy_state.append(elem)
 
         deploy_state = new_deploy_state
-
+        #TODO look into this function segment there seems to be repeated inputs
         for i in range(len(node_inputs)):
             ds_int_list = [int(x) for x in deploy_state[i][:][:]] 
             node_inputs[i, :self.MAX_TASK_TYPE] = ds_int_list
@@ -125,7 +126,7 @@ class OrchestrateAgent(Agent):
         return node_inputs, scale_inputs
     
 
-    def predict(self, x, epsilon_exploration):
+    def predict(self, x:list, epsilon_exploration:bool)->list:
         """Function to make predictions
 
         Args:
@@ -165,7 +166,7 @@ class OrchestrateAgent(Agent):
         self.scale_acts = torch.topk(scale_val, k=high_value_edge_nodes).indices
         return [self.node_act_probs, self.scale_act_probs, self.node_acts, self.scale_acts]    
 
-    def invoke_model(self, obs, epsilon_exploration):
+    def invoke_model(self, obs:list, epsilon_exploration:bool)->Tuple[torch.Tensor, torch.tensor, torch.Tensor, torch.Tensor, list, list]:
         """[Propagates the model inputs]
 
         Args:

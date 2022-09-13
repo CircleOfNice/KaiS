@@ -7,8 +7,8 @@ import torch.nn as nn
 class GraphCNN(nn.Module):
     """GraphCNN Class
     """
-    def __init__(self, input_dim, hid_dims, output_dim,
-    max_depth, act_fn):
+    def __init__(self, input_dim:int, hid_dims:int, output_dim:int,
+    max_depth:int, act_fn:nn):
         """[summary]
 
         Args:
@@ -30,7 +30,7 @@ class GraphCNN(nn.Module):
         self.agg_weights, self.agg_bias = self.init(self.output_dim, self.hid_dims, self.output_dim)
 
         
-    def glorot(self, shape):
+    def glorot(self, shape:list)->nn.init:
         """[summary]
 
         Args:
@@ -43,7 +43,7 @@ class GraphCNN(nn.Module):
         return init
     
         
-    def init(self, input_dim, hid_dims, output_dim):
+    def init(self, input_dim:int, hid_dims:int, output_dim:int)->torch.Tensor:
         """Initialization of layers
 
         Args:
@@ -71,7 +71,7 @@ class GraphCNN(nn.Module):
 
         return weights, bias
         
-    def forward(self, x):
+    def forward(self, x:np.array)->torch.Tensor:
         x = torch.from_numpy(x)
         # Raise x into higher dimension
             

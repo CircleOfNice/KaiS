@@ -4,7 +4,7 @@ from algorithm_torch.fc_layer import fc
 class NodeNet(nn.Module):
     """Node part of the orchestrate neural network
     """
-    def __init__(self, merge_node, node_inp_sizes = [32, 16, 8 ,1], act = nn.ReLU()):
+    def __init__(self, merge_node:int, node_inp_sizes:list = [32, 16, 8 ,1], act:nn = nn.ReLU()):
         """Initialisation of attributes
 
         Args:

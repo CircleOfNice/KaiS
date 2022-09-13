@@ -1,6 +1,7 @@
 import sys
+from typing import Callable, Tuple, Type
 sys.path.append("..") 
-
+import numpy as np
 import torch.nn as nn
 import torch
 
@@ -12,7 +13,7 @@ from algorithm_torch.losses import simple_square_loss
 class Value_Model(nn.Module):
     """Class for defining the value model (Critic part) of the Actor critic Model
     """
-    def __init__(self, state_dim, inp_sizes = [128, 64, 32], act = nn.Softsign(), loss = simple_square_loss):
+    def __init__(self, state_dim:int, inp_sizes: Tuple = [128, 64, 32], act:torch.nn = nn.Softsign(), loss:Callable = simple_square_loss):
         """Initialisation arguments for class
 
         Args:
@@ -36,7 +37,7 @@ class Value_Model(nn.Module):
         x = self.fc4(x)
         return x
     
-def build_value_model(state_dim, loss = simple_square_loss):
+def build_value_model(state_dim:int, loss:Callable= simple_square_loss)-> Tuple[Type[Value_Model], Callable]:
     """[Method to build the value model and assign its loss and optimizers]
     """
     vm = Value_Model(state_dim, inp_sizes = [128, 64, 32], loss = loss)
@@ -44,7 +45,7 @@ def build_value_model(state_dim, loss = simple_square_loss):
     return vm, vm_optimizer
     
     
-def update_value( s, y, learning_rate, vm, vm_optimizer):
+def update_value( s:np.array, y:np.array, learning_rate:float, vm:Type[Value_Model], vm_optimizer:torch.optim)->torch.Tensor:
     """[Method to optimize the Value net]
 
     Args:

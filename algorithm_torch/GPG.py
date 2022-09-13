@@ -1,15 +1,22 @@
 # GNN-based Learning for Service Orchestration
 from math import exp
+from typing import Type, Tuple
 import statistics
 import numpy as np
 import bisect
 from algorithm_torch.Orchestration_Agent import *
-#from algorithm_torch.policyReplayMemory import policyReplayMemory
 from algorithm_torch.helpers_main_pytorch import remove_docker_from_master_node, deploy_new_docker, entropy_weight_min, entropy_weight_decay
 from algorithm_torch.losses import act_loss
 import matplotlib.pyplot as plt
 
-def get_gpg_reward(master_list):
+def get_gpg_reward(master_list: list)->float:
+    """Get reward for the GPG Algorithm
+    Args:
+        master_list: List of Master eAP nodes
+
+    Returns:
+        reward: Calculated cumulative discounted reward
+    """
     task_len = 0
     for master in master_list:
         for node in master.node_list:
@@ -17,7 +24,7 @@ def get_gpg_reward(master_list):
     reward = np.exp(-(task_len))
     return reward
 
-def discount(x, gamma):
+def discount(reward:np.array, gamma:float)->np.array:
     """Calculate the discounted cumulative reward
         Cumulative Reward = r_t + gamma * r_t+1 + gamma ^2 * r_t+2 + ________
 
@@ -26,15 +33,16 @@ def discount(x, gamma):
         gamma (float): Discount factor
 
     Returns:
-        numpy array: Calculated cumulative discounted reward
+        out (numpy array): Calculated cumulative discounted reward
     """
-    out = np.zeros(x.shape)
-    out[-1] = x[-1]
-    for i in reversed(range(len(x) - 1)):
-        out[i] = x[i] + gamma * out[i + 1]
+    out = np.zeros(reward.shape)
+    out[-1] = reward[-1]
+    for i in reversed(range(len(reward) - 1)):
+        out[i] = reward[i] + gamma * out[i + 1]
     return out
 
-def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_tasks_in_queue, deploy_state_float, cpu_lists, mem_lists, task_lists, gcnn_list,  MAX_TESK_TYPE, epsilon_exploration):
+def orchestrate_decision(orchestrate_agent: Type[OrchestrateAgent], exp:list, done_tasks:list,undone_tasks:list, curr_tasks_in_queue:list, 
+                         deploy_state_float:list, cpu_lists:list, mem_lists:list, task_lists:list, gcnn_list:list,  MAX_TASK_TYPE:int, epsilon_exploration:bool)->Tuple[list, list, list]:
     """Generate Orchestration Decision
 
     Args:
@@ -44,7 +52,12 @@ def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_t
         undone_tasks: (list): List of undone tasks
         curr_tasks_in_queue (list): List of tasks currently in queue
         deploy_state_float(list of lists): List containing the tasks running on all of the Nodes  
-        MAX_TESK_TYPE (int) : Maximum number of task types
+        cpu_lists : list of cpu parameters
+        mem_lists : list of memory parameters
+        task_lists : Task lists
+        gcnn_list : List of graph CNN
+        MAX_TASK_TYPE (int) : Maximum number of task types
+        epsilon_exploration (bool) : Boolean for enabling epsilon exploration
 
     Returns:
         change_node (list) :  Nodes to be changed
@@ -61,26 +74,28 @@ def orchestrate_decision(orchestrate_agent, exp, done_tasks,undone_tasks, curr_t
     service_scaling_choice = [] # Server choice here is chosen services
     
     for x in scale_act[0][0]: 
-        if x >= MAX_TESK_TYPE:
-            service_scaling_choice.append(x - MAX_TESK_TYPE - 1)
+        if x >= MAX_TASK_TYPE:
+            service_scaling_choice.append(x - MAX_TASK_TYPE - 1)
         else:
-            service_scaling_choice.append(x - MAX_TESK_TYPE)
+            service_scaling_choice.append(x - MAX_TASK_TYPE)
     
     # Both of them are always one just used to allow matrix multiplication
     # Store experience
     exp['node_inputs'].append(node_inputs)
     exp['scale_inputs'].append(scale_inputs)
     return node_choice, service_scaling_choice, exp
-    
-def plot(x, y, title):
+'''    
+def plot(x:list, y:list, title:str)->None:
     plt.figure(figsize=(4, 3), dpi=300)
     plt.plot(x,y)
     plt.title(title)
     
     plt.savefig(title + '.png')
     plt.show()
+'''
 
-def get_piecewise_linear_fit_baseline(all_cum_rewards, all_wall_time):
+
+def get_piecewise_linear_fit_baseline(all_cum_rewards:list, all_wall_time:list)->list:# Extraneous now
     """Generate a piecewise linear fit for the given reward function along with time
         this is done to generate Q Value targets so that advantage i.e Q_Value_target - Q_Value_Predicted can be calculated
         
@@ -91,8 +106,8 @@ def get_piecewise_linear_fit_baseline(all_cum_rewards, all_wall_time):
     Returns:
         [baselines]: [returns a list of piecewise linear data extrapolation]
     """
-    print('all_wall_time: ', all_wall_time)
-    print('all_cum_rewards : ', all_cum_rewards)
+    #print('all_wall_time: ', all_wall_time)
+    #print('all_cum_rewards : ', all_cum_rewards)
     
     assert len(all_cum_rewards) == len(all_wall_time)
     
@@ -127,7 +142,7 @@ def get_piecewise_linear_fit_baseline(all_cum_rewards, all_wall_time):
 
 
 
-def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv):
+def compute_orchestrate_loss(orchestrate_agent: Type[OrchestrateAgent], exp:list, batch_adv:np.array)->float:
     """[Computation of orchestration loss for given experience (for one orchestration cycle)]
 
     Args:
@@ -164,7 +179,7 @@ def compute_orchestrate_loss(orchestrate_agent, exp, batch_adv):
     return orchestrate_agent.act_loss_
 
 
-def decrease_var(var, min_var, decay_rate):
+def decrease_var(var:float, min_var:float, decay_rate:float)->float:
     """Function to decrease Variable generally entropy
 
     Args:
@@ -183,16 +198,14 @@ def decrease_var(var, min_var, decay_rate):
     return var
 
 
-def train_orchestrate_agent(orchestrate_agent, exp, cum_reward_across_episodes =[0]):
+def train_orchestrate_agent(orchestrate_agent: Type[OrchestrateAgent], exp:list, cum_reward_across_episodes:list =[0])->Tuple[float, torch.Tensor, list]:
     
     """[Train the orchestration agent]
 
     Args:
         orchestrate_agent ([Orchestrate Agent Class]): [Orchestrate Agent]
         exp ([dictionary]): [Experience]
-        entropy_weight ([float]): [Entropy weight]
-        entropy_weight_min ([float]): [Minimum Entropy Weight]
-        entropy_weight_decay ([type]): [Entropy Weight Decay rate]
+        cum_reward_across_episodes: Cumulative rewards across episodes
 
     Returns:
         [Tensors]: [Entropy weight and calculated loss]
@@ -223,15 +236,14 @@ def train_orchestrate_agent(orchestrate_agent, exp, cum_reward_across_episodes =
     orchestrate_agent.optimizer.step()
     
     orchestrate_agent.entropy_weight = decrease_var(orchestrate_agent.entropy_weight, entropy_weight_min, entropy_weight_decay)
-    #print('orchestrate_agent.entropy_weight : ', orchestrate_agent.entropy_weight)
     return orchestrate_agent.entropy_weight, loss, all_cum_reward
 
-def execute_orchestration(change_node, change_service,deploy_state, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list):
+def execute_orchestration(change_node:int, change_service: list, deploy_state:list, service_coefficient:list, POD_MEM:list, POD_CPU:list, cur_time:float, master_list:list)->None:
     """Execute the orchestrated actions
 
     Args:
-        vaild_node (int) : Number of valid nodes for execution of tasks
-        MAX_TESK_TYPE (int) : Maximum number of task types
+        change_node (int) : Number of valid nodes for execution of tasks
+        change_service : services to be changed
         deploy_state(list of lists): List containing the tasks running on all of the Nodes  
         service_coefficient(list): Service Coefficients
         POD_MEM: (float): Memory of POD

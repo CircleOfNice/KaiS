@@ -4,7 +4,7 @@ import numpy as np
 class policyReplayMemory:
     """Class for Replay Memory of Policy Network
     """
-    def __init__(self, memory_size, batch_size):
+    def __init__(self, memory_size:int, batch_size:int):
         """[Initialisation Arguments]
 
         Args:
@@ -22,7 +22,7 @@ class policyReplayMemory:
         self.curr_lens = 0
 
     # Put data in policy replay memory
-    def add(self, s, a, r, mask):
+    def add(self, s:np.array, a:np.array, r:list, mask:np.array):
         """Adds Experience to the object
 
         Args:
@@ -54,7 +54,7 @@ class policyReplayMemory:
             self.neighbor_mask[index:(index + new_sample_lens)] = mask
 
     # Take a batch of samples
-    def sample(self):
+    def sample(self)->list:
         """Sample a batch of experience
 
         Returns:
@@ -69,7 +69,7 @@ class policyReplayMemory:
         batch_mask = self.neighbor_mask[indices]
         return [batch_s, batch_a, batch_r, batch_mask]
 
-    def reset(self):
+    def reset(self)->None:
         """reset the variables
         """
         self.states = []

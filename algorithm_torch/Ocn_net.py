@@ -1,3 +1,4 @@
+from typing import Callable, Tuple
 import torch
 import torch.nn as nn
 from algorithm_torch.Nodenet import *
@@ -7,9 +8,9 @@ from algorithm_torch.Scalenet import *
 class OCN(nn.Module):
     """Class for definition for Orchestration Network
     """
-    def __init__(self, merge_node_dim, expanded_state_dim, node_input_dim, 
-    scale_input_dim, output_dim, expand_act_on_state, executor_levels, 
-    node_inp_sizes = [32, 16, 8 ,1], scale_inp_sizes = [32, 16, 8 ,1], act = nn.ReLU(), batch_size = 1):
+    def __init__(self, merge_node_dim:int, expanded_state_dim:int, node_input_dim:int, 
+    scale_input_dim:int, output_dim:int, expand_act_on_state:Callable, executor_levels:int, 
+    node_inp_sizes:list = [32, 16, 8 ,1], scale_inp_sizes:list = [32, 16, 8 ,1], act:nn = nn.ReLU(), batch_size:int = 1):
         """Creation of the cumulative 
 
         Args:
@@ -39,7 +40,7 @@ class OCN(nn.Module):
         self.nodenet = NodeNet(merge_node_dim, node_inp_sizes = node_inp_sizes, act = nn.LeakyReLU())
         self.scalenet = ScaleNet(expanded_state_dim, scale_inp_sizes = self.scale_inp_sizes, act = nn.LeakyReLU())
 
-    def propagate(self, x):
+    def propagate(self, x:Tuple)->Tuple[torch.Tensor, torch.Tensor]:
         """Common function to propagate the input through the OCN network
 
         Args:
@@ -78,7 +79,7 @@ class OCN(nn.Module):
 
         return node_outputs, scale_outputs
         
-    def predict(self, x):
+    def predict(self, x:Tuple):
         """ Function to predict the output given inputs
 
         Args:
@@ -91,7 +92,7 @@ class OCN(nn.Module):
         node_outputs, scale_outputs = self.propagate(x)
         return node_outputs, scale_outputs  
     
-    def forward(self, x):
+    def forward(self, x:Tuple)->Tuple[torch.Tensor, torch.Tensor]:
         node_inputs, _, _ = x
         self.batch_size = node_inputs.shape[0]
         

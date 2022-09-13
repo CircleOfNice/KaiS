@@ -1,6 +1,6 @@
 import torch.nn as nn
-
-def fc(inp_dim, output_dim, act=nn.ReLU()):
+from typing import Callable
+def fc(inp_dim: int, output_dim: int, act:nn=nn.ReLU())->nn.Sequential:
     """Function to define a fully connected block
 
     Args:

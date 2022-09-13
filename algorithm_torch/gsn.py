@@ -1,5 +1,6 @@
 # Simple Graph Network for embedding purposes # Redundant as not being used in code
 
+from typing import Tuple
 import torch
 import torch.nn as nn
 import numpy as np 
@@ -7,7 +8,7 @@ import numpy as np
 class GraphSNN(nn.Module):
     """GraphSNN Class
     """
-    def __init__(self, input_dim, hid_dims, output_dim, act_fn):
+    def __init__(self, input_dim:int, hid_dims:int, output_dim:int, act_fn:torch.nn):
         """[summary]
 
         Args:
@@ -30,7 +31,7 @@ class GraphSNN(nn.Module):
             self.init(self.output_dim, self.hid_dims, self.output_dim)
         # graph summarization operation
 
-    def glorot(self, shape):
+    def glorot(self, shape:list)->torch.nn.init:
         """[summary]
 
         Args:
@@ -42,7 +43,7 @@ class GraphSNN(nn.Module):
         init = nn.init.xavier_uniform_(torch.empty(shape))
         return init
     
-    def init(self, input_dim, hid_dims, output_dim):
+    def init(self, input_dim:int, hid_dims:int, output_dim:int)->Tuple[list, list]:
         """Initialization of layers
 
         Args:
@@ -68,7 +69,7 @@ class GraphSNN(nn.Module):
         bias.append(torch.zeros([output_dim]))
         return weights, bias
         
-    def forward(self, s):
+    def forward(self, s:torch.Tensor)->list:
         # summarize information
         summaries = []
         for i in range(len(self.dag_weights)):

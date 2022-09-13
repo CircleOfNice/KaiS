@@ -3,7 +3,7 @@ import numpy as np
 class ReplayMemory:
     """Class for replay memory
     """
-    def __init__(self, memory_size, batch_size):
+    def __init__(self, memory_size:int, batch_size:int):
         """Replay Memory initialization
 
         Args:
@@ -21,7 +21,7 @@ class ReplayMemory:
         self.curr_lens = 0
 
     # Put data in policy replay memory
-    def add(self, s, a, r, next_s):
+    def add(self, s:np.array, a:np.array, r:list, next_s:np.array):
         """[Add Experience]
 
         Args:
@@ -53,7 +53,7 @@ class ReplayMemory:
             self.next_states[index:(index + new_sample_lens)] = next_s
 
     # Take a batch of samples
-    def sample(self):
+    def sample(self)->list:
         """Returns a batch of experience
 
         Returns:
@@ -68,7 +68,7 @@ class ReplayMemory:
         batch_mask = self.next_states[indices]
         return [batch_s, batch_a, batch_r, batch_mask]
 
-    def reset(self):
+    def reset(self)->None:
         """reset the variables
         """
         self.states = []

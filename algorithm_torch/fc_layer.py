@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-def fc(inp_dim, output_dim, act=False):
+def fc(inp_dim, output_dim:int, act:torch.nn=False)->torch.nn.Sequential:
     """Fully Connected Layer block
 
     Args:
@@ -21,7 +21,7 @@ def fc(inp_dim, output_dim, act=False):
         
     return fc_out 
 
-def expand_act_on_state(state, sub_acts):
+def expand_act_on_state(state:torch.Tensor, sub_acts:list)->torch.Tensor:
     """Function to concatenate states with sub_acts (Basically a list of values between 0.02 to 0.96) with multiple repetition over the tiling range (24)
     # Repeated state is appended with a vector of values havings different weightage across the last dimension likely to generate varied kind of action activations
     

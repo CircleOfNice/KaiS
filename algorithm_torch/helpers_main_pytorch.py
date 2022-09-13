@@ -1,3 +1,5 @@
+from ast import Call
+from typing import Callable, Tuple, Type
 import torch
 import matplotlib.pyplot as plt
 import torch.nn as nn
@@ -41,7 +43,7 @@ latency = 0
 act_function = nn.functional.leaky_relu
 opt_function = torch.optim.Adam
 
-def def_initial_state_values(len_all_task_list=3, list_length_edge_nodes_per_eap=[3, 3, 3]):
+def def_initial_state_values(len_all_task_list:int=3, list_length_edge_nodes_per_eap:list=[3, 3, 3])->Tuple:
     """Method to define initial values for the input cluster : 
 
     Args:
@@ -77,9 +79,13 @@ def def_initial_state_values(len_all_task_list=3, list_length_edge_nodes_per_eap
         for k in range(list_length_edge_nodes_per_eap[i]):
             node_list.append(random.choice(node_list_stack))
         node_param_lists.append(node_list)
+    #print('deploy_states: ', deploy_states)
+    #print('node_param_lists : ', node_param_lists)
+    #print('master_param_lists: ', master_param_lists)
+    #a=B
     return deploy_states, node_param_lists, master_param_lists
 
-def estimate_state_size(all_task_list, MAX_TASK_TYPE, edge_list):
+def estimate_state_size(all_task_list:list, MAX_TASK_TYPE:int, edge_list:list)-> list:
     
     """Estimate the size of state for the grid : 
 
@@ -106,7 +112,7 @@ def estimate_state_size(all_task_list, MAX_TASK_TYPE, edge_list):
  
     return s_grid_len
 
-def get_action_dims(node_param_lists):
+def get_action_dims(node_param_lists:list)->list:
     """Estimate the size of Action dimensions for for the Node parameters in the given list : 
 
     Args:
@@ -126,7 +132,7 @@ def get_action_dims(node_param_lists):
         action_dims.append(action_dim)
     return action_dims  # because of cluster
 
-def set_lr( optimizer, lr):    
+def set_lr( optimizer:torch.optim, lr:float)->None:    
     """Method to set the Learning rate of the given optimizer
 
     Args:
@@ -136,13 +142,13 @@ def set_lr( optimizer, lr):
     for params_group in optimizer.param_groups:
         params_group['lr'] = lr    
 
-def get_state_list(master_list, max_tasks):
+def get_state_list(master_list:list, max_tasks:int)->list:
     state_list = []
     for mast in master_list:
         state_list.append(state_inside_eAP(mast, len(mast.node_list), max_tasks))
     return state_list 
 
-def flatten(list):
+def flatten(list:list)->list:
     """Function to serialize sublists inside a given list
 
     Args:
@@ -154,7 +160,7 @@ def flatten(list):
     return [y for x in list for y in x]
  
 
-def remove_docker_from_master_node(master, change_node_idx, service_index, deploy_state):
+def remove_docker_from_master_node(master:Type[Master], change_node_idx:int, service_index:int, deploy_state:list):
     """Function to remove appropriate docker container from a given EAP (master node)
 
     Args:
@@ -180,7 +186,7 @@ def remove_docker_from_master_node(master, change_node_idx, service_index, deplo
             docker_idx = docker_idx + 1
 
 
-def deploy_new_docker(master, POD_MEM, POD_CPU, cur_time, change_node_idx, service_coefficient, service_index, deploy_state):
+def deploy_new_docker(master:Type[Master], POD_MEM:float, POD_CPU:float, cur_time:str, change_node_idx:int, service_coefficient:list, service_index:list, deploy_state:list):
     """Function to deploy new docker containers
 
     Args:
@@ -204,7 +210,7 @@ def deploy_new_docker(master, POD_MEM, POD_CPU, cur_time, change_node_idx, servi
                                                         service_index] + 1    
     
     
-def get_current_task(master):
+def get_current_task(master:Type[Master])->list:
     """Get Current task from the task queue
 
     Args:
@@ -220,7 +226,7 @@ def get_current_task(master):
     
     return task
             
-def state_inside_eAP(master, num_edge_nodes_per_eAP, max_tasks):
+def state_inside_eAP(master:Type[Master], num_edge_nodes_per_eAP:list, max_tasks:int)->Tuple[list,list,list,list,int, float]:
     """Get the state inside the given the edge nodes per eAP
 
     Args:
@@ -238,7 +244,8 @@ def state_inside_eAP(master, num_edge_nodes_per_eAP, max_tasks):
         delay_requirement = 100000
     else:
         service_type = master.task_queue[0][0]
-        
+        #print('service_type: ', service_type, master.task_queue)
+        #a=b
         delay_requirement = master.task_queue[0][2]-master.task_queue[0][1]
         
     undone_tasks = master.undone
@@ -249,7 +256,7 @@ def state_inside_eAP(master, num_edge_nodes_per_eAP, max_tasks):
 
     return cpu_list, mem_list, task_num, undone_tasks, service_type, delay_requirement
 
-def create_node_list(node_specification):
+def create_node_list(node_specification:list)->list:
     """Creates a node list
 
     Args:
@@ -262,7 +269,19 @@ def create_node_list(node_specification):
     for node_spec in node_specification:
         node_list.append(Node(node_spec[0], node_spec[1], [], []))
     return node_list
-def create_master_list(node_param_lists, master_param_lists, all_task_list, MAX_TASK_TYPE):
+def create_master_list(node_param_lists:list, master_param_lists:list, all_task_list:list, MAX_TASK_TYPE:int)->list:
+    """Creates List of Masters (eAPs)
+
+    Args:
+        node_param_lists ([list]): [params of underlying nodes]
+        master_param_lists ([list]): [params of master nodes (eAps)]
+        all_task_list (list): list of incoming tasks with
+        MAX_TASK_TYPE : Number of tasks
+
+    Returns:
+        master_list(List): [list of Masters (eAPs)]
+    """
+    
     node_lists = []
     for node_params in node_param_lists:
         node_lists.append(create_node_list(node_params))
@@ -273,7 +292,7 @@ def create_master_list(node_param_lists, master_param_lists, all_task_list, MAX_
         master_list.append(Master(master_params[0], master_params[1], node_lists[i], [], all_task_list[i], 0, 0, 0, [0] * MAX_TASK_TYPE, [0] * MAX_TASK_TYPE))
     return master_list
 
-def create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TASK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time):
+def create_eAP_and_Cloud(node_param_lists:list, master_param_lists:list, all_task_list:list, MAX_TASK_TYPE:int, POD_MEM:float,  POD_CPU:float, service_coefficient:list, cur_time:float)->Tuple[list, Type[Cloud]]:
     """Create Edge Access Points and Cloud
 
     Args:
@@ -299,7 +318,16 @@ def create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MA
     
     return master_list, cloud
 
-def get_last_length(master_list):
+def get_last_length(master_list:list)->Tuple[int, list]:
+    """Get length of nodes in each eAPs and the total 
+
+    Args:
+        master_list ([list]): [list containing the master eAPs]
+
+    Returns:
+        last_length(List): total length of action space for each eAP
+        length_list : Total length of action space 
+    """
     length_list = [0]
     last_length = length_list[0]
     for mstr in master_list:
@@ -307,19 +335,19 @@ def get_last_length(master_list):
         last_length = last_length + len(mstr.node_list)
     return last_length, length_list
         
-def put_current_task_on_queue(act, curr_task, action_dims, cloud, master_list): 
+def put_current_task_on_queue(act:list, curr_task:list, action_dims:list, cloud:Cloud, master_list:list)->None: 
     """Put current tasks on queue
 
     Args:
         act ([list]): actions
         curr_task ([list]): [list of tasks]
-        cluster_action_value (int): Action value
+        action_dims (int): Action dimension
         cloud (Cloud Object) : Created cloud object
         master_list (list) :  List of created Master Nodes
 
     """
     _, length_list = get_last_length(master_list)    
-
+    #print('curr_task : ', curr_task)
     cluster_action_values = [action-1 for action in action_dims]
 
     for i in range(len(act)):
@@ -334,7 +362,7 @@ def put_current_task_on_queue(act, curr_task, action_dims, cloud, master_list):
                 master_list[j].node_list[act[i] - length_list[j]].task_queue.append(curr_task[i])
                 
             
-def update_state_of_task( cur_time, check_queue, cloud, master_list):
+def update_state_of_task( cur_time:list, check_queue:Callable, cloud:Type[Cloud], master_list:list)->None:
     """Update the state of tasks
 
     Args:
@@ -360,7 +388,7 @@ def update_state_of_task( cur_time, check_queue, cloud, master_list):
     for i, master_entity in enumerate(master_list):
         master_entity.update_undone(undone[i])
     
-def update_state_of_dockers(cur_time, cloud, master_list):
+def update_state_of_dockers(cur_time:float, cloud: Type[Cloud], master_list: list)->Type[Cloud]:
     """Updates the state of dockers
 
     Args:
@@ -388,12 +416,12 @@ def update_state_of_dockers(cur_time, cloud, master_list):
 
     return cloud  
 
-def create_dockers(MAX_TESK_TYPE, deploy_states, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list):
+def create_dockers(MAX_TASK_TYPE:int, deploy_states:list, service_coefficient:list, POD_MEM:float, POD_CPU:float, cur_time:float, master_list:float)->None:
     """Creation of dockers
 
     Args:
-        vaild_node (int) : Number of valid nodes for execution of tasks
-        MAX_TESK_TYPE (int) : Maximum number of task types
+        
+        MAX_TASK_TYPE (int) : Maximum number of task types
         deploy_state(list of lists): List containing the tasks running on all of the Nodes  
         service_coefficient(list): Service Coefficients
         POD_MEM: (float): Memory of POD
@@ -411,7 +439,7 @@ def create_dockers(MAX_TESK_TYPE, deploy_states, service_coefficient, POD_MEM, P
     for i, deploy_state in enumerate(deploy_states):
         for dep in deploy_state:
             
-            for ii in range(MAX_TESK_TYPE):
+            for ii in range(MAX_TASK_TYPE):
 
                 decision = dep[ii]
                 for j in range(len(length_list)-1):
@@ -424,7 +452,15 @@ def create_dockers(MAX_TESK_TYPE, deploy_states, service_coefficient, POD_MEM, P
                             master_list[j].append_docker_to_node_service_list(k, docker)                              
     
                             
-def get_node_characteristics(master):
+def get_node_characteristics(master:Type[Master])->Tuple[list, list, list]:
+    """Get the node characteristics of masters eAPs
+
+    Args:
+        cpu_list (list) : CPU Parameters
+        mem_list (list) : Memory Parameters
+        task_list (list) :  Task Lists
+
+    """
     cpu_list = []
     mem_list = []
     task_list = []
@@ -432,24 +468,27 @@ def get_node_characteristics(master):
         cpu_list.append(master.node_list[i].cpu)
         mem_list.append(master.node_list[i].mem)
         task_list.append(len(master.node_list[i].task_queue))                
-    return cpu_list, mem_list, task_list                    
-def get_state_characteristics(MAX_TESK_TYPE, master_list):
+    return cpu_list, mem_list, task_list              
+      
+def get_state_characteristics(MAX_TASK_TYPE:int, master_list:list)->Tuple[list, list, list, list]:
     """Get lists of tasks that are done, undone and current task in queue
 
     Args:
         MAX_TESK_TYPE ([int]): Maximum types of tasks
         master_list ([Master Object list]): [Edge Access Point list containing nodes]
-        num_edge_nodes_per_eAP ([type]): [Number of edge nodes under an edge access point]
+        
 
     Returns:
-        [lists]: [lists of number of done, undone and current tasks in queue]
+        done_tasks (list) : Done Tasks list
+        undone_tasks (list) : Not Done Tasks list
+        curr_tasks_in_queue (list) : Current tasks in queue
     """
     done_tasks = []
     undone_tasks = []
     curr_tasks_in_queue = []
     
     # Get task state, include successful, failed, and unresolved
-    for i in range(MAX_TESK_TYPE):
+    for i in range(MAX_TASK_TYPE):
         done_val = 0.0
         undone_val = 0.0
         for master in master_list:
@@ -461,7 +500,7 @@ def get_state_characteristics(MAX_TESK_TYPE, master_list):
     for master in master_list:
 
         for i in range(len(master.node_list)):
-            tmp = [0.0] * MAX_TESK_TYPE
+            tmp = [0.0] * MAX_TASK_TYPE
             for j in range(len(master.node_list[i].task_queue)):
                 tmp[master.node_list[i].task_queue[j][0]] = tmp[master.node_list[i].task_queue[j][0]] + 1.0
             curr_tasks_in_queue.append(tmp)
@@ -469,13 +508,22 @@ def get_state_characteristics(MAX_TESK_TYPE, master_list):
     return done_tasks, undone_tasks, curr_tasks_in_queue
 
 
-def plot_list(data_list, title, x_label, y_label):
-        plt.figure(figsize=(15,10))
+def plot_list(data_list:list, title:str, x_label:str, y_label:str)->None:
+    """Plot the given list
 
-        plt.plot(data_list)#throughput_list)
-        plt.title(title)
-        plt.xlabel(x_label)#"Number of Episodes")
-        plt.ylabel(y_label)#"Throughput rate")
-        #plt.ylim([0, 100])
-        #plt.show()
-        plt.savefig('./plots/'+title + '.png')
+    Args:
+        data_list (list) : CPU Parameters
+        mem_list (list) : Memory Parameters
+        task_list (list) :  Task Lists
+
+    """
+
+    plt.figure(figsize=(15,10))
+
+    plt.plot(data_list)#throughput_list)
+    plt.title(title)
+    plt.xlabel(x_label)#"Number of Episodes")
+    plt.ylabel(y_label)#"Throughput rate")
+    #plt.ylim([0, 100])
+    #plt.show()
+    plt.savefig('./plots/'+title + '.png')

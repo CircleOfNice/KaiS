@@ -2,8 +2,9 @@
 
 import csv
 import random
-
-def get_all_task(path, randomize = True):
+from typing import Type, Tuple
+from env.platform import Master, Node
+def get_all_task(path:str, randomize:bool = True)->Tuple:
     """Get Processed data from the file given in path
 
     Args:
@@ -68,7 +69,7 @@ def get_all_task(path, randomize = True):
     return new_all_task, max(new_type_list)
 
 
-def put_task(task_queue, task):
+def put_task(task_queue:list, task:int)->list:
     """Puts tasks on the task queue
 
     Args:
@@ -85,7 +86,7 @@ def put_task(task_queue, task):
     return task_queue
 
 
-def update_task_queue(master, cur_time, master_id):
+def update_task_queue(master:Type[Master], cur_time:float, master_id:int)->Type[Master]:
     """[summary]
 
     Args:
@@ -126,7 +127,7 @@ def update_task_queue(master, cur_time, master_id):
     return master
 
 
-def check_queue(task_queue, cur_time, length_masterlist):
+def check_queue(task_queue:list, cur_time:float, length_masterlist:int)->Tuple:
     """[Check the queue for tasks in queue]
 
     Args:
@@ -159,7 +160,7 @@ def check_queue(task_queue, cur_time, length_masterlist):
     return task_queue, undone, undone_kind
 
 
-def update_docker(node, master_list, cur_time, service_coefficient, POD_CPU):
+def update_docker(node:Type[Node], master_list:list, cur_time:float, service_coefficient:list, POD_CPU:float)->Tuple:
     """[Update the docker given the node]
 
     Args:

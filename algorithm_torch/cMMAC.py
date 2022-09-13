@@ -5,11 +5,12 @@ from copy import deepcopy
 from algorithm_torch.CMMAC_Policy_Model import *
 from algorithm_torch.CMMAC_Value_Model import *
 from algorithm_torch.ReplayMemory import *
+from typing import Union, Tuple, Type
 
 class Estimator:
     """Class to Define the cMMAC (Actor Critic) model
     """
-    def __init__(self, action_dim, state_dim, number_of_master_nodes):
+    def __init__(self, action_dim:int, state_dim:int, number_of_master_nodes:int):
         """Initialisation of arguments
 
         Args:
@@ -25,25 +26,13 @@ class Estimator:
         self.entropy = 1
         self.pm, self.pm_optimizer = build_policy_model(self.state_dim, self.action_dim)
         
-
-    def squared_difference_loss(self, target, output):
-        """Calculate squared difference loss
-
-        Args:
-            target ([float]): [Target Value]
-            output ([float]): [Output Value]
-
-        Returns:
-            [float]: [Calcultated squared_difference_loss]
-        """
-        loss = torch.sum(target**2 - output**2)
-        return loss      
-
-    def action(self, s, vm, critic_state, ava_node, context):
+    def action(self, state:np.array, critic: Type[Value_Model], critic_state: np.array, ava_node:list, context: bool)-> Tuple[list, np.array, np.array, np.array,list, np.array, list]:
         """
 
         Args:
-            s ([Numpy Array]): [State Array]
+            state ([Numpy Array]): [State Array]
+            critic: Global Critic
+            critic_state: Critic State
             ava_node ([list]): [currently deployed nodes] #[Confusing name it is the nodes which are currently deployed]
             context ([list]): [Context is basically a flag]
 
@@ -55,7 +44,7 @@ class Estimator:
                curr_neighbor_mask_policy) : Neighbor masking policy
                next_state_ids : Propagated states
         """
-        value_output = vm(np.array(critic_state))
+        value_output = critic(np.array(critic_state))
         value_output = value_output.flatten()
         
         action_tuple = []
@@ -81,7 +70,7 @@ class Estimator:
         self.valid_neighbor_node_id = [[i for i in range(self.action_dim)] for j in range(self.number_of_master_nodes)]
 
         # compute policy probability.
-        self.pm_out =self.pm(s)
+        self.pm_out =self.pm(state)
         action_probs,_,_ = sm_prob(self.pm_out, curr_neighbor_mask) 
         curr_neighbor_mask_policy = []
         for idx, grid_valid_idx in enumerate(grid_ids):
@@ -112,7 +101,7 @@ class Estimator:
                     temp_a = np.zeros(self.action_dim)
                     temp_a[curr_action_idx] = 1
                     action_choosen_mat.append(temp_a)
-                    policy_state.append(s)
+                    policy_state.append(state)
                     curr_state_value.append(value_output[idx])
                     next_state_ids.append(self.valid_neighbor_grid_id[grid_valid_idx][curr_action_idx])
                     curr_neighbor_mask_policy.append(curr_neighbor_mask[idx])
@@ -121,13 +110,14 @@ class Estimator:
                np.stack(policy_state), np.stack(action_choosen_mat), curr_state_value, \
                np.stack(curr_neighbor_mask_policy), next_state_ids
     
-    def compute_advantage(self, curr_state_value, next_state_ids, next_state, vm, node_reward, gamma):
+    def compute_advantage(self, curr_state_value:list, next_state_ids:list, next_state:np.array, critic: Type[Value_Model], node_reward: np.array, gamma:float)->list:
         """[Calculates difference between predicted Q value and ! Value target]
 
         Args:
             curr_state_value ([list]): [Q value for current state]
             next_state_ids ([list]): [Next state ids]
             next_state ([Numpy array]): [Next State Grid]
+            critic : Global Critic Network
             node_reward ([Numpy Array]): [Node Reward grid]
             gamma ([float]): [Gamma variable for Bellman's equations]
 
@@ -138,7 +128,7 @@ class Estimator:
 
         advantage = []
         node_reward = node_reward.flatten()
-        qvalue_next = vm(next_state).flatten()
+        qvalue_next = critic(next_state).flatten()
 
         for idx, _ in enumerate(next_state_ids):
             temp_adv = sum(node_reward) + gamma * sum(qvalue_next) - curr_state_value[idx]
@@ -146,13 +136,15 @@ class Estimator:
 
         return advantage
     
-    def compute_targets(self, valid_prob, next_state, vm, node_reward, curr_neighbor_mask, gamma):
+    def compute_targets(self, valid_prob: np.array, next_state: np.array, critic: Type[Value_Model], node_reward: np.array, curr_neighbor_mask: np.array, gamma: float)->np.array:
         """[Method for computation of Targets]
 
         Args:
             valid_prob ([Numpy array]): [Valid probablility]
             next_state ([Numpy array]): [next state matrix]
+            critic: Global Critic Network
             node_reward ([Numpy array]): [Reward for the node]
+            curr_neighbor_mask : Current mask of the consumption of Resources
             gamma ([float]): [gamma for computaion of bellman's equations]
 
         Returns:
@@ -162,7 +154,7 @@ class Estimator:
         
         targets = []
         node_reward = node_reward.flatten()
-        qvalue_next = vm(next_state).flatten()
+        qvalue_next = critic(next_state).flatten()
 
         for idx in np.arange(len(valid_prob)):
             grid_prob = valid_prob[idx][curr_neighbor_mask[idx] > 0]
@@ -173,10 +165,11 @@ class Estimator:
 
         return np.array(targets).reshape([-1, 1])
 
-def to_grid_rewards(node_reward):
+def to_grid_rewards(node_reward:list)->np.array:
     
     """[Serialises the given node rewards]
-
+    Args:
+            node_reward ([list]): [noder rewards in terms of list]
     Returns:
         [list]: [serialised numpy array]
     """
@@ -185,7 +178,7 @@ def to_grid_rewards(node_reward):
 
 
 
-def calculate_reward(master_list, cur_done, cur_undone):
+def calculate_reward(master_list: list, cur_done:list, cur_undone:list)-> float:
     """
     Tailored MARDL for Decentralised request dispatch - Reward : Improve the longterm throughput while ensuring the load balancing at the edge
     
