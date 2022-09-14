@@ -22,7 +22,7 @@ class OCN(nn.Module):
             expand_act_on_state ([Function]): [Function to concatenate the scale]
             executor_levels ([type]): [Executor Levels (Tiling Length for scale Input)] 
             node_inp_sizes (list, optional): [Node net hidden dims]. Defaults to [32, 16, 8 ,1].
-            scale (list, optional): [scale net hidden dims]. Defaults to [32, 16, 8 ,1].
+            scale_inp_sizes (list, optional): [scale net hidden dims]. Defaults to [32, 16, 8 ,1].
             act ([Python Activation Layer], optional): [Python Activation Layer]. Defaults to nn.ReLU().
             batch_size (int, optional): [Batch Size]. Defaults to 1.
         """

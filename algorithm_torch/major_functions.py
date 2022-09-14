@@ -171,6 +171,7 @@ def initialize_episode_params(all_task_list:list, edge_list:list, MAX_TASK_TYPE:
     Args: 
         all_task_list: list of parameters
         edge_list: list of parameters
+        MAX_TASK_TYPE: Maximum Task type
         cur_time: list of parameters
     Returns:
         master_list: Generated List of Masters 
@@ -359,7 +360,7 @@ def get_updated_tasks_ava_node_states(master_list:list, cloud, deploy_states:lis
         deploy_states: State of deployment
         action_dims : List of action_dims
         cur_time : current time
-        mas_tasks : Maximum number of tasks
+        max_tasks : Maximum number of tasks
         randomize : randomization flag for eAPs
     Returns:
         master_list: updated List of Masters(eAPs)
@@ -381,7 +382,7 @@ def get_updated_tasks_ava_node_states(master_list:list, cloud, deploy_states:lis
     
     return master_list, curr_task, ava_node, s_grid, critic_state
 
-def get_estimators_output(q_estimator_list:list, s_grid:list,critic, critic_state:list, ava_node:list, context:bool)->Tuple[list,list,list,list,list,list,list]:
+def get_estimators_output(q_estimator_list:list, s_grid:list, critic: Type[Value_Model], critic_state:list, ava_node:list, context:bool)->Tuple[list,list,list,list,list,list,list]:
     '''
     Function to get state for the global critic
     Args: 
@@ -456,7 +457,7 @@ def get_done_status(master_list:list, pre_done:list, pre_undone:list)->Tuple[lis
     
     return pre_done, pre_undone, cur_done, cur_undone
 
-def put_and_update_tasks(act:list, curr_task:list, action_dims:list, cloud, master_list:list,check_queue:Callable, cur_time:float, pre_done:list, pre_undone:list)-> Tuple[list,list, list, list, Type[Cloud]]:
+def put_and_update_tasks(act:list, curr_task:list, action_dims:list, cloud:Type[Cloud], master_list:list,check_queue:Callable, cur_time:float, pre_done:list, pre_undone:list)-> Tuple[list,list, list, list, Type[Cloud]]:
     '''
     Function to update the status of tasks
     Args: 
@@ -544,7 +545,7 @@ def train_critic(TRAIN_TIMES:int, master_list:list, ReplayMemory_list:list, crit
         master_list: master (Eap) List
         ReplayMemory_list:Replay Memory list
         critic: Critic
-        critic_optimizer: Critic 
+        critic_optimizer: Critic optimizer
         log_estimator_value_loss: List for logging value Loss
     Returns:
         log_estimator_value_loss: List for logging value Loss
@@ -587,7 +588,7 @@ def train_actor_critic_without_orchestration(ReplayMemory_list:list, policy_repl
         ReplayMemory_list:Replay Memory list
         policy_replay_list : Replay Memory list for policy network
         master_list: master (Eap) List
-        q_estimator_list : 
+        q_estimator_list : List of Estimators (cMMAC Agents)
         critic: Critic
         critic_optimizer: Critic Optimizer
         log_estimator_value_loss:  List for logging value Loss

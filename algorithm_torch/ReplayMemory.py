@@ -21,36 +21,36 @@ class ReplayMemory:
         self.curr_lens = 0
 
     # Put data in policy replay memory
-    def add(self, s:np.array, a:np.array, r:list, next_s:np.array):
+    def add(self, state:np.array, action:np.array, reward:list, next_state:np.array):
         """[Add Experience]
 
         Args:
-            s ([Numpy Array]): [State]
-            a ([Numpy Array]): [Action]
-            r ([Numpy Array]): [reward]
+            state ([Numpy Array]): [State]
+            action ([Numpy Array]): [Action]
+            reward ([Numpy Array]): [reward]
             next_s ([Numpy Array]): [next State]
         """
         
         if self.curr_lens == 0:
-            self.states = s
-            self.actions = a
-            self.rewards = r
-            self.next_states = next_s
+            self.states = state
+            self.actions = action
+            self.rewards = reward
+            self.next_states = next_state
             self.curr_lens = self.states.shape[0]
 
         elif self.curr_lens <= self.memory_size:
-            self.states = np.concatenate((self.states, s), axis=0)
-            self.next_states = np.concatenate((self.next_states, next_s), axis=0)
-            self.actions = np.concatenate((self.actions, a), axis=0)
-            self.rewards = np.concatenate((self.rewards, r), axis=0)
+            self.states = np.concatenate((self.states, state), axis=0)
+            self.next_states = np.concatenate((self.next_states, next_state), axis=0)
+            self.actions = np.concatenate((self.actions, action), axis=0)
+            self.rewards = np.concatenate((self.rewards, reward), axis=0)
             self.curr_lens = self.states.shape[0]
         else:
             new_sample_lens = s.shape[0]
             index = random.randint(0, self.curr_lens - new_sample_lens)
-            self.states[index:(index + new_sample_lens)] = s
-            self.actions[index:(index + new_sample_lens)] = a
-            self.rewards[index:(index + new_sample_lens)] = r
-            self.next_states[index:(index + new_sample_lens)] = next_s
+            self.states[index:(index + new_sample_lens)] = state
+            self.actions[index:(index + new_sample_lens)] = action
+            self.rewards[index:(index + new_sample_lens)] = reward
+            self.next_states[index:(index + new_sample_lens)] = next_state
 
     # Take a batch of samples
     def sample(self)->list:

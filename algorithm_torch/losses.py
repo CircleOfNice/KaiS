@@ -11,23 +11,91 @@ from torch.nn.functional import log_softmax
 # policy_replay_list - (previous policy state matrix, previous action choosen matrix, advantage, previous curr_neighbor_mask)
 
 def calculate_log_prob(act_probs:torch.Tensor, eps:float)->torch.Tensor:
-        return torch.log(act_probs + eps)
+    """Calculate log probs from given action probabilities
+
+    Args:
+        act_probs : action probabilities
+        eps : epsilon probabilities
+
+    Returns:
+        log_prob: log action probabilities
+    """
+    log_prob = torch.log(act_probs + eps)
+    return log_prob
+
+
 def mul_act_probs(act_probs:torch.Tensor, adv_or_torch_log:torch.Tensor)->torch.Tensor:
-    return -torch.mul(act_probs, adv_or_torch_log)
+    """Multiply act probabilities with incoming vectors
+
+    Args:
+        act_probs : action probabilities
+        adv_or_torch_log : advantage or toch log 
+
+    Returns:
+        result: negative multiplication action probabilities
+    """
+    result = -torch.mul(act_probs, adv_or_torch_log)
+    return result
 def sum_normalise( torch_mul_log_prob:torch.Tensor)->torch.Tensor:
-    return torch.sum(torch_mul_log_prob)/torch_mul_log_prob.shape[0]
+    """Sum multiplied log probabilities and average it across batch
+
+    Args:
+        torch_mul_log_prob : multiplied log probabilities
+
+    Returns:
+        normalised: Sum multiplied log probabilities and average it across batch
+    """
+    normalised = torch.sum(torch_mul_log_prob)/torch_mul_log_prob.shape[0]
+    return normalised
 
 def simple_policy_loss(log_prob: torch.Tensor, advantage:torch.Tensor)->torch.Tensor:
+    """Calculate policy loss across batch
+
+    Args:
+        log_prob : log probabilities
+        advantage: Advantage
+
+    Returns:
+        multiply(-log_prob, advantage): multiplied log probabilities and advantage
+    """
     return multiply(-log_prob, advantage)
 
-def simple_value_loss_1(value:torch.Tensor, _return:torch.Tensor)->torch.Tensor:
+def simple_value_loss_1(value:torch.Tensor, _return:torch.Tensor)->torch.Tensor:# Optional loss type
+    """Calculate value loss 
+
+    Args:
+        value : Predicted values
+        _return: Target Values
+
+    Returns:
+        SmoothL1Loss(value, _return): SmoothL1Loss
+    """
     return SmoothL1Loss(value, _return)
 
 def simple_square_loss(output:torch.Tensor,target:torch.Tensor)->torch.Tensor: # current value loss implementation
+    """Simple Square Loss
+
+    Args:
+        output : Predicted Values
+        target: Target Values
+
+    Returns:
+        val_loss: Simple Square Loss
+    """
     val_loss = sum((target - output)**2)
     return val_loss
 
 def _policy_net_loss(logsoftmaxprob:torch.Tensor, tfadv:torch.Tensor, ACTION:np.array)->torch.Tensor:
+    """ Policy loss without entropy loss
+
+    Args:
+        logsoftmaxprob : Log softmax probabilities
+        tfadv: Advantage
+        ACTION: Valid Actions
+
+    Returns:
+        mean_policy_loss_sum: Mean policy loss
+    """
     log_prob = logsoftmaxprob * ACTION
     _policy_loss = simple_policy_loss(log_prob, tfadv)
     _policy_loss_sum = sum(_policy_loss, axis=1)
@@ -35,8 +103,19 @@ def _policy_net_loss(logsoftmaxprob:torch.Tensor, tfadv:torch.Tensor, ACTION:np.
     return mean_policy_loss_sum# changing it
 
 def _entropy_loss(softmaxprob: torch.Tensor, logsoftmaxprob:torch.Tensor)->torch.Tensor:
+    """ Entropy loss 
+
+    Args:
+        softmaxprob : Log softmax probabilities
+        logsoftmaxprob: Log softmax probabilities
+        ACTION: Valid Actions
+
+    Returns:
+        mean_: Entropy loss
+    """
     raw_softmaxprob_logsoftmaxprob = softmaxprob * logsoftmaxprob
-    return - mean(raw_softmaxprob_logsoftmaxprob)
+    mean_= - mean(raw_softmaxprob_logsoftmaxprob)
+    return mean_#- mean(raw_softmaxprob_logsoftmaxprob)
 
 def policy_net_loss(softmaxprob:torch.Tensor, tfadv:torch.Tensor, ACTION:np.array, entropy:float)->torch.Tensor:#TODO entropy here is redundant
     """[Method to calculate policy net loss]

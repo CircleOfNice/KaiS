@@ -18,11 +18,12 @@ class OrchestrateAgent(Agent):
 
         Args:
             node_input_dim ([int]): [Input dimension of the node part of orchestration net]
-            scale_input_dim ([int]): [Input dimension of the service scaling part of orchestration net]
             hid_dims ([list]): [int]
             output_dim ([int]): [Output dimensions of OCN Net (also for the inbuilt )]
             max_depth ([int]): [description]
             executor_levels ([range]): [Levels of Execution (for Tiling)]
+            MAX_TASK_TYPE (int) : Maximum task type
+            entropy_weight (float): Entropy weight
             eps ([float]): [Epsilon value to avoid numerical instabilities]
             act_fn ([Pytorch Activation function]): [Pytorch Activation ]
             optimizer ([Pytorch Optimizer]): [Pytorch Optimizer]
@@ -126,17 +127,17 @@ class OrchestrateAgent(Agent):
         return node_inputs, scale_inputs
     
 
-    def predict(self, x:list, epsilon_exploration:bool)->list:
+    def predict(self, obs_list:list, epsilon_exploration:bool)->list:
         """Function to make predictions
 
         Args:
-            x ([list]): [list containing scale and node inputs and gcn outputs]
+            obs_list ([list]): [list containing scale and node inputs and gcn outputs]
 
         Returns:
             [list]: [list of Tensors]
         """
 
-        self.node_inputs, self.scale_inputs, self.gcn.outputs = x
+        self.node_inputs, self.scale_inputs, self.gcn.outputs = obs_list
         
         self.optimizer.zero_grad()
         self.gcn(self.node_inputs)
