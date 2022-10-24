@@ -1,7 +1,18 @@
+# Functions comprising the environment
+
 import csv
+import random
+from typing import Type, Tuple
+from env.platform import Master, Node
+def get_all_task(path:str, randomize:bool = True)->Tuple:
+    """Get Processed data from the file given in path
 
+    Args:
+        path ([str]): [path to the file]
 
-def get_all_task(path):
+    Returns:
+        [list]: [lists containing type of task , start time & end time of tasks, cpu and memory]
+    """
     type_list = []
     start_time = []
     end_time = []
@@ -17,18 +28,57 @@ def get_all_task(path):
             mem_list.append(row[8])
 
     init_time = int(start_time[0])
+    new_type_list = []
+    new_start_time = []
+    new_end_time = []
+    new_cpu_list = []
+    new_mem_list = []
+
     for i in range(len(start_time)):
-        type_list[i] = int(type_list[i]) - 1
-        start_time[i] = int(start_time[i]) - init_time
-        end_time[i] = int(end_time[i]) - init_time
-        cpu_list[i] = int(cpu_list[i]) / 100.0
-        mem_list[i] = float(mem_list[i])
-    all_task = [type_list, start_time, end_time, cpu_list, mem_list]
+        
+        
+        start_time_ = (int(start_time[i]) - init_time)
+        end_time_ = (int(end_time[i]) - init_time) 
+        type_list_ = (int(type_list[i]) - 1)
+        cpu_list_ = (int(cpu_list[i]) / 100.0)
+        mem_list_ = (float(mem_list[i]))
+        time_diff = int(end_time_ - start_time_)
+        
+        
+        if randomize:
+        
+            if time_diff > 200:
+                end_time_ = end_time_ + random.randint(-10, 10)
+            if time_diff > 500:
+                end_time_ = end_time_ + random.randint(-50, 50)
+            if time_diff > 1000:
+                end_time_ = end_time_ + random.randint(-100, 100)
+            if time_diff > 1500:
+                end_time_ = end_time_ + random.randint(-200, 200)
 
-    return all_task
+        if time_diff<0:
+            continue
+        
+        new_start_time.append(start_time_)
+        new_end_time.append(end_time_)
+        new_cpu_list.append(cpu_list_)
+        new_mem_list.append(mem_list_)
+        new_type_list.append(type_list_)
+    new_all_task = [new_type_list, new_start_time, new_end_time, new_cpu_list, new_mem_list]
+    
+    return new_all_task, max(new_type_list)
 
 
-def put_task(task_queue, task):
+def put_task(task_queue:list, task:int)->list:
+    """Puts tasks on the task queue
+
+    Args:
+        task_queue ([list]): [list of queued tasks ]
+        task ([type]): [task to be put on the task_queue]
+
+    Returns:
+        [list]: [list of queued tasks ]]
+    """
     for i in range(len(task_queue) - 1):
         j = len(task_queue) - i - 1
         task_queue[j] = task_queue[j - 1]
@@ -36,7 +86,17 @@ def put_task(task_queue, task):
     return task_queue
 
 
-def update_task_queue(master, cur_time, master_id):
+def update_task_queue(master:Type[Master], cur_time:float, master_id:int)->Type[Master]:
+    """[summary]
+
+    Args:
+        master ([Master Object]): [eAP object]
+        cur_time ([int]): [Current time]
+        master_id ([int]): [number of the eAP object]
+
+    Returns:
+        ([Master Object]): [eAP object]
+    """
     # clean task for overtime
     i = 0
     while len(master.task_queue) > i:
@@ -63,12 +123,26 @@ def update_task_queue(master, cur_time, master_id):
             tmp_list.append(master.task_queue[i])
     tmp_list = sorted(tmp_list, key=lambda x: (x[2], x[1]))
     master.task_queue = tmp_list
+    
     return master
 
 
-def check_queue(task_queue, cur_time):
+def check_queue(task_queue:list, cur_time:float, length_masterlist:int)->Tuple:
+    """[Check the queue for tasks in queue]
+
+    Args:
+        task_queue ([list]): [list containing the queue]
+        cur_time ([int]): [current time]
+
+    Returns:
+        [list]: [tasks in the queue, tasks undone(not done), there type(kind)]
+    """
+
     task_queue = sorted(task_queue, key=lambda x: (x[2], x[1]))
-    undone = [0, 0]
+    undone =[]
+    for un in range(length_masterlist):
+        undone.append(0)
+        
     undone_kind = []
     # clean task for overtime
     i = 0
@@ -86,9 +160,25 @@ def check_queue(task_queue, cur_time):
     return task_queue, undone, undone_kind
 
 
-def update_docker(node, cur_time, service_coefficient, POD_CPU):
-    done = [0, 0]
-    undone = [0, 0]
+def update_docker(node:Type[Node], master_list:list, cur_time:float, service_coefficient:list, POD_CPU:float)->Tuple:
+    """[Update the docker given the node]
+
+    Args:
+        node ([Node Object]): [Edge node]
+        cur_time ([int]): [current time]
+        service_coefficient ([float]): [number identifying intensity (demand ) of the tasks]
+        POD_CPU ([float]): [CPU resources required to make a POD]
+
+    Returns:
+        [list]: [Edge node, undone and done task lists with list of tasks that are done and undone]
+    """
+    
+    done = []
+    undone = []
+    for i in range(len(master_list)):
+        done.append(0)
+        undone.append(0)
+        
     done_kind = []
     undone_kind = []
 
@@ -121,6 +211,7 @@ def update_docker(node, cur_time, service_coefficient, POD_CPU):
 
                     elif cur_time + to_do > node.task_queue[i][2]:
                         undone[node.task_queue[i][5]] = undone[node.task_queue[i][5]] + 1
+                        print('undone[node.task_queue[i][5]] : ', undone[node.task_queue[i][5]])
                         undone_kind.append(node.task_queue[i][0])
                         del node.task_queue[i]
                         flag = 1
@@ -131,4 +222,5 @@ def update_docker(node, cur_time, service_coefficient, POD_CPU):
             flag = 0
         else:
             i = i + 1
+
     return node, undone, done, done_kind, undone_kind
