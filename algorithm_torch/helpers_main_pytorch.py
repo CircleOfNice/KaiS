@@ -141,9 +141,13 @@ def get_action_dims(node_param_lists:list)->list:
 
         action_dim = 0
         for _ in _list:
+            print(action_dim)
             action_dim+=1
-        action_dim+=1            
+        
+        #action_dim+=1            
         action_dims.append(action_dim)
+        print('node_param_lists , action_dims : ', node_param_lists , action_dims)
+    #a=b
     return action_dims  # because of cluster
 
 def set_lr( optimizer:torch.optim, lr:float)->None:    
@@ -324,13 +328,14 @@ def create_eAP_and_Cloud(node_param_lists:list, master_param_lists:list, all_tas
         cloud (Cloud Object) : Created cloud object
     """
     master_list = create_master_list(node_param_lists, master_param_lists, all_task_list, MAX_TASK_TYPE)
+    '''
     cloud = Cloud([], [], sys.maxsize, sys.maxsize)  # (..., cpu, mem)
     ################################################################################################
     for i in range(MAX_TASK_TYPE):
         docker = Docker(POD_MEM * service_coefficient[i], POD_CPU * service_coefficient[i], cur_time, i, [-1])
         cloud.service_list.append(docker)
-    
-    return master_list, cloud
+    '''
+    return master_list#, cloud
 
 def get_last_length(master_list:list)->Tuple[int, list]:
     """Get length of nodes in each eAPs and the total 
@@ -349,7 +354,7 @@ def get_last_length(master_list:list)->Tuple[int, list]:
         last_length = last_length + len(mstr.node_list)
     return last_length, length_list
         
-def put_current_task_on_queue(act:list, curr_task:list, action_dims:list, cloud:Cloud, master_list:list)->None: 
+def put_current_task_on_queue(act:list, curr_task:list, master_list:list)->None: 
     """Put current tasks on queue
 
     Args:
@@ -361,22 +366,25 @@ def put_current_task_on_queue(act:list, curr_task:list, action_dims:list, cloud:
 
     """
     _, length_list = get_last_length(master_list)    
-    #print('curr_task : ', curr_task)
-    cluster_action_values = [action-1 for action in action_dims]
-
+    
+    #cluster_action_values = [action-1 for action in action_dims]
+    print('act : ', act)
+    print('curr_task : ', curr_task)
     for i in range(len(act)):
         if curr_task[i][0] == -1:
             continue
+        '''     
         if act[i] == cluster_action_values[i]:
             cloud.task_queue.append(curr_task[i])
             continue
-        
+        '''
+        #print(act[i])
         for j in range(len(length_list)-1):
             if act[i] >= length_list[j] and act[i] < length_list[j+1] :
                 master_list[j].node_list[act[i] - length_list[j]].task_queue.append(curr_task[i])
                 
             
-def update_state_of_task( cur_time:list, check_queue:Callable, cloud:Type[Cloud], master_list:list)->None:
+def update_state_of_task( cur_time:list, check_queue:Callable,  master_list:list)->None:
     """Update the state of tasks
 
     Args:
@@ -398,11 +406,11 @@ def update_state_of_task( cur_time:list, check_queue:Callable, cloud:Type[Cloud]
             for i, master_entity in enumerate(master_list):
                 master_entity.update_undone(undone[i])
 
-    cloud.task_queue, undone, undone_kind = check_queue(cloud.task_queue, cur_time, len(master_list))
+    #cloud.task_queue, undone, undone_kind = check_queue(cloud.task_queue, cur_time, len(master_list))
     for i, master_entity in enumerate(master_list):
         master_entity.update_undone(undone[i])
     
-def update_state_of_dockers(cur_time:float, cloud: Type[Cloud], master_list: list)->Type[Cloud]:
+def update_state_of_dockers(cur_time:float, master_list: list)->Type[Cloud]:
     """Updates the state of dockers
 
     Args:
@@ -422,13 +430,13 @@ def update_state_of_dockers(cur_time:float, cloud: Type[Cloud], master_list: lis
             for i, master_entity in enumerate(master_list):
                 master_entity.update_undone(undone[i])
                 master_entity.update_done(done[i])
-    cloud, undone, done, done_kind, undone_kind = update_docker(cloud, master_list, cur_time, service_coefficient, POD_CPU)
+    #cloud, undone, done, done_kind, undone_kind = update_docker(cloud, master_list, cur_time, service_coefficient, POD_CPU)
 
     for i, master_entity in enumerate(master_list):
                 master_entity.update_undone(undone[i])
                 master_entity.update_done(done[i])
 
-    return cloud  
+    #return cloud  
 
 def create_dockers(MAX_TASK_TYPE:int, deploy_states:list, service_coefficient:list, POD_MEM:float, POD_CPU:float, cur_time:float, master_list:float)->None:
     """Creation of dockers

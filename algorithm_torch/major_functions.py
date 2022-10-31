@@ -142,7 +142,7 @@ def initialize_cmmac_agents(MAX_TASK_TYPE:int, all_task_list:list,edge_list:list
             policy_replay_list.append(policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) #experience Replay for Policy network for cMMMac Agent
     
     # Creation of global critic (currently without cloud info of unprocessed requests)
-    critic, critic_optimizer = build_value_model(sum(s_grid_len)+ 1) # Length of task queue can be only one digit long
+    critic, critic_optimizer = build_value_model(sum(s_grid_len))#+ 1) # Length of task queue can be only one digit long
     
     return critic, critic_optimizer, q_estimator_list,  ReplayMemory_list, policy_replay_list
 
@@ -186,7 +186,7 @@ def initialize_episode_params(all_task_list:list, edge_list:list, MAX_TASK_TYPE:
     deploy_states, node_param_lists, master_param_lists = def_initial_state_values(len(all_task_list), edge_list)
         
     # Create clusters based on the hardware resources you need
-    master_list, cloud = create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TASK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time)
+    master_list = create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TASK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time)
     
     # Creation of node Graph CNN
     '''
@@ -200,7 +200,7 @@ def initialize_episode_params(all_task_list:list, edge_list:list, MAX_TASK_TYPE:
     
     pre_done, pre_undone, context = get_done_undone_context(master_param_lists)
         
-    return master_list, cloud, deploy_states, pre_done, pre_undone, context
+    return master_list, deploy_states, pre_done, pre_undone, context
 
 def get_all_node_characteristics(master_list:list)->Tuple[list, list, list]:
     '''
@@ -288,18 +288,26 @@ def get_ava_node(curr_task:list, action_dims:list, deploy_states:list, randomize
 
     for i in range(len(curr_task)):
         #TODO Repeated chunk of code delete this
-        if randomize ==False:
+        #if randomize ==False:
         
-            tmp_list = [action_dims[i] -1]  # Cloud is always available
-        else:
-            
-            tmp_list = [action_dims[i] -1]
+        #    tmp_list = [action_dims[i] -1]  # Cloud is always available
+        #else:
+        #    
+        #    tmp_list = [action_dims[i] -1]
+        tmp_list = [action_dims[i]-1] # Natural reduction of dimension for computers
+        
         deploy_state = deploy_states[i]
+        #print('len(tmp_list), len(deploy_states), deploy_state : ', len(tmp_list), len(deploy_states), deploy_state)
         for ii in range(len(deploy_state)):
-
-            if deploy_state[ii][curr_task[i][0]] == 1:
+            #print('deploy_state[ii] : ', deploy_state[ii])
+            print('curr_task : ', curr_task)
+            print('curr_task[i] : ', curr_task[i])
+            print('curr_task[i][0] : ', curr_task[i][0])
+            print('deploy_state[ii][curr_task[i][0]] : ', deploy_state[ii][curr_task[i][0]])
+            if curr_task[i][0] !=-1 and deploy_state[ii][curr_task[i][0]] == 1:
                 tmp_list.append(ii)
         ava_node.append(tmp_list)
+    print('ava_node : ', ava_node)
     return ava_node
 
 def get_critic_state(master_list:list, state_list:list, deploy_states:list)->list:
@@ -321,7 +329,7 @@ def get_critic_state(master_list:list, state_list:list, deploy_states:list)->lis
         
     return  s_grid
 
-def get_updated_tasks_ava_node_states(master_list:list, cloud, deploy_states:list, action_dims:list, cur_time: float, max_tasks:int, randomize:bool)->Tuple[list,list, list,list,list]:
+def get_updated_tasks_ava_node_states(master_list:list, deploy_states:list, action_dims:list, cur_time: float, max_tasks:int, randomize:bool)->Tuple[list,list, list,list,list]:
     '''
     Function to update tasks, avalilable nodes and states
     Args: 
@@ -348,8 +356,8 @@ def get_updated_tasks_ava_node_states(master_list:list, cloud, deploy_states:lis
     
     s_grid = get_critic_state(master_list, state_list, deploy_states)
     critic_state = flatten(s_grid)
-    critic_state.append(len(cloud.task_queue))
-    
+    #critic_state.append(len(cloud.task_queue))
+    #print('(ava_node, s_grid, state_list : ', ava_node, s_grid, state_list)
     return master_list, curr_task, ava_node, s_grid, critic_state
 
 def get_estimators_output(q_estimator_list:list, s_grid:list, critic: Type[Value_Model], critic_state:list, ava_node:list, context:bool)->Tuple[list,list,list,list,list,list,list]:
@@ -378,8 +386,9 @@ def get_estimators_output(q_estimator_list:list, s_grid:list, critic: Type[Value
     curr_state_value = []
     curr_neighbor_mask = []
     next_state_ids = []
+    #print('len(s_grid) get_estimators_output : ', len(s_grid))
     for i in range(len(s_grid)):
-        
+        #print('len(s_grid) loop, i : ', len(s_grid), i)
         act_, valid_action_prob_mat_, policy_state_, action_choosen_mat_, \
         curr_state_value_, curr_neighbor_mask_, next_state_ids_ = q_estimator_list[i].action(np.array(s_grid[i]), critic, critic_state, ava_node[i], context,)
 
@@ -427,7 +436,7 @@ def get_done_status(master_list:list, pre_done:list, pre_undone:list)->Tuple[lis
     
     return pre_done, pre_undone, cur_done, cur_undone
 
-def put_and_update_tasks(act:list, curr_task:list, action_dims:list, cloud:Type[Cloud], master_list:list,check_queue:Callable, cur_time:float, pre_done:list, pre_undone:list)-> Tuple[list,list, list, list, Type[Cloud]]:
+def put_and_update_tasks(act:list, curr_task:list, master_list:list,check_queue:Callable, cur_time:float, pre_done:list, pre_undone:list)-> Tuple[list,list, list, list, Type[Cloud]]:
     '''
     Function to update the status of tasks
     Args: 
@@ -448,17 +457,15 @@ def put_and_update_tasks(act:list, curr_task:list, action_dims:list, cloud:Type[
         cloud :  Cloud
     '''
     # Put the current task on the queue based on dispatch decision
-    put_current_task_on_queue(act, curr_task, action_dims, cloud, master_list)
+    put_current_task_on_queue(act, curr_task, master_list)# action_dims, cloud, 
     # Update state of task
-    update_state_of_task(cur_time, check_queue, cloud, master_list)
+    update_state_of_task(cur_time, check_queue,  master_list)#cloud,
     
     # Update state of dockers in every node
-    cloud = update_state_of_dockers(cur_time, cloud, master_list)
+    update_state_of_dockers(cur_time, master_list)#cloud, 
         
     pre_done, pre_undone, cur_done, cur_undone = get_done_status(master_list, pre_done, pre_undone)
-    return pre_done, pre_undone, cur_done, cur_undone, cloud 
-
-# TODO :Comment for remaining functions and add type hints
+    return pre_done, pre_undone, cur_done, cur_undone#, cloud 
 
 
 def update_exp_replays(immediate_reward:np.array, q_estimator_list:list, ReplayMemory_list:list, policy_replay_list:list, action_mat_prev:np.array, critic_state:np.array, critic:Type[Value_Model], s_grid:list, 

@@ -55,7 +55,7 @@ class Estimator:
         policy_state = []
         curr_state_value = []
         next_state_ids = []
-        
+        #TODO put things in perspective here
         
         grid_ids = [x for x in range(self.number_of_master_nodes)]
         self.valid_action_mask = np.zeros((self.number_of_master_nodes, self.action_dim))
@@ -73,6 +73,7 @@ class Estimator:
         self.pm_out =self.pm(state)
         action_probs,_,_ = sm_prob(self.pm_out, curr_neighbor_mask) 
         curr_neighbor_mask_policy = []
+        print('len(grid_ids) : ', len(grid_ids))
         for idx, grid_valid_idx in enumerate(grid_ids):
             action_prob = action_probs[idx]
             # action probability for state value function
@@ -90,13 +91,14 @@ class Estimator:
             curr_action_indices = [0] * self.action_dim
             for kk in curr_action_indices_temp:
                 curr_action_indices[kk] += 1
-
+            print('curr_action_indices : ', curr_action_indices)
+            print('action_dim : ', self.action_dim)
             self.valid_neighbor_grid_id = self.valid_neighbor_node_id
             for curr_action_idx, num_driver in enumerate(curr_action_indices):
                 if num_driver > 0:
                     end_node_id = int(self.valid_neighbor_node_id[grid_valid_idx][curr_action_idx])
                     action_tuple.append(end_node_id)
-
+                    print
                     # for training
                     temp_a = np.zeros(self.action_dim)
                     temp_a[curr_action_idx] = 1
