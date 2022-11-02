@@ -72,7 +72,7 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
     
     for n_iter in np.arange(RUN_TIMES):
         ########### Initialize the setup and repeat the experiment many times ###########
-        print('n_iter, RUN_TIMES : ', n_iter, RUN_TIMES)
+        #print('n_iter, RUN_TIMES : ', n_iter, RUN_TIMES)
         batch_reward = []
         cur_time = 0
         order_response_rates = []
@@ -93,7 +93,8 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
             
             master_list, curr_task, ava_node, s_grid, critic_state = get_updated_tasks_ava_node_states(master_list, deploy_states, action_dims, cur_time, max_tasks, randomize)
             
-            
+            #print('curr_task eap : ', curr_task)
+            #print('ava_node eap : ', ava_node)
             #print('critic_state : ', len(critic_state))
             #print('s_grid.shape : ', len(s_grid))
             # Dispatch decision

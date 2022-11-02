@@ -32,12 +32,14 @@ class Policy_Model(nn.Module):
         self.pm_criterion = loss
         
     def forward(self, x:np.array)->torch.Tensor:
+        
         x = torch.from_numpy(x)
         
         x = self.fc1(x.float())
         x = self.fc2(x)
         x = self.fc3(x)
         x = self.fc4(x) 
+        #print(x)
         return x 
     
     

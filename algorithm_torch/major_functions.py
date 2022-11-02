@@ -294,20 +294,38 @@ def get_ava_node(curr_task:list, action_dims:list, deploy_states:list, randomize
         #else:
         #    
         #    tmp_list = [action_dims[i] -1]
-        tmp_list = [action_dims[i]-1] # Natural reduction of dimension for computers
+        tmp_list = [] # There is no cloud action so removing the cloud action# Natural reduction of dimension for computers
         
         deploy_state = deploy_states[i]
+        #print('deploy_states : ', deploy_states)
+        #print('deploy_state : ', deploy_state)
+        #print('curr_task : ', curr_task)
         #print('len(tmp_list), len(deploy_states), deploy_state : ', len(tmp_list), len(deploy_states), deploy_state)
         for ii in range(len(deploy_state)):
             #print('deploy_state[ii] : ', deploy_state[ii])
-            print('curr_task : ', curr_task)
-            print('curr_task[i] : ', curr_task[i])
-            print('curr_task[i][0] : ', curr_task[i][0])
-            print('deploy_state[ii][curr_task[i][0]] : ', deploy_state[ii][curr_task[i][0]])
-            if curr_task[i][0] !=-1 and deploy_state[ii][curr_task[i][0]] == 1:
-                tmp_list.append(ii)
+            #print('curr_task : ', curr_task)
+            #print('curr_task[i] : ', curr_task[i])
+            #print('curr_task[i][0] : ', curr_task[i][0])
+            #print('deploy_state[ii][curr_task[i][0]] : ', deploy_state[ii][curr_task[i][0]])
+            try:
+                #val =curr_task[i][0]
+                #val2 =curr_task[i]
+                #print('curr_task: ', curr_task)
+                #print('curr_task[i][0]: ', val)
+                #print('curr_task[i], ii : ', val2, ii)
+                #print('deploy_state[ii]: ', deploy_state[ii])
+                #print('deploy_state[ii][curr_task[i][0]] : ', deploy_state[ii][curr_task[i][0]] )
+                if deploy_state[ii][curr_task[i][0]] == 1:
+                    #print('val curr_task[i][0] : ', curr_task[i][0])
+                    tmp_list.append(ii)
+                    #print(tmp_list)
+            except: 
+                continue
         ava_node.append(tmp_list)
-    print('ava_node : ', ava_node)
+    #print('ava_node : ', ava_node)
+    #print('after curr_task : ', (curr_task))
+    #a=b
+    #print('Look into Major Functions ava node to check')
     return ava_node
 
 def get_critic_state(master_list:list, state_list:list, deploy_states:list)->list:
@@ -499,13 +517,17 @@ def update_exp_replays(immediate_reward:np.array, q_estimator_list:list, ReplayM
         # Advantage for policy network.
         advantage = q_estimator_list[m].compute_advantage([curr_state_value_prev[m]], [next_state_ids_prev[m]] ,
                                                 np.array(critic_state), critic, r_grid[[m],:], gamma)
-
+        #print(len(curr_task))
         test_cond_list = []
         for i, elem in enumerate(curr_task):
-            test_cond_list.append(elem[0] != -1)
-        
-        cond = test_cond_list[0]
-        
+            try:
+                test_cond_list.append(elem[0] != -1)
+            except:
+                continue
+        try:
+            cond = test_cond_list[0]
+        except:
+            continue
         if len(test_cond_list)>1:
             for i in range(1,len(test_cond_list)):
                 cond = cond and test_cond_list[i]

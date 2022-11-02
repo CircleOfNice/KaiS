@@ -69,9 +69,10 @@ def def_initial_state_values(len_all_task_list:int=3, list_length_edge_nodes_per
         node_param_lists :  Parameter list for Edge nodes required
         master_param_lists : Parameter list for Master nodes required
     """
-    deploy_state_stack = [[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
-                [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
-                [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1],]
+    deploy_state_stack = [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]]
+    #[[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
+    #            [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
+    #            [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1],]
     node_list_stack = [[100.0, 4.0], [200.0, 6.0], [100.0, 8.0], [200.0, 8.0], [100.0, 2.0], [200.0, 6.0]]
     master_param_list_stack = [[200.0, 8.0]]
     deploy_states = []
@@ -141,12 +142,12 @@ def get_action_dims(node_param_lists:list)->list:
 
         action_dim = 0
         for _ in _list:
-            print(action_dim)
+            #print(action_dim)
             action_dim+=1
         
         #action_dim+=1            
         action_dims.append(action_dim)
-        print('node_param_lists , action_dims : ', node_param_lists , action_dims)
+        #print('node_param_lists , action_dims : ', node_param_lists , action_dims)
     #a=b
     return action_dims  # because of cluster
 
@@ -237,7 +238,7 @@ def get_current_task(master:Type[Master])->list:
     Returns:
         [list]: [list containing the current task]
     """
-    task = [-1]
+    task = []
     if len(master.task_queue) != 0:
         task = master.task_queue[0]
         del master.task_queue[0]
@@ -366,12 +367,16 @@ def put_current_task_on_queue(act:list, curr_task:list, master_list:list)->None:
 
     """
     _, length_list = get_last_length(master_list)    
-    
+    #print('length_list : ', length_list)
     #cluster_action_values = [action-1 for action in action_dims]
-    print('act : ', act)
-    print('curr_task : ', curr_task)
+    #print('act : ', act)
+    #print('curr_task : ', curr_task)
     for i in range(len(act)):
-        if curr_task[i][0] == -1:
+        #print('curr_task : ', curr_task[i][0])
+        
+        try:
+            val = curr_task[i][0]
+        except:
             continue
         '''     
         if act[i] == cluster_action_values[i]:
@@ -380,6 +385,7 @@ def put_current_task_on_queue(act:list, curr_task:list, master_list:list)->None:
         '''
         #print(act[i])
         for j in range(len(length_list)-1):
+            #print('acting : ', act[i] )
             if act[i] >= length_list[j] and act[i] < length_list[j+1] :
                 master_list[j].node_list[act[i] - length_list[j]].task_queue.append(curr_task[i])
                 

@@ -55,25 +55,30 @@ class Estimator:
         policy_state = []
         curr_state_value = []
         next_state_ids = []
+        
         #TODO put things in perspective here
         
         grid_ids = [x for x in range(self.number_of_master_nodes)]
+        #print('grid_ids : ', grid_ids)
         self.valid_action_mask = np.zeros((self.number_of_master_nodes, self.action_dim))
+        #print('self.valid_action_mask : ', self.valid_action_mask)
         for j in ava_node:
-            if len(self.valid_action_mask[self.number_of_master_nodes-1]) ==j:
-
-                self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
-            else:
-                self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
+            #if len(self.valid_action_mask[self.number_of_master_nodes-1]) ==j:
+            #
+            #    self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
+            #else:
+            #    self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
+            self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
         curr_neighbor_mask = deepcopy(self.valid_action_mask)
-
+        #print('curr_neighbor_mask : ', curr_neighbor_mask)
         self.valid_neighbor_node_id = [[i for i in range(self.action_dim)] for j in range(self.number_of_master_nodes)]
-
+        #print('self.valid_neighbor_node_id : ', self.valid_neighbor_node_id)
+        #print(a=b)
         # compute policy probability.
         self.pm_out =self.pm(state)
         action_probs,_,_ = sm_prob(self.pm_out, curr_neighbor_mask) 
         curr_neighbor_mask_policy = []
-        print('len(grid_ids) : ', len(grid_ids))
+        #print('len(grid_ids) : ', len(grid_ids))
         for idx, grid_valid_idx in enumerate(grid_ids):
             action_prob = action_probs[idx]
             # action probability for state value function
@@ -85,20 +90,24 @@ class Estimator:
             if int(context[idx]) == 0:
                 continue
             
-            curr_action_indices_temp = np.random.choice(self.action_dim, int(context[idx]),
-                                                        p=action_prob / np.sum(action_prob))
-            
+            #curr_action_indices_temp = np.random.choice(self.action_dim, int(context[idx]),
+            #                                            p=action_prob / np.sum(action_prob))
+            curr_action_indices_temp  = [np.argmax(action_prob)]
+            #print('curr_action_indices_temp : ', curr_action_indices_temp) 
+            #print('action_prob : ', action_prob)
+            #print('action_probs : ', action_probs)
+            #print('action_predicted : ', curr_action_indices_temp)
             curr_action_indices = [0] * self.action_dim
             for kk in curr_action_indices_temp:
                 curr_action_indices[kk] += 1
-            print('curr_action_indices : ', curr_action_indices)
-            print('action_dim : ', self.action_dim)
+            #print('curr_action_indices : ', curr_action_indices)
+            #print('action_dim : ', self.action_dim)
             self.valid_neighbor_grid_id = self.valid_neighbor_node_id
             for curr_action_idx, num_driver in enumerate(curr_action_indices):
                 if num_driver > 0:
                     end_node_id = int(self.valid_neighbor_node_id[grid_valid_idx][curr_action_idx])
                     action_tuple.append(end_node_id)
-                    print
+                    
                     # for training
                     temp_a = np.zeros(self.action_dim)
                     temp_a[curr_action_idx] = 1
@@ -107,7 +116,10 @@ class Estimator:
                     curr_state_value.append(value_output[idx])
                     next_state_ids.append(self.valid_neighbor_grid_id[grid_valid_idx][curr_action_idx])
                     curr_neighbor_mask_policy.append(curr_neighbor_mask[idx])
-
+        
+        #print('curr_neighbor_mask_policy : ', curr_neighbor_mask_policy)
+        #print('action_choosen_mat : ', action_choosen_mat)
+        #a=b
         return action_tuple, np.stack(valid_prob), \
                np.stack(policy_state), np.stack(action_choosen_mat), curr_state_value, \
                np.stack(curr_neighbor_mask_policy), next_state_ids
