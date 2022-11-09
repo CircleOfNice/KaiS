@@ -23,7 +23,7 @@ service_coefficient = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]#[0.8, 0.8, 0.9,
 # Parameters related to DRL
 gamma = 0.9 # Discounting Coefficient
 learning_rate = 1e-3 # Learning Rate
-
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 state_dim = 54#90#88 #Dimension of state for cMMAC (flattened Deployed state, task num, cpu_list, min_list)
 
 #node_input_dim = 2*MAX_TESK_TYPE#24 # Input dimension of Node part of the Orchestration Net 
@@ -94,10 +94,6 @@ def def_initial_state_values(len_all_task_list:int=3, list_length_edge_nodes_per
         for k in range(list_length_edge_nodes_per_eap[i]):
             node_list.append(random.choice(node_list_stack))
         node_param_lists.append(node_list)
-    #print('deploy_states: ', deploy_states)
-    #print('node_param_lists : ', node_param_lists)
-    #print('master_param_lists: ', master_param_lists)
-    #a=B
     return deploy_states, node_param_lists, master_param_lists
 
 def estimate_state_size(all_task_list:list, MAX_TASK_TYPE:int, edge_list:list)-> list:
@@ -142,14 +138,11 @@ def get_action_dims(node_param_lists:list)->list:
 
         action_dim = 0
         for _ in _list:
-            #print(action_dim)
             action_dim+=1
-        
-        #action_dim+=1            
+         
         action_dims.append(action_dim)
-        #print('node_param_lists , action_dims : ', node_param_lists , action_dims)
-    #a=b
-    return action_dims  # because of cluster
+
+    return action_dims
 
 def set_lr( optimizer:torch.optim, lr:float)->None:    
     """Method to set the Learning rate of the given optimizer
@@ -263,8 +256,6 @@ def state_inside_eAP(master:Type[Master], num_edge_nodes_per_eAP:list, max_tasks
         delay_requirement = 100000
     else:
         service_type = master.task_queue[0][0]
-        #print('service_type: ', service_type, master.task_queue)
-        #a=b
         delay_requirement = master.task_queue[0][2]-master.task_queue[0][1]
         
     undone_tasks = master.undone
@@ -329,14 +320,8 @@ def create_eAP_and_Cloud(node_param_lists:list, master_param_lists:list, all_tas
         cloud (Cloud Object) : Created cloud object
     """
     master_list = create_master_list(node_param_lists, master_param_lists, all_task_list, MAX_TASK_TYPE)
-    '''
-    cloud = Cloud([], [], sys.maxsize, sys.maxsize)  # (..., cpu, mem)
-    ################################################################################################
-    for i in range(MAX_TASK_TYPE):
-        docker = Docker(POD_MEM * service_coefficient[i], POD_CPU * service_coefficient[i], cur_time, i, [-1])
-        cloud.service_list.append(docker)
-    '''
-    return master_list#, cloud
+
+    return master_list
 
 def get_last_length(master_list:list)->Tuple[int, list]:
     """Get length of nodes in each eAPs and the total 
@@ -367,25 +352,14 @@ def put_current_task_on_queue(act:list, curr_task:list, master_list:list)->None:
 
     """
     _, length_list = get_last_length(master_list)    
-    #print('length_list : ', length_list)
-    #cluster_action_values = [action-1 for action in action_dims]
-    #print('act : ', act)
-    #print('curr_task : ', curr_task)
+
     for i in range(len(act)):
-        #print('curr_task : ', curr_task[i][0])
-        
         try:
             val = curr_task[i][0]
         except:
             continue
-        '''     
-        if act[i] == cluster_action_values[i]:
-            cloud.task_queue.append(curr_task[i])
-            continue
-        '''
-        #print(act[i])
+
         for j in range(len(length_list)-1):
-            #print('acting : ', act[i] )
             if act[i] >= length_list[j] and act[i] < length_list[j+1] :
                 master_list[j].node_list[act[i] - length_list[j]].task_queue.append(curr_task[i])
                 
@@ -407,12 +381,9 @@ def update_state_of_task( cur_time:list, check_queue:Callable,  master_list:list
             for j in undone_kind:
                 mstr.undone_kind[j] = mstr.undone_kind[j] + 1
             
-            #TODO I do not understand why the undone list is used to update every other list
-            
             for i, master_entity in enumerate(master_list):
                 master_entity.update_undone(undone[i])
 
-    #cloud.task_queue, undone, undone_kind = check_queue(cloud.task_queue, cur_time, len(master_list))
     for i, master_entity in enumerate(master_list):
         master_entity.update_undone(undone[i])
     
@@ -436,13 +407,10 @@ def update_state_of_dockers(cur_time:float, master_list: list)->Type[Cloud]:
             for i, master_entity in enumerate(master_list):
                 master_entity.update_undone(undone[i])
                 master_entity.update_done(done[i])
-    #cloud, undone, done, done_kind, undone_kind = update_docker(cloud, master_list, cur_time, service_coefficient, POD_CPU)
 
     for i, master_entity in enumerate(master_list):
                 master_entity.update_undone(undone[i])
                 master_entity.update_done(done[i])
-
-    #return cloud  
 
 def create_dockers(MAX_TASK_TYPE:int, deploy_states:list, service_coefficient:list, POD_MEM:float, POD_CPU:float, cur_time:float, master_list:float)->None:
     """Creation of dockers
@@ -552,6 +520,4 @@ def plot_list(data_list:list, title:str, x_label:str, y_label:str)->None:
     plt.title(title)
     plt.xlabel(x_label)#"Number of Episodes")
     plt.ylabel(y_label)#"Throughput rate")
-    #plt.ylim([0, 100])
-    #plt.show()
     plt.savefig('./plots/'+title + '.png')

@@ -4,8 +4,8 @@ sys.path.append("..")
 import numpy as np
 import torch.nn as nn
 import torch
-
-from algorithm_torch.CMMAC_fc_layer import fc
+from algorithm_torch.helpers_main_pytorch import device
+from algorithm_torch.cMMAC_model import createmodel
 import torch.optim as optim
 from algorithm_torch.helpers_main_pytorch import set_lr
 from algorithm_torch.losses import simple_square_loss
@@ -22,20 +22,15 @@ class Value_Model(nn.Module):
             act (Pytorch Activation layer type, optional): Desired Activation function for all layers. Defaults to nn.ReLU().
         """
         super().__init__()
-        self.fc1 = fc(state_dim, inp_sizes[0], act=act)
-        self.fc2 = fc(inp_sizes[0], inp_sizes[1], act=act)
-        self.fc3 = fc(inp_sizes[1], inp_sizes[2], act=act)
-        self.fc4 = fc(inp_sizes[2], 1, act=act)
+        self.inp_sizes = inp_sizes
+        self.state_dim = state_dim
+        self.act  = act
+        self.model = createmodel(self.inp_sizes, self.state_dim, 1, self.act)
         self.vm_criterion = loss
         
-
-    def forward(self, x):
-        x = torch.from_numpy(x)
-        x = self.fc1(x.float())
-        x = self.fc2(x)
-        x = self.fc3(x)
-        x = self.fc4(x)
-        return x
+    def forward(self, x:np.array)->torch.Tensor:
+        x = self.model(x.float())
+        return x 
     
 def build_value_model(state_dim:int, loss:Callable= simple_square_loss)-> Tuple[Type[Value_Model], Callable]:
     """[Method to build the value model and assign its loss and optimizers]
@@ -53,13 +48,19 @@ def update_value( s:np.array, y:np.array, learning_rate:float, vm:Type[Value_Mod
         y ([Numpy array]): [target]
         learning_rate ([float]): [learning rate]
     """
+    vm.to(device)
+    s = torch.from_numpy(s)
+    s = s.to(device)
     vm_optimizer.zero_grad()
-    value_output = vm(s)
+    value_output = vm(s.float())
     y = torch.tensor(y)
+    value_output, y = value_output.to(device), y.to(device)
     loss = vm.vm_criterion(y, value_output)
     
     set_lr(vm_optimizer, learning_rate)
     loss.backward()
     vm_optimizer.step()
+    vm.to("cpu")
+    value_output, y = value_output.to("cpu"), y.to("cpu")
     return loss
     

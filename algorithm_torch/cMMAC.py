@@ -5,6 +5,7 @@ from copy import deepcopy
 from algorithm_torch.CMMAC_Policy_Model import *
 from algorithm_torch.CMMAC_Value_Model import *
 from algorithm_torch.ReplayMemory import *
+from algorithm_torch.helpers_main_pytorch import device
 from typing import Union, Tuple, Type
 
 class Estimator:
@@ -44,7 +45,18 @@ class Estimator:
                curr_neighbor_mask_policy) : Neighbor masking policy
                next_state_ids : Propagated states
         """
-        value_output = critic(np.array(critic_state))
+        
+        critic.to(device)
+        self.pm.to(device)
+        critic_state = np.array(critic_state)
+        critic_state = torch.Tensor(critic_state)#, dtype=torch.float)
+        critic_state = critic_state.to(device)
+        
+        state = np.array(state)
+        state = torch.Tensor(state)#, dtype=torch.float)
+        state = state.to(device)
+        
+        value_output = critic(critic_state)
         value_output = value_output.flatten()
         
         action_tuple = []
@@ -56,52 +68,33 @@ class Estimator:
         curr_state_value = []
         next_state_ids = []
         
-        #TODO put things in perspective here
-        
         grid_ids = [x for x in range(self.number_of_master_nodes)]
-        #print('grid_ids : ', grid_ids)
         self.valid_action_mask = np.zeros((self.number_of_master_nodes, self.action_dim))
-        #print('self.valid_action_mask : ', self.valid_action_mask)
         for j in ava_node:
-            #if len(self.valid_action_mask[self.number_of_master_nodes-1]) ==j:
-            #
-            #    self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
-            #else:
-            #    self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
+
             self.valid_action_mask[self.number_of_master_nodes-1][j] = 1
         curr_neighbor_mask = deepcopy(self.valid_action_mask)
-        #print('curr_neighbor_mask : ', curr_neighbor_mask)
         self.valid_neighbor_node_id = [[i for i in range(self.action_dim)] for j in range(self.number_of_master_nodes)]
-        #print('self.valid_neighbor_node_id : ', self.valid_neighbor_node_id)
-        #print(a=b)
         # compute policy probability.
+        
         self.pm_out =self.pm(state)
         action_probs,_,_ = sm_prob(self.pm_out, curr_neighbor_mask) 
         curr_neighbor_mask_policy = []
-        #print('len(grid_ids) : ', len(grid_ids))
         for idx, grid_valid_idx in enumerate(grid_ids):
             action_prob = action_probs[idx]
             # action probability for state value function
 
-            action_prob = action_prob.detach().numpy()
+            action_prob = action_prob.detach().cpu().numpy()
             valid_prob.append(action_prob)
             
             # To prevent breaking of the code given the context is set to 0
             if int(context[idx]) == 0:
                 continue
             
-            #curr_action_indices_temp = np.random.choice(self.action_dim, int(context[idx]),
-            #                                            p=action_prob / np.sum(action_prob))
             curr_action_indices_temp  = [np.argmax(action_prob)]
-            #print('curr_action_indices_temp : ', curr_action_indices_temp) 
-            #print('action_prob : ', action_prob)
-            #print('action_probs : ', action_probs)
-            #print('action_predicted : ', curr_action_indices_temp)
             curr_action_indices = [0] * self.action_dim
             for kk in curr_action_indices_temp:
                 curr_action_indices[kk] += 1
-            #print('curr_action_indices : ', curr_action_indices)
-            #print('action_dim : ', self.action_dim)
             self.valid_neighbor_grid_id = self.valid_neighbor_node_id
             for curr_action_idx, num_driver in enumerate(curr_action_indices):
                 if num_driver > 0:
@@ -112,18 +105,27 @@ class Estimator:
                     temp_a = np.zeros(self.action_dim)
                     temp_a[curr_action_idx] = 1
                     action_choosen_mat.append(temp_a)
-                    policy_state.append(state)
+                    policy_state.append(state.to('cpu'))
                     curr_state_value.append(value_output[idx])
                     next_state_ids.append(self.valid_neighbor_grid_id[grid_valid_idx][curr_action_idx])
                     curr_neighbor_mask_policy.append(curr_neighbor_mask[idx])
+
+        critic.to("cpu")
+        critic_state = critic_state.to("cpu")
+        state = state.to("cpu")
         
-        #print('curr_neighbor_mask_policy : ', curr_neighbor_mask_policy)
-        #print('action_choosen_mat : ', action_choosen_mat)
-        #a=b
-        return action_tuple, np.stack(valid_prob), \
-               np.stack(policy_state), np.stack(action_choosen_mat), curr_state_value, \
-               np.stack(curr_neighbor_mask_policy), next_state_ids
-    
+        
+        valid_prob = np.stack(valid_prob)
+        
+        policy_state = np.stack(policy_state) 
+        action_choosen_mat = np.stack(action_choosen_mat)
+        curr_neighbor_mask_policy = np.stack(curr_neighbor_mask_policy)
+        
+        return action_tuple, valid_prob, \
+               policy_state, action_choosen_mat, curr_state_value, \
+               curr_neighbor_mask_policy, next_state_ids
+
+        
     def compute_advantage(self, curr_state_value:list, next_state_ids:list, next_state:np.array, critic: Type[Value_Model], node_reward: np.array, gamma:float)->list:
         """[Calculates difference between predicted Q value and ! Value target]
 
@@ -140,14 +142,19 @@ class Estimator:
         """
         # compute advantage
 
+        next_state = torch.Tensor(next_state)#, dtype=torch.float)
+        next_state = next_state.to(device)
+        critic.to(device)
+        
         advantage = []
         node_reward = node_reward.flatten()
         qvalue_next = critic(next_state).flatten()
 
         for idx, _ in enumerate(next_state_ids):
             temp_adv = sum(node_reward) + gamma * sum(qvalue_next) - curr_state_value[idx]
-            advantage.append(temp_adv.detach().numpy())
-
+            advantage.append(temp_adv.cpu().detach().numpy())
+        critic.to("cpu")
+        next_state = next_state.to("cpu")
         return advantage
     
     def compute_targets(self, valid_prob: np.array, next_state: np.array, critic: Type[Value_Model], node_reward: np.array, curr_neighbor_mask: np.array, gamma: float)->np.array:
@@ -166,6 +173,9 @@ class Estimator:
         """
         # compute targets
         
+        next_state = torch.Tensor(next_state)#, dtype=torch.float)
+        next_state = next_state.to(device)
+        critic.to(device)
         targets = []
         node_reward = node_reward.flatten()
         qvalue_next = critic(next_state).flatten()
@@ -174,9 +184,10 @@ class Estimator:
             grid_prob = valid_prob[idx][curr_neighbor_mask[idx] > 0]
             
             curr_grid_target = np.sum(
-                grid_prob * (sum(node_reward) + gamma * sum(qvalue_next.detach().numpy())))
+                grid_prob * (sum(node_reward) + gamma * sum(qvalue_next.cpu().detach().numpy())))
             targets.append(curr_grid_target)
-
+        critic.to("cpu")
+        next_state = next_state.to("cpu")
         return np.array(targets).reshape([-1, 1])
 
 def to_grid_rewards(node_reward:list)->np.array:

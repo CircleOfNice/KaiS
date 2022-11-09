@@ -287,45 +287,16 @@ def get_ava_node(curr_task:list, action_dims:list, deploy_states:list, randomize
     ava_node = []
 
     for i in range(len(curr_task)):
-        #TODO Repeated chunk of code delete this
-        #if randomize ==False:
-        
-        #    tmp_list = [action_dims[i] -1]  # Cloud is always available
-        #else:
-        #    
-        #    tmp_list = [action_dims[i] -1]
         tmp_list = [] # There is no cloud action so removing the cloud action# Natural reduction of dimension for computers
         
         deploy_state = deploy_states[i]
-        #print('deploy_states : ', deploy_states)
-        #print('deploy_state : ', deploy_state)
-        #print('curr_task : ', curr_task)
-        #print('len(tmp_list), len(deploy_states), deploy_state : ', len(tmp_list), len(deploy_states), deploy_state)
         for ii in range(len(deploy_state)):
-            #print('deploy_state[ii] : ', deploy_state[ii])
-            #print('curr_task : ', curr_task)
-            #print('curr_task[i] : ', curr_task[i])
-            #print('curr_task[i][0] : ', curr_task[i][0])
-            #print('deploy_state[ii][curr_task[i][0]] : ', deploy_state[ii][curr_task[i][0]])
             try:
-                #val =curr_task[i][0]
-                #val2 =curr_task[i]
-                #print('curr_task: ', curr_task)
-                #print('curr_task[i][0]: ', val)
-                #print('curr_task[i], ii : ', val2, ii)
-                #print('deploy_state[ii]: ', deploy_state[ii])
-                #print('deploy_state[ii][curr_task[i][0]] : ', deploy_state[ii][curr_task[i][0]] )
                 if deploy_state[ii][curr_task[i][0]] == 1:
-                    #print('val curr_task[i][0] : ', curr_task[i][0])
                     tmp_list.append(ii)
-                    #print(tmp_list)
             except: 
                 continue
         ava_node.append(tmp_list)
-    #print('ava_node : ', ava_node)
-    #print('after curr_task : ', (curr_task))
-    #a=b
-    #print('Look into Major Functions ava node to check')
     return ava_node
 
 def get_critic_state(master_list:list, state_list:list, deploy_states:list)->list:
@@ -601,7 +572,7 @@ def train_actor_critic_without_orchestration(ReplayMemory_list:list, policy_repl
     
     log_estimator_value_loss = train_critic(TRAIN_TIMES, master_list, ReplayMemory_list, critic, critic_optimizer, log_estimator_value_loss)
     log_estimator_policy_loss = train_actors(TRAIN_TIMES, master_list, policy_replay_list, q_estimator_list, log_estimator_policy_loss)
-    
+
     return log_estimator_value_loss, log_estimator_policy_loss
 
         

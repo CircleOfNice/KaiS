@@ -25,7 +25,7 @@ from algorithm_torch.major_functions import initialize_eap_params, initialize_cm
 from algorithm_torch.major_functions import get_updated_tasks_ava_node_states, get_estimators_output, put_and_update_tasks, update_exp_replays, train_actor_critic_without_orchestration, check_and_dump
 
 def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, randomize: bool, total_eaps: int, 
-              low_bound_edge_mode: int, upper_bound_edge_mode : int, nodes_in_cluster: int, randomize_data: bool, epsilon_exploration: bool)-> float:
+              low_bound_edge_mode: int, upper_bound_edge_mode : int, nodes_in_cluster: int, randomize_data: bool, epsilon_exploration: bool, explore_var: float)-> float:
     """[Function to execute the KAIS Algorithm ]
 
     Args:
@@ -55,7 +55,6 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
     log_orchestration_loss, log_estimator_value_loss, log_estimator_policy_loss = [], [], []
     global_step1 = 0
     global_step2 = 0
-    #exp = {'node_inputs': [], 'scale_inputs': [], 'reward': [], 'wall_time': [] }
     csv_paths = ['./data/Task_1.csv', './data/Task_2.csv']
     max_tasks, all_task_list,edge_list, _, master_param_lists, action_dims = initialize_eap_params(csv_paths, total_eaps, nodes_in_cluster,
                                                                                                                                   low_bound_edge_mode, upper_bound_edge_mode, randomize_data, randomize)
@@ -79,7 +78,6 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
         if len(all_cum_reward)>0:
             for elem in all_cum_reward[0]:
                 cum_reward_across_episodes.append(elem)
-        #exp = {'node_inputs': [], 'scale_inputs': [], 'reward': [], 'wall_time': [] }
         ############ Set up according to your own needs  ###########
         # The parameters here are set only to support the operation of the program, and may not be consistent with the actual system
         # At each edge node 1 denotes a kind of service which is running
@@ -92,25 +90,18 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
             ########### Each frame ###########
             
             master_list, curr_task, ava_node, s_grid, critic_state = get_updated_tasks_ava_node_states(master_list, deploy_states, action_dims, cur_time, max_tasks, randomize)
-            
-            #print('curr_task eap : ', curr_task)
-            #print('ava_node eap : ', ava_node)
-            #print('critic_state : ', len(critic_state))
-            #print('s_grid.shape : ', len(s_grid))
             # Dispatch decision
             act, valid_action_prob_mat, policy_state, action_choosen_mat, curr_neighbor_mask, curr_state_value, next_state_ids = get_estimators_output(q_estimator_list, s_grid,critic, critic_state, ava_node, context)
             ###### Randomising if 0.05 then it is epsilor exploration
             if epsilon_exploration:
-                if random.uniform(0, 1)< 0.05:
+                if random.uniform(0, 1)< explore_var:
                 	act = [random.randint(0,sum(action_dims)), random.randint(0,sum(action_dims))]
                  
             pre_done, pre_undone, cur_done, cur_undone  = put_and_update_tasks(act, curr_task,  master_list,check_queue, cur_time, pre_done, pre_undone)
-            #a=b
             achieve_num.append(sum(cur_done))
             fail_num.append(sum(cur_undone))
 
             immediate_reward = calculate_reward(master_list, cur_done, cur_undone)
-            #print('CMMAC reward :, ', immediate_reward )
             record.append([master_list, cur_done, cur_undone, immediate_reward])
 
             if slot != 0:
@@ -165,11 +156,11 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 200#10#20#0#20 #500 # Number of Episodes to run
+    RUN_TIMES = 1#10#20#0#20 #500 # Number of Episodes to run
     TASK_NUM = 5000 # 5000 Time for each Episode Ending # Though episodes are actually longer
     TRAIN_TIMES = 1#0#50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000#1000 # Orchestration cycle
-
+    explore_var = 0.05
     ##############################################################
     # New configuration settings
     nodes_in_cluster =3
@@ -180,4 +171,4 @@ if __name__ == "__main__":
     randomize_data = False
     epsilon_exploration = True # Not the default implementation for this project
 
-    throughput_list = execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, randomize_data, epsilon_exploration)
+    throughput_list = execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, randomize_data, epsilon_exploration, explore_var)

@@ -211,7 +211,6 @@ def update_docker(node:Type[Node], master_list:list, cur_time:float, service_coe
 
                     elif cur_time + to_do > node.task_queue[i][2]:
                         undone[node.task_queue[i][5]] = undone[node.task_queue[i][5]] + 1
-                        print('undone[node.task_queue[i][5]] : ', undone[node.task_queue[i][5]])
                         undone_kind.append(node.task_queue[i][0])
                         del node.task_queue[i]
                         flag = 1
