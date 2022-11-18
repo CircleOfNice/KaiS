@@ -11,7 +11,7 @@ from typing import Union, Tuple, Type
 class Estimator:
     """Class to Define the cMMAC (Actor Critic) model
     """
-    def __init__(self, action_dim:int, state_dim:int, number_of_master_nodes:int):
+    def __init__(self, action_dim:int, state_dim:int, inp_sizes, number_of_master_nodes:int):
         """Initialisation of arguments
 
         Args:
@@ -23,9 +23,11 @@ class Estimator:
         self.number_of_master_nodes = number_of_master_nodes
         self.action_dim = action_dim
         self.state_dim = state_dim
+        self.inp_sizes = inp_sizes
+        
         # Initial value for losses
         self.entropy = 1
-        self.pm, self.pm_optimizer = build_policy_model(self.state_dim, self.action_dim)
+        self.pm, self.pm_optimizer = build_policy_model(self.state_dim, self.action_dim, self.inp_sizes)
         
     def action(self, state:np.array, critic: Type[Value_Model], critic_state: np.array, ava_node:list, context: bool)-> Tuple[list, np.array, np.array, np.array,list, np.array, list]:
         """

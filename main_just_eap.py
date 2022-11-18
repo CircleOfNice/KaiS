@@ -3,7 +3,7 @@ import time
 import logging
 logger = logging.getLogger(__name__)  
 import random
-
+import optuna
 # set log level
 logger.setLevel(logging.ERROR)
 
@@ -25,7 +25,7 @@ from algorithm_torch.major_functions import initialize_eap_params, initialize_cm
 from algorithm_torch.major_functions import get_updated_tasks_ava_node_states, get_estimators_output, put_and_update_tasks, update_exp_replays, train_actor_critic_without_orchestration, check_and_dump
 
 def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, randomize: bool, total_eaps: int, 
-              low_bound_edge_mode: int, upper_bound_edge_mode : int, nodes_in_cluster: int, randomize_data: bool, epsilon_exploration: bool, explore_var: float)-> float:
+              low_bound_edge_mode: int, upper_bound_edge_mode : int, nodes_in_cluster: int, inp_sizes: list, randomize_data: bool, epsilon_exploration: bool, explore_var: float)-> float:
     """[Function to execute the KAIS Algorithm ]
 
     Args:
@@ -56,10 +56,12 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
     global_step1 = 0
     global_step2 = 0
     csv_paths = ['./data/Task_1.csv', './data/Task_2.csv']
+    
+    
     max_tasks, all_task_list,edge_list, _, master_param_lists, action_dims = initialize_eap_params(csv_paths, total_eaps, nodes_in_cluster,
-                                                                                                                                  low_bound_edge_mode, upper_bound_edge_mode, randomize_data, randomize)
+                                                                                                                                  low_bound_edge_mode, upper_bound_edge_mode , randomize_data, randomize)
     MAX_TASK_TYPE = max_tasks +1
-    critic, critic_optimizer, q_estimator_list, ReplayMemory_list, policy_replay_list = initialize_cmmac_agents(MAX_TASK_TYPE, all_task_list,edge_list, master_param_lists, action_dims, randomize)
+    critic, critic_optimizer, q_estimator_list, ReplayMemory_list, policy_replay_list = initialize_cmmac_agents(MAX_TASK_TYPE, all_task_list,edge_list, master_param_lists, action_dims, inp_sizes,randomize)
     
     logger.debug('Multiple Actors initialised')
     logger.debug('centralised critic initialised')
@@ -150,13 +152,16 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
     done_dumping  = check_and_dump(name, time_str, record, throughput_list)
     
     generate_plots(all_task_list, throughput_list, log_orchestration_loss, log_estimator_value_loss, log_estimator_policy_loss, randomize, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster)
+    average_throughput = sum(throughput_list)/len(throughput_list)
     print('dumped Experiment Data: ', done_dumping)
-    return throughput_list
+    return average_throughput
+
+
     
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 1#10#20#0#20 #500 # Number of Episodes to run
+    RUN_TIMES = 2#10#20#0#20 #500 # Number of Episodes to run
     TASK_NUM = 5000 # 5000 Time for each Episode Ending # Though episodes are actually longer
     TRAIN_TIMES = 1#0#50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000#1000 # Orchestration cycle
@@ -166,9 +171,27 @@ if __name__ == "__main__":
     nodes_in_cluster =3
     low_bound_edge_mode = 2
     upper_bound_edge_mode = 6
+    automl = True
+    
     total_eaps = 1 #random.sample(range(low_bound_edge_mpde, upper_bound_edge_mpde), 1)[0]
     randomize = False #False # Change it as per needs
     randomize_data = False
     epsilon_exploration = True # Not the default implementation for this project
 
-    throughput_list = execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, randomize_data, epsilon_exploration, explore_var)
+    
+    inp_sizes = [128, 64, 32]
+    if automl:
+        def objective(trial):
+            n_layers = trial.suggest_int('n_layers', 1, 10)
+            min = 8
+            max = 512
+            
+            
+            inp_sizes = [trial.suggest_int(str(i), min, max) for i in range(n_layers)]
+            throughput_list = execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, inp_sizes, randomize_data, epsilon_exploration, explore_var)
+            return throughput_list
+        study = optuna.create_study(direction='maximize')
+    out = study.optimize(objective, n_trials=500)
+    print('Study results best trial : ',study.best_trial)
+            
+    throughput_list = execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, inp_sizes, randomize_data, epsilon_exploration, explore_var)

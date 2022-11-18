@@ -32,10 +32,10 @@ class Value_Model(nn.Module):
         x = self.model(x.float())
         return x 
     
-def build_value_model(state_dim:int, loss:Callable= simple_square_loss)-> Tuple[Type[Value_Model], Callable]:
+def build_value_model(state_dim:int, inp_sizes, loss:Callable= simple_square_loss)-> Tuple[Type[Value_Model], Callable]:
     """[Method to build the value model and assign its loss and optimizers]
     """
-    vm = Value_Model(state_dim, inp_sizes = [128, 64, 32], loss = loss)
+    vm = Value_Model(state_dim, inp_sizes = inp_sizes, loss = loss)
     vm_optimizer = optim.Adam(vm.parameters(), lr=0.001)
     return vm, vm_optimizer
     

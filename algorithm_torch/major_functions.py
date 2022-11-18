@@ -107,7 +107,7 @@ def initialize_eap_params(csv_paths: str, total_eaps : int, nodes_in_cluster : i
 
     return  max_tasks, all_task_list,edge_list, node_param_lists, master_param_lists, action_dims
 
-def initialize_cmmac_agents(MAX_TASK_TYPE:int, all_task_list:list,edge_list:list, master_param_lists:list, action_dims:list, randomize:bool)->Tuple[Type[Value_Model], Callable, list,  list, list]:
+def initialize_cmmac_agents(MAX_TASK_TYPE:int, all_task_list:list,edge_list:list, master_param_lists:list, action_dims:list, inp_sizes:list, randomize:bool)->Tuple[Type[Value_Model], Callable, list,  list, list]:
     '''
     Function to initialise eAp Agents 
     Args: 
@@ -132,7 +132,7 @@ def initialize_cmmac_agents(MAX_TASK_TYPE:int, all_task_list:list,edge_list:list
 
     if randomize ==False:
         for i in range(len(master_param_lists)):
-            q_estimator_list.append(Estimator(action_dims[i], s_grid_len[i], 1)) # Definition of cMMAc Agent
+            q_estimator_list.append(Estimator(action_dims[i], s_grid_len[i], inp_sizes, 1)) # Definition of cMMAc Agent
             ReplayMemory_list.append(ReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) # experience Replay for value network for cMMMac Agent
             policy_replay_list.append(policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) #experience Replay for Policy network for cMMMac Agent
     else:
@@ -142,7 +142,7 @@ def initialize_cmmac_agents(MAX_TASK_TYPE:int, all_task_list:list,edge_list:list
             policy_replay_list.append(policyReplayMemory(memory_size=1e+6, batch_size=int(3e+3))) #experience Replay for Policy network for cMMMac Agent
     
     # Creation of global critic (currently without cloud info of unprocessed requests)
-    critic, critic_optimizer = build_value_model(sum(s_grid_len))#+ 1) # Length of task queue can be only one digit long
+    critic, critic_optimizer = build_value_model(sum(s_grid_len), inp_sizes)#+ 1) # Length of task queue can be only one digit long
     
     return critic, critic_optimizer, q_estimator_list,  ReplayMemory_list, policy_replay_list
 
@@ -375,9 +375,7 @@ def get_estimators_output(q_estimator_list:list, s_grid:list, critic: Type[Value
     curr_state_value = []
     curr_neighbor_mask = []
     next_state_ids = []
-    #print('len(s_grid) get_estimators_output : ', len(s_grid))
     for i in range(len(s_grid)):
-        #print('len(s_grid) loop, i : ', len(s_grid), i)
         act_, valid_action_prob_mat_, policy_state_, action_choosen_mat_, \
         curr_state_value_, curr_neighbor_mask_, next_state_ids_ = q_estimator_list[i].action(np.array(s_grid[i]), critic, critic_state, ava_node[i], context,)
 
@@ -488,7 +486,6 @@ def update_exp_replays(immediate_reward:np.array, q_estimator_list:list, ReplayM
         # Advantage for policy network.
         advantage = q_estimator_list[m].compute_advantage([curr_state_value_prev[m]], [next_state_ids_prev[m]] ,
                                                 np.array(critic_state), critic, r_grid[[m],:], gamma)
-        #print(len(curr_task))
         test_cond_list = []
         for i, elem in enumerate(curr_task):
             try:
