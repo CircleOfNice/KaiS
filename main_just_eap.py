@@ -3,7 +3,7 @@ import time
 import logging
 logger = logging.getLogger(__name__)  
 import random
-import optuna
+#import optuna
 # set log level
 logger.setLevel(logging.ERROR)
 
@@ -84,14 +84,14 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
         # The parameters here are set only to support the operation of the program, and may not be consistent with the actual system
         # At each edge node 1 denotes a kind of service which is running
         master_list, deploy_states, pre_done, pre_undone, context = initialize_episode_params(all_task_list, edge_list, MAX_TASK_TYPE, cur_time)
-        
+        #print('pre_done, pre_undone : ', pre_done, pre_undone)
         logger.debug('Outer loop initialization done')
         ########### Each slot ###########
         for slot in range(BREAK_POINT):
             cur_time = cur_time + SLOT_TIME
             ########### Each frame ###########
             
-            master_list, curr_task, ava_node, s_grid, critic_state = get_updated_tasks_ava_node_states(master_list, deploy_states, action_dims, cur_time, max_tasks, randomize)
+            master_list, curr_task, ava_node, s_grid, critic_state, state_list = get_updated_tasks_ava_node_states(master_list, deploy_states, action_dims, cur_time, max_tasks, randomize)
             # Dispatch decision
             act, valid_action_prob_mat, policy_state, action_choosen_mat, curr_neighbor_mask, curr_state_value, next_state_ids = get_estimators_output(q_estimator_list, s_grid,critic, critic_state, ava_node, context)
             ###### Randomising if 0.05 then it is epsilor exploration
@@ -161,9 +161,9 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 2#10#20#0#20 #500 # Number of Episodes to run
-    TASK_NUM = 5000 # 5000 Time for each Episode Ending # Though episodes are actually longer
-    TRAIN_TIMES = 1#0#50 # Training Iterations for policy and value networks (Actor , Critic)
+    RUN_TIMES = 1#10#20#0#20 #500 # Number of Episodes to run
+    TASK_NUM = 2000 # 5000 Time for each Episode Ending # Though episodes are actually longer
+    TRAIN_TIMES = 5#0#50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000#1000 # Orchestration cycle
     explore_var = 0.05
     ##############################################################
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     nodes_in_cluster =3
     low_bound_edge_mode = 2
     upper_bound_edge_mode = 6
-    automl = True
+    automl = False#True
     
     total_eaps = 1 #random.sample(range(low_bound_edge_mpde, upper_bound_edge_mpde), 1)[0]
     randomize = False #False # Change it as per needs
@@ -191,7 +191,7 @@ if __name__ == "__main__":
             throughput_list = execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, inp_sizes, randomize_data, epsilon_exploration, explore_var)
             return throughput_list
         study = optuna.create_study(direction='maximize')
-    out = study.optimize(objective, n_trials=500)
-    print('Study results best trial : ',study.best_trial)
+        out = study.optimize(objective, n_trials=50)
+        print('Study results best trial : ',study.best_trial)
             
     throughput_list = execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, inp_sizes, randomize_data, epsilon_exploration, explore_var)

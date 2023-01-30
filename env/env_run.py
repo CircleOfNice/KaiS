@@ -4,6 +4,7 @@ import csv
 import random
 from typing import Type, Tuple
 from env.platform import Master, Node
+from env.platform import Docker
 def get_all_task(path:str, randomize:bool = True)->Tuple:
     """Get Processed data from the file given in path
 
@@ -109,7 +110,6 @@ def update_task_queue(master:Type[Master], cur_time:float, master_id:int)->Type[
             del master.task_queue[i]
         else:
             i = i + 1
-    # get new task
     while master.all_task[1][master.all_task_index] < cur_time:
         task = [master.all_task[0][master.all_task_index], master.all_task[1][master.all_task_index],
                 master.all_task[2][master.all_task_index], master.all_task[3][master.all_task_index],
@@ -122,8 +122,8 @@ def update_task_queue(master:Type[Master], cur_time:float, master_id:int)->Type[
         if master.task_queue[i][0] != -1:
             tmp_list.append(master.task_queue[i])
     tmp_list = sorted(tmp_list, key=lambda x: (x[2], x[1]))
+
     master.task_queue = tmp_list
-    
     return master
 
 
@@ -149,6 +149,7 @@ def check_queue(task_queue:list, cur_time:float, length_masterlist:int)->Tuple:
     while len(task_queue) != i:
         flag = 0
         if cur_time >= task_queue[i][2]:
+            
             undone[task_queue[i][5]] = undone[task_queue[i][5]] + 1
             undone_kind.append(task_queue[i][0])
             del task_queue[i]
@@ -157,69 +158,50 @@ def check_queue(task_queue:list, cur_time:float, length_masterlist:int)->Tuple:
             flag = 0
         else:
             i = i + 1
+        
     return task_queue, undone, undone_kind
 
-
-def update_docker(node:Type[Node], master_list:list, cur_time:float, service_coefficient:list, POD_CPU:float)->Tuple:
-    """[Update the docker given the node]
-
-    Args:
-        node ([Node Object]): [Edge node]
-        cur_time ([int]): [current time]
-        service_coefficient ([float]): [number identifying intensity (demand ) of the tasks]
-        POD_CPU ([float]): [CPU resources required to make a POD]
-
-    Returns:
-        [list]: [Edge node, undone and done task lists with list of tasks that are done and undone]
-    """
-    
+def update_docker(node:Type[Node], master_list:list, cur_time:float, service_coefficient:list)->Tuple:
     done = []
     undone = []
-    for i in range(len(master_list)):
-        done.append(0)
-        undone.append(0)
-        
     done_kind = []
-    undone_kind = []
-
-    # find achieved task in current time
-    for i in range(len(node.service_list)):
-        if node.service_list[i].available_time <= cur_time and len(node.service_list[i].doing_task) > 1:
-            done[node.service_list[i].doing_task[5]] = done[node.service_list[i].doing_task[5]] + 1
-            done_kind.append(node.service_list[i].doing_task[0])
-            node.service_list[i].doing_task = [-1]
-            node.service_list[i].available_time = cur_time
-    # execute task in queue
-    i = 0
-    while i != len(node.task_queue):
-        flag = 0
-        for j in range(len(node.service_list)):
-            if i == len(node.task_queue):
-                break
-            if node.task_queue[i][0] == node.service_list[j].kind:
-                if node.service_list[j].available_time > cur_time:
-                    continue
-                if node.service_list[j].available_time <= cur_time:
-                    to_do = (node.task_queue[i][3]) / node.service_list[j].cpu
-                    if cur_time + to_do <= node.task_queue[i][2] and node.cpu >= POD_CPU * service_coefficient[
-                        node.task_queue[i][0]]:
-                        node.cpu = node.cpu - POD_CPU * service_coefficient[node.task_queue[i][0]]
-                        node.service_list[j].available_time = cur_time + to_do
-                        node.service_list[j].doing_task = node.task_queue[i]
-                        del node.task_queue[i]
-                        flag = 1
-
-                    elif cur_time + to_do > node.task_queue[i][2]:
-                        undone[node.task_queue[i][5]] = undone[node.task_queue[i][5]] + 1
-                        undone_kind.append(node.task_queue[i][0])
-                        del node.task_queue[i]
-                        flag = 1
-                    elif node.cpu < POD_CPU * service_coefficient[node.task_queue[i][0]]:
-                        pass
-
-        if flag == 1:
-            flag = 0
-        else:
-            i = i + 1
-
-    return node, undone, done, done_kind, undone_kind
+    undone_kind = []    
+    flag = 0
+    if node.task_queue!=[-1]:
+        
+        task_queue = []
+        for i in range(len(node.task_queue)):
+            
+            if node.cpu >= node.task_queue[i][3] * service_coefficient[node.task_queue[i][0]] and \
+                node.mem >= node.task_queue[i][4] * service_coefficient[node.task_queue[i][0]]:       
+                flag  = 1  
+                docker_container = Docker(node.task_queue[i][3] * service_coefficient[node.task_queue[i][0]], 
+                                        node.task_queue[i][4] * service_coefficient[node.task_queue[i][0]], 
+                                        node.task_queue[i][2], node.task_queue[i][0], node.task_queue[i]) 
+                node.service_list.append(docker_container)
+                node.cpu = node.cpu - node.task_queue[i][3] * service_coefficient[node.task_queue[i][0]]
+                node.mem = node.mem - node.task_queue[i][4] * service_coefficient[node.task_queue[i][0]]
+                task_queue.append(i)
+                done_kind.append(node.task_queue[i][0]) 
+                done.append(1)
+        if flag ==1:
+            new_node_task_queue= [node.task_queue[x] for x in range(len(node.task_queue)) if x not in task_queue]
+            node.task_queue = new_node_task_queue
+    else : 
+        pass    
+    remove_elements=  []
+    remove_element_flag = 0
+    for i, service in enumerate(node.service_list):
+        if service.available_time > cur_time:
+            continue
+        elif service.available_time <= cur_time:
+            node.cpu = node.cpu + service.doing_task[3] * service_coefficient[service.kind]
+            node.mem = node.mem + service.doing_task[4] * service_coefficient[service.kind]
+            undone.append(1)
+            undone_kind.append(service.doing_task[0])
+            remove_elements.append(i)
+            remove_element_flag =1  
+    if remove_element_flag ==1:      
+        new_node_service_list = [node.service_list[x] for x in range(len(node.service_list)) if x not in remove_elements]
+        node.service_list = new_node_service_list
+    return node, undone, done, done_kind, undone_kind 

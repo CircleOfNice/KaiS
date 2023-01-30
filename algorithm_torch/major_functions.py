@@ -189,15 +189,6 @@ def initialize_episode_params(all_task_list:list, edge_list:list, MAX_TASK_TYPE:
     master_list = create_eAP_and_Cloud(node_param_lists, master_param_lists, all_task_list, MAX_TASK_TYPE, POD_MEM,  POD_CPU, service_coefficient, cur_time)
     
     # Creation of node Graph CNN
-    '''
-    graph_cnn_list = []
-    for master in master_list:
-        cpu_list, mem_list, _ = get_node_characteristics(master) 
-        graph_cnn_list.append(GraphCNN(len(cpu_list)+ len(mem_list) + len(mem_list), hid_dims, output_dim, max_depth, act_function))
-    '''
-    # Create dockers based on deploy_state
-    create_dockers( MAX_TASK_TYPE, deploy_states, service_coefficient, POD_MEM, POD_CPU, cur_time, master_list)
-    
     pre_done, pre_undone, context = get_done_undone_context(master_param_lists)
         
     return master_list, deploy_states, pre_done, pre_undone, context
@@ -345,9 +336,7 @@ def get_updated_tasks_ava_node_states(master_list:list, deploy_states:list, acti
     
     s_grid = get_critic_state(master_list, state_list, deploy_states)
     critic_state = flatten(s_grid)
-    #critic_state.append(len(cloud.task_queue))
-    #print('(ava_node, s_grid, state_list : ', ava_node, s_grid, state_list)
-    return master_list, curr_task, ava_node, s_grid, critic_state
+    return master_list, curr_task, ava_node, s_grid, critic_state, state_list
 
 def get_estimators_output(q_estimator_list:list, s_grid:list, critic: Type[Value_Model], critic_state:list, ava_node:list, context:bool)->Tuple[list,list,list,list,list,list,list]:
     '''
@@ -413,8 +402,8 @@ def get_done_status(master_list:list, pre_done:list, pre_undone:list)->Tuple[lis
     ch_pre_undone = []
     for i, mstr in enumerate(master_list):
         cur_done.append(mstr.done - pre_done[i])
-        cur_undone.append(mstr.undone - pre_undone[i])
         
+        cur_undone.append(mstr.undone - pre_undone[i])
         ch_pre_done.append(mstr.done)
         ch_pre_undone.append(mstr.undone)
 
@@ -444,12 +433,13 @@ def put_and_update_tasks(act:list, curr_task:list, master_list:list,check_queue:
         cloud :  Cloud
     '''
     # Put the current task on the queue based on dispatch decision
-    put_current_task_on_queue(act, curr_task, master_list)# action_dims, cloud, 
+    if any(curr_task):
+        master_list  =  put_current_task_on_queue(act, curr_task, master_list)# action_dims, cloud, 
     # Update state of task
-    update_state_of_task(cur_time, check_queue,  master_list)#cloud,
+    master_list = update_state_of_task(cur_time, check_queue,  master_list)#cloud,
     
     # Update state of dockers in every node
-    update_state_of_dockers(cur_time, master_list)#cloud, 
+    master_list = update_state_of_dockers(cur_time, master_list)#cloud, 
         
     pre_done, pre_undone, cur_done, cur_undone = get_done_status(master_list, pre_done, pre_undone)
     return pre_done, pre_undone, cur_done, cur_undone#, cloud 

@@ -16,8 +16,8 @@ import sys
 vaild_node = 6  # Number of edge nodes available
 SLOT_TIME = 0.5  # Time of one slot
 #MAX_TESK_TYPE = 12  # Number of tesk types
-POD_CPU = 15.0  # CPU resources required for a POD
-POD_MEM = 1.0  # Memory resources required for a POD
+POD_CPU = 1.0  # CPU resources required for a POD
+POD_MEM = 0.1  # Memory resources required for a POD
 # Resource demand coefficients for different types of services
 service_coefficient = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]#[0.8, 0.8, 0.9, 0.9, 1.0, 1.0, 1.1, 1.1, 1.2, 1.2, 1.3, 1.3, 1.4, 1.4]
 # Parameters related to DRL
@@ -73,7 +73,7 @@ def def_initial_state_values(len_all_task_list:int=3, list_length_edge_nodes_per
     #[[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
     #            [0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0], [0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1],
     #            [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1],]
-    node_list_stack = [[100.0, 4.0], [200.0, 6.0], [100.0, 8.0], [200.0, 8.0], [100.0, 2.0], [200.0, 6.0]]
+    node_list_stack = [[100.0, 4.0]]#, [200.0, 6.0], [100.0, 8.0], [200.0, 8.0], [100.0, 2.0], [200.0, 6.0]]
     master_param_list_stack = [[200.0, 8.0]]
     deploy_states = []
     master_param_lists =[]
@@ -253,7 +253,7 @@ def state_inside_eAP(master:Type[Master], num_edge_nodes_per_eAP:list, max_tasks
     task_num  = [len(master.task_queue)]
     if len(master.task_queue)==0:
         service_type = max_tasks + 1
-        delay_requirement = 100000
+        delay_requirement = -1
     else:
         service_type = master.task_queue[0][0]
         delay_requirement = master.task_queue[0][2]-master.task_queue[0][1]
@@ -351,8 +351,8 @@ def put_current_task_on_queue(act:list, curr_task:list, master_list:list)->None:
         master_list (list) :  List of created Master Nodes
 
     """
+    
     _, length_list = get_last_length(master_list)    
-
     for i in range(len(act)):
         try:
             val = curr_task[i][0]
@@ -362,7 +362,7 @@ def put_current_task_on_queue(act:list, curr_task:list, master_list:list)->None:
         for j in range(len(length_list)-1):
             if act[i] >= length_list[j] and act[i] < length_list[j+1] :
                 master_list[j].node_list[act[i] - length_list[j]].task_queue.append(curr_task[i])
-                
+    return master_list
             
 def update_state_of_task( cur_time:list, check_queue:Callable,  master_list:list)->None:
     """Update the state of tasks
@@ -383,10 +383,8 @@ def update_state_of_task( cur_time:list, check_queue:Callable,  master_list:list
             
             for i, master_entity in enumerate(master_list):
                 master_entity.update_undone(undone[i])
+    return master_list
 
-    for i, master_entity in enumerate(master_list):
-        master_entity.update_undone(undone[i])
-    
 def update_state_of_dockers(cur_time:float, master_list: list)->Type[Cloud]:
     """Updates the state of dockers
 
@@ -398,20 +396,17 @@ def update_state_of_dockers(cur_time:float, master_list: list)->Type[Cloud]:
     """
     for mstr in master_list:
         for i in range(len(mstr.node_list)):
-            mstr.node_list[i], undone, done, done_kind, undone_kind = update_docker(mstr.node_list[i], master_list,  cur_time, service_coefficient, POD_CPU)
+            mstr.node_list[i], undone, done, done_kind, undone_kind = update_docker(mstr.node_list[i], master_list,  cur_time, service_coefficient)
+            
             for j in range(len(done_kind)):
                 mstr.done_kind[done_kind[j]] = mstr.done_kind[done_kind[j]] + 1
             for j in range(len(undone_kind)):
                 mstr.undone_kind[undone_kind[j]] = mstr.undone_kind[undone_kind[j]] + 1
-            
-            for i, master_entity in enumerate(master_list):
-                master_entity.update_undone(undone[i])
-                master_entity.update_done(done[i])
-
-    for i, master_entity in enumerate(master_list):
-                master_entity.update_undone(undone[i])
-                master_entity.update_done(done[i])
-
+            for j in range(len(undone)):
+                mstr.update_undone(undone[j])
+            for j in range(len(done)):
+                mstr.update_done(done[j])
+    return master_list
 def create_dockers(MAX_TASK_TYPE:int, deploy_states:list, service_coefficient:list, POD_MEM:float, POD_CPU:float, cur_time:float, master_list:float)->None:
     """Creation of dockers
 
@@ -429,25 +424,27 @@ def create_dockers(MAX_TASK_TYPE:int, deploy_states:list, service_coefficient:li
     
     length_list = [0]
     last_length = length_list[0]
+    
     for mstr in master_list:
         length_list.append(last_length + len(mstr.node_list))
         last_length = last_length + len(mstr.node_list)
     for i, deploy_state in enumerate(deploy_states):
         for dep in deploy_state:
-            
             for ii in range(MAX_TASK_TYPE):
-
                 decision = dep[ii]
+
                 for j in range(len(length_list)-1):
                     if i>= length_list[j] and i < length_list[j+1] and decision == 1:
                         k= i-length_list[j]
-                        if master_list[j].node_list[k].mem >= POD_MEM * service_coefficient[ii]:
+
+                        if master_list[j].node_list[k].mem >= POD_MEM * service_coefficient[ii] and master_list[j].node_list[k].cpu >= POD_CPU * service_coefficient[ii]:
                             docker = Docker(POD_MEM * service_coefficient[ii], POD_CPU * service_coefficient[ii], cur_time,
                                             ii, [-1])
-                            master_list[j].add_to_node_attribute(k, 'mem', - POD_MEM * service_coefficient[ii])
-                            master_list[j].append_docker_to_node_service_list(k, docker)                              
-    
                             
+                            master_list[j].add_to_node_attribute(k, 'mem', - POD_MEM * service_coefficient[ii])
+                            master_list[j].add_to_node_attribute(k, 'cpu', - POD_CPU * service_coefficient[ii])
+                            master_list[j].append_docker_to_node_service_list(k, docker)                              
+                
 def get_node_characteristics(master:Type[Master])->Tuple[list, list, list]:
     """Get the node characteristics of masters eAPs
 
