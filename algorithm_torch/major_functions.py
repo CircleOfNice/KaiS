@@ -1,6 +1,6 @@
 from algorithm_torch.helpers_main_pytorch import *
 #from algorithm_torch.GPG import get_gpg_reward
-from env.env_run import get_all_task, update_task_queue
+from env.env_run import get_all_task, update_task_queue, get_all_task_kubernetes
 from algorithm_torch.cMMAC import Estimator, to_grid_rewards
 from algorithm_torch.ReplayMemory import ReplayMemory
 from algorithm_torch.policyReplayMemory import policyReplayMemory
@@ -28,7 +28,7 @@ def get_all_task_lists(csv_paths:list, randomize_data:bool)->Tuple:
     max_task_pool_init = []
 
     for csv_path in csv_paths:
-        all_task, max_task = get_all_task(csv_path, randomize=randomize_data)
+        all_task, max_task = get_all_task_kubernetes(csv_path, randomize=randomize_data)
         all_task_list_init.append(all_task)
         max_task_pool_init.append(max_task)
     return all_task_list_init, max_task_pool_init

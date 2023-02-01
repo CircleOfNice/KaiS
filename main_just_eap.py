@@ -56,9 +56,12 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
     global_step1 = 0
     global_step2 = 0
     csv_paths = ['./data/Task_1.csv', './data/Task_2.csv']
+
+    csv_paths_kubernetes = [r"/home/ubuntu/mountdir/gdrive/06  Projekte/72 KI/31172009 CRLC_OS/10 Experimentelle Daten/testcluster_data_new/data_01.json"]
+
     
     
-    max_tasks, all_task_list,edge_list, _, master_param_lists, action_dims = initialize_eap_params(csv_paths, total_eaps, nodes_in_cluster,
+    max_tasks, all_task_list,edge_list, _, master_param_lists, action_dims = initialize_eap_params(csv_paths_kubernetes, total_eaps, nodes_in_cluster,
                                                                                                                                   low_bound_edge_mode, upper_bound_edge_mode , randomize_data, randomize)
     MAX_TASK_TYPE = max_tasks +1
     critic, critic_optimizer, q_estimator_list, ReplayMemory_list, policy_replay_list = initialize_cmmac_agents(MAX_TASK_TYPE, all_task_list,edge_list, master_param_lists, action_dims, inp_sizes,randomize)
@@ -97,7 +100,7 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
             ###### Randomising if 0.05 then it is epsilor exploration
             if epsilon_exploration:
                 if random.uniform(0, 1)< explore_var:
-                	act = [random.randint(0,sum(action_dims)), random.randint(0,sum(action_dims))]
+                    act = [random.randint(0,sum(action_dims)), random.randint(0,sum(action_dims))]
                  
             pre_done, pre_undone, cur_done, cur_undone  = put_and_update_tasks(act, curr_task,  master_list,check_queue, cur_time, pre_done, pre_undone)
             achieve_num.append(sum(cur_done))
