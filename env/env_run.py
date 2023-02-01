@@ -9,6 +9,36 @@ from env import load_data
 import random
 
 
+def _convert_mem_units(mem_list:list) -> list:
+    """This method converts the units for memory from Millibytes (Kubernetes) to Gigabytes (Kais)
+
+    Args:
+        mem_list (list): List of memory requests for the tasks (in Millibytes)
+
+    Returns:
+        list: List of memory requests for the tasks (in Gigabytes)
+    """
+    result_list = [i / 1e+12 for i in mem_list]
+    return result_list
+
+
+def _convert_cpu_units(cpu_list:list) -> list:
+    """This method converts the units for cpu requests from Kubernetes to KaiS-Format.
+
+    Kubernetes uses millicore format, whereas were not 100% sure what the unit in KaiS actually is?
+    Maybe % of cpu used?
+    
+    TODO this method does currently nothing as were not sure how to correctly convert the data
+
+    Args:
+        cpu_list (list): List of cpu requests for the tasks (in millicores)
+
+    Returns:
+        list: Returns the same input list back
+    """
+    return cpu_list
+
+
 def _generate_fake_start_end_time(duration_list:list, time_scale_fac:float=1) -> Tuple:
     """Method to generate fake start and end times for data.
 
@@ -57,9 +87,16 @@ def get_all_task_kubernetes(path:str, randomize:bool = True) -> Tuple:
     task_info_lists = load_data.get_all_task(path)
 
     cpu_list = task_info_lists.cpu_req
+    cpu_list = _convert_cpu_units(cpu_list=cpu_list)
+
     mem_list = task_info_lists.mem_req
-    type_list = [1] * len(cpu_list)
+    mem_list = _convert_mem_units(mem_list=mem_list)
+
+    type_list = [1] * len(cpu_list) # TODO setting task type to 1 for every task, is that a problem?
     duration_list = task_info_lists.task_duration
+
+    # TODO Tasks which 0 duration potentially run forever, put high number here?
+    duration_list = [10 or i for i in duration_list] 
 
     start_time_list, end_time_list = _generate_fake_start_end_time(duration_list=duration_list, time_scale_fac=1)
 

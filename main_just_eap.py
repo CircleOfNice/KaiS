@@ -94,9 +94,12 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
             cur_time = cur_time + SLOT_TIME
             ########### Each frame ###########
             
-            master_list, curr_task, ava_node, s_grid, critic_state, state_list = get_updated_tasks_ava_node_states(master_list, deploy_states, action_dims, cur_time, max_tasks, randomize)
+            master_list, curr_task, ava_node, s_grid, critic_state, state_list = get_updated_tasks_ava_node_states(master_list,
+             deploy_states, action_dims, cur_time, max_tasks, randomize)
             # Dispatch decision
-            act, valid_action_prob_mat, policy_state, action_choosen_mat, curr_neighbor_mask, curr_state_value, next_state_ids = get_estimators_output(q_estimator_list, s_grid,critic, critic_state, ava_node, context)
+            act, valid_action_prob_mat, policy_state, action_choosen_mat, curr_neighbor_mask, curr_state_value, next_state_ids = get_estimators_output(
+                q_estimator_list, s_grid,critic, critic_state, ava_node, context)
+
             ###### Randomising if 0.05 then it is epsilor exploration
             if epsilon_exploration:
                 if random.uniform(0, 1)< explore_var:
