@@ -57,7 +57,7 @@ class Docker:
     """[This class serves as framework for definition of Docker containers with properties such as 
     cpu processing, memory, Time since availability, Service kind,  task being done( generally [-1])]
     """
-    def __init__(self, mem:float, cpu:float, available_time:float, kind:int, doing_task:int):
+    def __init__(self, mem:float, cpu:float, available_time:float, kind:int, doing_task:list):
         self.mem = mem
         self.cpu = cpu
         self.available_time = available_time

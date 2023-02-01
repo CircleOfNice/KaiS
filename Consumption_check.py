@@ -3,7 +3,7 @@ import time
 import logging
 logger = logging.getLogger(__name__)  
 import random
-#import optuna
+import optuna
 # set log level
 logger.setLevel(logging.ERROR)
 
@@ -14,7 +14,7 @@ file_handler.setFormatter(formatter)
 
 # add file handler to logger
 logger.addHandler(file_handler)
-
+from algorithm_torch.helpers_consumption import *
 from algorithm_torch.cMMAC import *
 #from algorithm_torch.GPG import *
 from env.platform import *
@@ -25,7 +25,7 @@ from algorithm_torch.major_functions import initialize_eap_params, initialize_cm
 from algorithm_torch.major_functions import get_updated_tasks_ava_node_states, get_estimators_output, put_and_update_tasks, update_exp_replays, train_actor_critic_without_orchestration, check_and_dump
 
 def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, randomize: bool, total_eaps: int, 
-              low_bound_edge_mode: int, upper_bound_edge_mode : int, nodes_in_cluster: int, inp_sizes: list, randomize_data: bool, epsilon_exploration: bool, explore_var: float)-> float:
+              low_bound_edge_mode: int, upper_bound_edge_mode : int, nodes_in_cluster: int, inp_sizes: list, randomize_data: bool, epsilon_exploration: bool, explore_var: float, exploration_reduction: float)-> float:
     """[Function to execute the KAIS Algorithm ]
 
     Args:
@@ -56,12 +56,9 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
     global_step1 = 0
     global_step2 = 0
     csv_paths = ['./data/Task_1.csv', './data/Task_2.csv']
-
-    csv_paths_kubernetes = [r"/home/ubuntu/mountdir/gdrive/06  Projekte/72 KI/31172009 CRLC_OS/10 Experimentelle Daten/testcluster_data_new/data_01.json"]
-
+    consumption_list_overall = []
     
-    
-    max_tasks, all_task_list,edge_list, _, master_param_lists, action_dims = initialize_eap_params(csv_paths_kubernetes, total_eaps, nodes_in_cluster,
+    max_tasks, all_task_list,edge_list, _, master_param_lists, action_dims = initialize_eap_params(csv_paths, total_eaps, nodes_in_cluster,
                                                                                                                                   low_bound_edge_mode, upper_bound_edge_mode , randomize_data, randomize)
     MAX_TASK_TYPE = max_tasks +1
     critic, critic_optimizer, q_estimator_list, ReplayMemory_list, policy_replay_list = initialize_cmmac_agents(MAX_TASK_TYPE, all_task_list,edge_list, master_param_lists, action_dims, inp_sizes,randomize)
@@ -80,6 +77,7 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
         batch_reward = []
         cur_time = 0
         order_response_rates = []
+        consumption_list_episode = []
         if len(all_cum_reward)>0:
             for elem in all_cum_reward[0]:
                 cum_reward_across_episodes.append(elem)
@@ -87,8 +85,9 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
         # The parameters here are set only to support the operation of the program, and may not be consistent with the actual system
         # At each edge node 1 denotes a kind of service which is running
         master_list, deploy_states, pre_done, pre_undone, context = initialize_episode_params(all_task_list, edge_list, MAX_TASK_TYPE, cur_time)
-        #print('pre_done, pre_undone : ', pre_done, pre_undone)
+        
         logger.debug('Outer loop initialization done')
+
         ########### Each slot ###########
         for slot in range(BREAK_POINT):
             cur_time = cur_time + SLOT_TIME
@@ -100,7 +99,8 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
             ###### Randomising if 0.05 then it is epsilor exploration
             if epsilon_exploration:
                 if random.uniform(0, 1)< explore_var:
-                    act = [random.randint(0,sum(action_dims)), random.randint(0,sum(action_dims))]
+                	act = [random.randint(0,sum(action_dims)), random.randint(0,sum(action_dims))]
+                #print('randomised_act', act)
                  
             pre_done, pre_undone, cur_done, cur_undone  = put_and_update_tasks(act, curr_task,  master_list,check_queue, cur_time, pre_done, pre_undone)
             achieve_num.append(sum(cur_done))
@@ -133,6 +133,8 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
             else:
                 order_response_rates.append(0)
 
+            consumption_list_episode.append(get_consumption_dictionary(master_list))
+        consumption_list_overall.append(consumption_list_episode)
         all_number = sum(achieve_num) + sum(fail_num)
         throughput_list.append(sum(achieve_num) / float(all_number))
         print('throughput_list_all =', throughput_list, '\ncurrent_achieve_number =', sum(achieve_num), ', current_fail_number =', sum(fail_num))
@@ -147,9 +149,13 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
         log_estimator_value_loss, log_estimator_policy_loss = train_actor_critic_without_orchestration(ReplayMemory_list, policy_replay_list, master_list, q_estimator_list, critic, critic_optimizer, 
                                                  log_estimator_value_loss, log_estimator_policy_loss, TRAIN_TIMES)
         logger.info('Done training for run time {}', str(n_iter))
-        
+
+        explore_var = exploration_reduction*explore_var
     print('Average throughput Achieved : ', sum(throughput_list)/len(throughput_list))
-    
+    #print(consumption_list_overall)
+    episode_data = get_data(consumption_list_overall, master_list)
+    plot_episodes_individually(episode_data)
+    aggregrate_data(consumption_list_overall)
     name = 'full_randomisation_orchestration_no_randomisation_'
     time_str = str(time.time())
     done_dumping  = check_and_dump(name, time_str, record, throughput_list)
@@ -164,11 +170,12 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 1#10#20#0#20 #500 # Number of Episodes to run
+    RUN_TIMES = 200#10#20#0#20 #500 # Number of Episodes to run
     TASK_NUM = 2000 # 5000 Time for each Episode Ending # Though episodes are actually longer
-    TRAIN_TIMES = 5#0#50 # Training Iterations for policy and value networks (Actor , Critic)
+    TRAIN_TIMES = 1#0#50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000#1000 # Orchestration cycle
-    explore_var = 0.05
+    explore_var = 1#0.05
+    exploration_reduction = 0.99
     ##############################################################
     # New configuration settings
     nodes_in_cluster =3
@@ -194,7 +201,7 @@ if __name__ == "__main__":
             throughput_list = execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, inp_sizes, randomize_data, epsilon_exploration, explore_var)
             return throughput_list
         study = optuna.create_study(direction='maximize')
-        out = study.optimize(objective, n_trials=50)
+        out = study.optimize(objective, n_trials=500)
         print('Study results best trial : ',study.best_trial)
             
-    throughput_list = execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, inp_sizes, randomize_data, epsilon_exploration, explore_var)
+    throughput_list = execution(RUN_TIMES, TASK_NUM, TRAIN_TIMES, CHO_CYCLE, randomize, total_eaps, low_bound_edge_mode, upper_bound_edge_mode, nodes_in_cluster, inp_sizes, randomize_data, epsilon_exploration, explore_var, exploration_reduction)
