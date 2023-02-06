@@ -56,7 +56,7 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
     global_step1 = 0
     global_step2 = 0
     csv_paths = ['./data/Task_1.csv', './data/Task_2.csv']
-    csv_paths_kubernetes = csv_paths_kubernetes = [r"/home/ubuntu/mountdir/gdrive/06  Projekte/72 KI/31172009 CRLC_OS/10 Experimentelle Daten/testcluster_data_new/data_01.json"]
+    csv_paths_kubernetes = [r"/home/ubuntu/mountdir/gdrive/06  Projekte/72 KI/31172009 CRLC_OS/10 Experimentelle Daten/2023_02_06_data/data_2.json"]
 
     consumption_list_overall = []
     
@@ -139,7 +139,7 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
         consumption_list_overall.append(consumption_list_episode)
         all_number = sum(achieve_num) + sum(fail_num)
         if all_number > 0:
-            throughput_list.append(sum(achieve_num) / float(all_number))
+            throughput_list.append(round(sum(achieve_num) / float(all_number), 2))
         print('throughput_list_all =', throughput_list, '\ncurrent_achieve_number =', sum(achieve_num), ', current_fail_number =', sum(fail_num))
         
         achieve_num = []
@@ -173,8 +173,8 @@ def execution(RUN_TIMES: int, BREAK_POINT:int, TRAIN_TIMES:int, CHO_CYCLE:int, r
 if __name__ == "__main__":
     ############ Set up according to your own needs  ###########
     # The parameters are set to support the operation of the program, and may not be consistent with the actual system
-    RUN_TIMES = 200#10#20#0#20 #500 # Number of Episodes to run
-    TASK_NUM = 2000 # 5000 Time for each Episode Ending # Though episodes are actually longer
+    RUN_TIMES = 50#10#20#0#20 #500 # Number of Episodes to run
+    TASK_NUM = 5000 # 5000 Time for each Episode Ending # Though episodes are actually longer
     TRAIN_TIMES = 1#0#50 # Training Iterations for policy and value networks (Actor , Critic)
     CHO_CYCLE = 1000#1000 # Orchestration cycle
     explore_var = 1#0.05

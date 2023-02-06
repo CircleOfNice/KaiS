@@ -518,3 +518,4 @@ def plot_list(data_list:list, title:str, x_label:str, y_label:str)->None:
     plt.xlabel(x_label)#"Number of Episodes")
     plt.ylabel(y_label)#"Throughput rate")
     plt.savefig('./plots/'+title + '.png')
+    plt.close("all")

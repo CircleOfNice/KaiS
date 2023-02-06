@@ -1,5 +1,7 @@
 
 import matplotlib.pyplot as plt
+
+
 def plot_list(data_list:list, title:str, x_label:str, y_label:str)->None:
     """Plot the given list
 
@@ -17,6 +19,7 @@ def plot_list(data_list:list, title:str, x_label:str, y_label:str)->None:
     plt.xlabel(x_label)#"Number of Episodes")
     plt.ylabel(y_label)#"Throughput rate")
     plt.savefig('./plots/'+title + '.png')
+    plt.close("all")
 
 
 def get_consumption_dictionary(master_list: list)-> dict:
