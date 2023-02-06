@@ -2,6 +2,7 @@
 
 import csv
 import random
+import numpy as np
 from typing import Type, Tuple
 from env.platform import Master, Node
 from env.platform import Docker
@@ -39,6 +40,26 @@ def _convert_cpu_units(cpu_list:list) -> list:
     return cpu_list
 
 
+def _get_normalized_start_end_time_lists(start_time_list:list, duration_list:list) -> Tuple:
+    """Method to normalize the start times of tasks and calculating the end times of tasks based on the task duration
+
+    The normalized start_time_list starts at time 0.
+
+    Args:
+        start_time_list (list): List of integers with the start times of tasks
+        duration_list (list): List of integers with the end times of tasks.
+
+    Returns:
+        Tuple: start_time_list, end_time_list
+    """
+    start_time = start_time_list[0]
+    start_time_list = [i - start_time for i in start_time_list]
+    end_time_list = np.array(start_time_list) + np.array(duration_list)
+    end_time_list = end_time_list.tolist()
+
+    return start_time_list, end_time_list
+
+
 def _generate_fake_start_end_time(duration_list:list, time_scale_fac:float=1) -> Tuple:
     """Method to generate fake start and end times for data.
 
@@ -63,6 +84,7 @@ def _generate_fake_start_end_time(duration_list:list, time_scale_fac:float=1) ->
     end_time_list = [start_time_list[i] + duration_list[i] for i in range(len(duration_list))]
 
     return (start_time_list, end_time_list)
+
 
 
 def get_all_task_kubernetes(path:str, randomize:bool = True) -> Tuple:
@@ -92,13 +114,18 @@ def get_all_task_kubernetes(path:str, randomize:bool = True) -> Tuple:
     mem_list = task_info_lists.mem_req
     mem_list = _convert_mem_units(mem_list=mem_list)
 
-    type_list = [1] * len(cpu_list) # TODO setting task type to 1 for every task, is that a problem?
+    # TODO setting task type to 1 for every task, is that a problem?
+    type_list = [1] * len(cpu_list) 
+
+    # TODO with a step size of 0.5 secs do we need to double the duration?
     duration_list = task_info_lists.task_duration
 
     # TODO Tasks which 0 duration potentially run forever, put high number here?
-    duration_list = [10 or i for i in duration_list] 
+    duration_list = [i or 10 for i in duration_list] 
 
-    start_time_list, end_time_list = _generate_fake_start_end_time(duration_list=duration_list, time_scale_fac=1)
+    # start_time_list, end_time_list = _generate_fake_start_end_time(duration_list=duration_list, time_scale_fac=1)
+    start_time_list = task_info_lists.start_time
+    start_time_list, end_time_list = _get_normalized_start_end_time_lists(start_time_list, duration_list)
 
     result_list = [type_list, start_time_list, end_time_list, cpu_list, mem_list]
     return result_list, max(type_list)
