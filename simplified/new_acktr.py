@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 #from over_simplified_env_check import *
 from stable_baselines.common.vec_env import DummyVecEnv
 from stable_baselines.deepq.policies import MlpPolicy, CnnPolicy, LnMlpPolicy
-from stable_baselines import DQN
+from stable_baselines import ACKTR
 #from new_env import CustomEnv
 #from new_env_with_step_count_in_state import CustomEnv
 from Gym_Env_Random_Tasks_With_Labels import CustomEnv
@@ -24,7 +24,7 @@ Episode_length = len(result_list[0][:1000])
 print(Episode_length)
 total_reward_list = []
 #policy_kwargs = dict(act_fun=tf.nn.sigmoid, net_arch=[ 32])
-model = DQN(MlpPolicy, env, verbose=1)
+model = ACKTR("MlpPolicy", env)
 ''',exploration_fraction = 0.1,
 train_freq=500, batch_size =32, double_q = True,
 exploration_initial_eps=1,  
@@ -35,11 +35,11 @@ max_reward_model = 0
 for epi in tqdm(range(Episodes)):
     env.set_train_param(True)
     model.learn(total_timesteps=Episode_length-1)
-    print('done dqn learn')
+    print('done acktr learn')
     sum_reward = sum(env.reward_list )
     print(f'Episode : {epi} reward for episode {sum_reward}')
     if sum_reward>max_reward_model:
-        model.save(os.path.join('models','dqn', str(sum_reward)))
+        model.save(os.path.join('models','acktr', str(sum_reward)))
         max_reward_model = sum_reward
     total_reward_list.append(sum_reward)
     env.reward_list=[]
@@ -48,7 +48,7 @@ for epi in tqdm(range(Episodes)):
 
 
 print('total_reward_list : ', total_reward_list)
-model.save("dqn")
+model.save("acktr")
 plt.plot(total_reward_list)
 plt.title('Reward DQN Over time')
 plt.ylabel('Reward Accumulated')
