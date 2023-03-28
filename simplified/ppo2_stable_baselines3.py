@@ -1,10 +1,10 @@
 import os
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-
+import torch 
 from stable_baselines3 import PPO
 
-from gym_simple_randomised import CustomEnv
+from new_gym_patching import CustomEnv
 from env_run import get_all_task_kubernetes
 from collections import Counter
 
@@ -13,13 +13,18 @@ result_list,_ = get_all_task_kubernetes(path)
 
 env = CustomEnv(4, result_list, True) 
 
-Episodes = 100
+Episodes = 20#5000
 Episode_length = len(result_list[0])#[:1000])
 
 print(Episode_length)
 total_reward_list = []
 
-model = PPO("MlpPolicy", env)
+
+policy_kwargs = dict(activation_fn=torch.nn.Tanh, net_arch=[64, 128, 256, 512, 1024])
+
+model = PPO("MlpPolicy", env)#, policy_kwargs = policy_kwargs)
+print(model.policy)
+#a=B
 max_reward_model = 0
 for epi in tqdm(range(Episodes)):
     env.set_train_param(True)

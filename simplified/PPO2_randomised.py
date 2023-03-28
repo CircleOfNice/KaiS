@@ -20,7 +20,7 @@ result_list,_ = get_all_task_kubernetes(path)
 
 env = CustomEnv(4, result_list, True) 
 
-Episodes = 100
+Episodes = 3
 Episode_length = len(result_list[0])#[:1000])
 
 print(Episode_length)

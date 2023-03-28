@@ -5,7 +5,7 @@ from tqdm import tqdm
 #from components.Node import Node
 import numpy as np
 from gym.spaces.box import Box
-from random import shuffle, choice
+from random import shuffle, choice, sample
 import random
 class Node:
     """[This class serves as framework for definition of Edge Node with properties such as 
@@ -49,7 +49,6 @@ class Master:
         cpu_params= []
         mem_params= []
         
-        
         fail_params_choice_list = [[[0, self.req_cpu],[0, self.req_mem]],
                                 [[self.req_cpu, self.max_available_cpu],[0, self.req_mem]],
                                 [[0, self.req_cpu],[self.req_mem, self.max_available_memory],
@@ -58,37 +57,18 @@ class Master:
                                 ]]
                                 
         
-        
-        #fail_params_choice_list = [[[0, self.max_available_cpu],[0, self.max_available_memory]],]
+        fail_params_choice_list = [[[0, self.max_available_cpu],[0, self.max_available_memory]],]
         selection_list = [i for i in range(self.number_of_nodes)]
         actionable_node = np.random.choice(selection_list)
         
         # To be triggered Every Time Step:#
         for _ in range(self.number_of_nodes):
           selected_fail_param = choice(fail_params_choice_list)
-          #print()
-          #print('self.req_cpu, self.req_mem : ', self.req_cpu, self.req_mem)
-          #print('selected_fail_param : ', selected_fail_param)
           cpu_params.append(np.random.randint(selected_fail_param[0][0],selected_fail_param[0][1]))
           mem_params.append(np.random.uniform(selected_fail_param[1][0],selected_fail_param[1][1]))
-            
-            #cpu_params.append(self.max_available_cpu)
-            #mem_params.append(self.max_available_memory)
-        #shuffle(cpu_params)
-        #shuffle(mem_params)
-        '''
-          if self.train:
-            cpu_params.append(np.random.randint(0, self.max_available_cpu))
-            mem_params.append(np.random.uniform(0, self.max_available_memory))
-          elif self.train == False:
-            #print('elif self.train == False : ', self.train == False)
-            cpu_params.append(self.max_available_cpu)
-            mem_params.append(self.max_available_memory)
-        '''
-        #print('Before cpu_params, mem_params: ', cpu_params, mem_params)
-        #print('actionable_node : ', actionable_node)
-        cpu_params[actionable_node] = np.random.randint(self.req_cpu, self.max_available_cpu)
-        mem_params[actionable_node] = np.random.uniform(self.req_mem, self.max_available_memory)
+
+        #cpu_params[actionable_node] = np.random.randint(self.req_cpu, self.max_available_cpu)
+        #mem_params[actionable_node] = np.random.uniform(self.req_mem, self.max_available_memory)
         #print('After cpu_params, mem_params: ', cpu_params, mem_params)
         self.node_list = [Node(cpu = cpu_params[i], mem = mem_params[i]) for i in range(self.number_of_nodes)]
         self.action_value = actionable_node
@@ -106,7 +86,15 @@ class Master:
                 master_observation_space.append((state_normalisation[0], self.max_available_cpu, state_normalisation[1], self.max_available_memory))
             else:
                 master_observation_space.append((state_normalisation[0], self.max_available_cpu, state_normalisation[1], self.max_available_memory))
+        
+        #print('self.current_incoming_task : ', self.current_incoming_task)
         master_observation_space = np.vstack(master_observation_space)
+        #master_observation_space = np.ravel(master_observation_space)
+        #print('master_observation_space: ', master_observation_space)
+        #master_observation_space.append()
+        #master_observation_space = np.append(master_observation_space, np.array([self.req_cpu, self.req_mem]), 0)
+        #print('master_observation_space : ', master_observation_space)
+        #a=b
         return master_observation_space
     def get_random_action(self):
         action = np.random.choice(self.action_space, 1)
@@ -125,13 +113,6 @@ class Master:
         
         cpu_reward = ((node.cpu- self.req_cpu)/self.max_available_cpu)
         mem_reward = ((node.mem- self.req_mem)/self.max_available_memory)
-        #print('cpu_reward, mem_reward : ', cpu_reward, mem_reward)
-        '''
-        if cpu_reward <= 0 or mem_reward<=0:
-          reward =  abs(cpu_reward) + abs(mem_reward)
-          reward = - abs(reward)
-        else:
-          reward =  abs(cpu_reward)  + abs(mem_reward)
         
         if cpu_reward>0:
           cpu_reward = 1
@@ -144,39 +125,20 @@ class Master:
           
         else:
           mem_reward = -1
-        '''
+        
         reward = cpu_reward  + mem_reward
         
         if reward >0:
           if action ==mem_index_max:
               reward = 10 + reward
-          #else:
-          #  mem_reward = -10 * mem_reward
+
           if action ==cpu_index_max:
               reward = 10 + reward
-        
-        #else:
-        #  cpu_reward = -10 * cpu_reward
-        
-        #print('reward : ', reward)
-        #if self.train == True:
-        #  print('phase train: ', self.train)
-        #  print('Action Requested', action )
-        #  print('Before State : ', node.get_current_state_data())
-        #  print('self.req_cpu, self.req_mem : ', self.req_cpu, self.req_mem)
+
         if node.cpu>=self.req_cpu and node.mem >= self.req_mem:
           
           node.update_state(cpu_val = - self.req_cpu, mem_val= - self.req_mem)
-          
-        #if reward<=0:
-        #print(' rewards : ', reward)  
-        #if self.train == True:
-        #  print('After State : ', node.get_current_state_data())
-        #  print('reward : ', reward)
-        #  print()
-        #  print()
-        #if reward == 1 and self.train:
-        #  a=b
+
         return reward 
 
     def reset(self):
@@ -186,10 +148,11 @@ class CustomEnv(gym.Env):
   """Custom Environment that follows gym interface"""
   #metadata = {'render.modes': ['human']}
 
-  def __init__(self, number_of_nodes, data, train ):
+  def __init__(self, number_of_nodes, mask_nodes, data, train ):
     super(CustomEnv, self).__init__()
     self.number_of_nodes=number_of_nodes
     self.master = Master(number_of_nodes, data, train)
+    self.mask_nodes = mask_nodes
     self.reset()
     # Define action and observation space
     # They must be gym.spaces objects
@@ -201,6 +164,7 @@ class CustomEnv(gym.Env):
     self.train = train
     self.reward_list = []
     self.step_counter = 0
+    self.number_of_masked_nodes = choice([i for i in range(int(self.number_of_nodes/2))])
     task = self.generate_new_task()
     self.update_incoming_task(task) 
     self.data_len = len(self.master.data[0][:])
@@ -209,6 +173,13 @@ class CustomEnv(gym.Env):
     self.master.train = param
     self.master.set_node_list()
     
+  def valid_action_mask(self):
+      actions = [i for i in range(self.number_of_nodes)]
+      mask = sample(actions,  self.mask_nodes)
+      #print('mask : ', mask)
+      mask_list = [1 if i in mask else 0 for i in range(self.number_of_nodes)]
+      #print('mask_list : ', mask_list)
+      return mask_list
   def reset(self):
     self.master.reset()
     observation = self.master.get_master_observation_space()
@@ -241,7 +212,7 @@ class CustomEnv(gym.Env):
     
     optimal_action = self.master.action_value
     reward = self.master.execute_action(action)
-    
+    #print(reward)
     #print('reward : ', reward)
     #observation = self.master.get_master_observation_space()
     #observation = observation.ravel()
@@ -266,6 +237,7 @@ class CustomEnv(gym.Env):
     #action = self.master.action_value
     #observation_ = observation_.ravel()
     observation_ = self.master.get_master_observation_space()
+    #print(self.reward_list)
     return observation_, reward, done, info#, observation_, optimal_action
     
   def update_incoming_task(self, task):
