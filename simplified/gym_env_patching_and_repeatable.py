@@ -102,15 +102,33 @@ class Master:
         cpu_index_max = max(range(len(cpu_list)), key=cpu_list.__getitem__)  
         mem_index_max = max(range(len(mem_list)), key=mem_list.__getitem__)  
         
-        cpu_reward = ((node.cpu- self.req_cpu)/self.max_available_cpu)
-        mem_reward = ((node.mem- self.req_mem)/self.max_available_memory)
+        cpu_reward = (node.cpu/ self.req_cpu)#/self.max_available_cpu)#((node.cpu- self.req_cpu)/self.max_available_cpu)
+        mem_reward = (node.mem/ self.req_mem)#((node.mem- self.req_mem)/self.max_available_memory)
         
-        if cpu_reward>0:
-          cpu_reward = 1
-          
+        #print()
+        #print('action : ', action)
+        #print('Before cpu_reward, mem_reward : ', cpu_reward, mem_reward)
+        if cpu_reward>=1 and mem_reward>=1:
+          if cpu_reward<mem_reward:
+              if action ==cpu_index_max:
+                #cpu_reward = mem_reward
+                cpu_reward = cpu_reward + 10
+                
+          elif mem_reward<cpu_reward:
+              if action ==mem_index_max:
+                #mem_reward = cpu_reward
+                mem_reward = mem_reward + 10
+
+        elif cpu_reward<1 and  mem_reward<1:
+          cpu_reward = -abs(cpu_reward)
+          mem_reward = -abs(mem_reward)
         else:
-          cpu_reward = -1
-        
+          cpu_reward = -10
+          mem_reward = -10
+        #print('After cpu_reward, mem_reward : ', cpu_reward, mem_reward)  
+        #print('cpu_reward, mem_reward : ', cpu_reward, mem_reward)
+        reward = cpu_reward  + mem_reward
+        '''
         if mem_reward>0:
           mem_reward = 1
           
@@ -118,14 +136,14 @@ class Master:
           mem_reward = -1
         
         reward = cpu_reward  + mem_reward
-        
+        '''
         if reward >0:
           if action ==mem_index_max:
               reward = 10 + reward
 
           if action ==cpu_index_max:
               reward = 10 + reward
-
+        
         if node.cpu>=self.req_cpu and node.mem >= self.req_mem:
           
           node.update_state(cpu_val = - self.req_cpu, mem_val= - self.req_mem)
