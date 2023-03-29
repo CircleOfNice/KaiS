@@ -1,6 +1,6 @@
 import gym 
 from gym import spaces
-from components.Master import Master
+# from components.Master import Master
 from tqdm import tqdm
 #from components.Node import Node
 import numpy as np
@@ -89,7 +89,7 @@ class Master:
         return action[0]
     def execute_action(self, action):
       
-        node = self.node_list[action]
+        node_choice = self.node_list[action]
         cpu_list = []
         mem_list = []
         for i , node in enumerate(self.node_list):
@@ -102,8 +102,8 @@ class Master:
         cpu_index_max = max(range(len(cpu_list)), key=cpu_list.__getitem__)  
         mem_index_max = max(range(len(mem_list)), key=mem_list.__getitem__)  
         
-        cpu_reward = (node.cpu/ self.req_cpu)#/self.max_available_cpu)#((node.cpu- self.req_cpu)/self.max_available_cpu)
-        mem_reward = (node.mem/ self.req_mem)#((node.mem- self.req_mem)/self.max_available_memory)
+        cpu_reward = (node_choice.cpu/ self.req_cpu)#/self.max_available_cpu)#((node.cpu- self.req_cpu)/self.max_available_cpu)
+        mem_reward = (node_choice.mem/ self.req_mem)#((node.mem- self.req_mem)/self.max_available_memory)
         
         #print()
         #print('action : ', action)
@@ -144,9 +144,9 @@ class Master:
           if action ==cpu_index_max:
               reward = 10 + reward
         
-        if node.cpu>=self.req_cpu and node.mem >= self.req_mem:
+        if node_choice.cpu>=self.req_cpu and node_choice.mem >= self.req_mem:
           
-          node.update_state(cpu_val = - self.req_cpu, mem_val= - self.req_mem)
+          node_choice.update_state(cpu_val = - self.req_cpu, mem_val= - self.req_mem)
 
         return reward 
 
