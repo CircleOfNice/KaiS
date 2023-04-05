@@ -17,21 +17,22 @@ def mask_fn(env: gym.Env) -> np.ndarray:
 
 path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
 result_list,_ = get_all_task_kubernetes(path)
-total_nodes = 4
-masked_nodes = 2
+total_nodes = 1000
+masked_nodes = 800
 custom_env = CustomEnv(total_nodes, masked_nodes, result_list, True)   # Initialize env
 
 
 customenv = ActionMasker(custom_env, mask_fn)  # Wrap to enable masking
 Episode_length = len(result_list[0])#[:5])
-Episodes = 50#5000
+Episodes = 500#5000
 # MaskablePPO behaves the same as SB3's PPO unless the env is wrapped
 # with ActionMasker. If the wrapper is detected, the masks are automatically
 # retrieved and used when learning. Note that MaskablePPO does not accept
 # a new action_mask_fn kwarg, as it did in an earlier draft.
 total_reward_list = []
 
-model = MaskablePPO(MaskableActorCriticPolicy, customenv, verbose=0, tensorboard_log="tensorboard_logs")#, verbose=True)
+policy_kwargs = dict(net_arch=[32, 64, 128, 256, 512, 1024])
+model = MaskablePPO(MaskableActorCriticPolicy, customenv, verbose=0, tensorboard_log="tensorboard_logs", policy_kwargs = policy_kwargs)#, verbose=True)
 
 
 

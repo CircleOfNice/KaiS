@@ -95,12 +95,14 @@ class Master:
         
         cpu_reward = (node_choice.cpu/ self.req_cpu)
         mem_reward = (node_choice.mem/ self.req_mem)
+        '''
         if cpu_reward>=1 and mem_reward>=1:
           reward = 1
         else: 
           reward = -1 
         '''
         # Proportional Approach
+        
         if cpu_reward>=1 and mem_reward>=1:
           if cpu_reward<mem_reward:
               if action ==cpu_index_max:
@@ -114,10 +116,10 @@ class Master:
           cpu_reward = -abs(cpu_reward)
           mem_reward = -abs(mem_reward)
         else:
-          cpu_reward = -20
-          mem_reward = -20
+          cpu_reward = -5
+          mem_reward = -5
         reward = cpu_reward  + mem_reward
-        '''
+        
         if node_choice.cpu>=self.req_cpu and node_choice.mem >= self.req_mem:
           
           node_choice.update_state(cpu_val = - self.req_cpu, mem_val= - self.req_mem)
@@ -155,7 +157,9 @@ class CustomEnv(gym.Env):
   
   def valid_action_mask(self):
       actions = [i for i in range(self.number_of_nodes)]
-      mask = sample(actions,  self.mask_nodes)
+      #mask = sample(actions,  self.mask_nodes)
+      mask = sample(actions,  np.random.randint(0,self.mask_nodes))
+      #print('len(mask) : ', len(mask))
       self.master.mask_list = [1 if i in mask else 0 for i in range(self.number_of_nodes)]
       return self.master.mask_list
   def reset(self):
