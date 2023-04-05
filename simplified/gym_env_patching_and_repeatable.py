@@ -69,10 +69,10 @@ class Master:
         for i, node in  enumerate(self.node_list):
             state_normalisation = node.get_current_state_data()
             if normalised:
-                master_observation_space.append((state_normalisation[0], state_normalisation[1] , state_normalisation[2], state_normalisation[3]))
+                master_observation_space.append((state_normalisation[0], state_normalisation[1]))# , state_normalisation[2], state_normalisation[3]))
             else:
-                master_observation_space.append((state_normalisation[0], state_normalisation[1] , state_normalisation[2], state_normalisation[3]))
-        master_observation_space.append((self.current_incoming_task[3], self.current_incoming_task[4], 0,0))
+                master_observation_space.append((state_normalisation[0], state_normalisation[1]))# , state_normalisation[2], state_normalisation[3]))
+        master_observation_space.append((self.current_incoming_task[3], self.current_incoming_task[4]))#, 0,0))
         master_observation_space = np.vstack(master_observation_space)
         return master_observation_space
     def get_random_action(self):
@@ -95,7 +95,12 @@ class Master:
         
         cpu_reward = (node_choice.cpu/ self.req_cpu)
         mem_reward = (node_choice.mem/ self.req_mem)
-        
+        if cpu_reward>=1 and mem_reward>=1:
+          reward = 1
+        else: 
+          reward = -1 
+        '''
+        # Proportional Approach
         if cpu_reward>=1 and mem_reward>=1:
           if cpu_reward<mem_reward:
               if action ==cpu_index_max:
@@ -109,29 +114,14 @@ class Master:
           cpu_reward = -abs(cpu_reward)
           mem_reward = -abs(mem_reward)
         else:
-          cpu_reward = -5
-          mem_reward = -5
+          cpu_reward = -20
+          mem_reward = -20
         reward = cpu_reward  + mem_reward
         '''
-        if mem_reward>0:
-          mem_reward = 1
-          
-        else:
-          mem_reward = -1
-        
-        reward = cpu_reward  + mem_reward
-        '''
-        if reward >0:
-          if action ==mem_index_max:
-              reward = 10 + reward
-
-          if action ==cpu_index_max:
-              reward = 10 + reward
-        
         if node_choice.cpu>=self.req_cpu and node_choice.mem >= self.req_mem:
           
           node_choice.update_state(cpu_val = - self.req_cpu, mem_val= - self.req_mem)
-
+        
         return reward 
 
     def reset(self):

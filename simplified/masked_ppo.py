@@ -17,10 +17,14 @@ def mask_fn(env: gym.Env) -> np.ndarray:
 
 path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
 result_list,_ = get_all_task_kubernetes(path)
-custom_env = CustomEnv(10, 4, result_list, True)   # Initialize env
+total_nodes = 4
+masked_nodes = 2
+custom_env = CustomEnv(total_nodes, masked_nodes, result_list, True)   # Initialize env
+
+
 customenv = ActionMasker(custom_env, mask_fn)  # Wrap to enable masking
 Episode_length = len(result_list[0])#[:5])
-Episodes = 10#5000
+Episodes = 50#5000
 # MaskablePPO behaves the same as SB3's PPO unless the env is wrapped
 # with ActionMasker. If the wrapper is detected, the masks are automatically
 # retrieved and used when learning. Note that MaskablePPO does not accept
@@ -53,23 +57,22 @@ for epi in tqdm(range(Episodes)):
     print('done PPO2 learn')
     print(' len(customenv.reward_list) : ', sum(customenv.reward_list ), len(customenv.reward_list))
     sum_reward = sum(customenv.reward_list )/ len(customenv.reward_list)
-    print(f'Episodes : {epi} reward for episode {sum_reward}')
-    print('done PPO2 learn throughput: ', sum_reward/ (Episode_length))
+    print(f'Episodes : {epi} average reward till episode {sum_reward}')
     if sum_reward>max_reward_model:
-        model.save(os.path.join('models','PPO2', str(sum_reward)))
+        model.save(os.path.join('models','PPO2', str(sum_reward)+'_'+str(total_nodes) +'_node_'+ str(masked_nodes)+'_mask.zip'))
         max_reward_model = sum_reward
     total_reward_list.append(sum_reward)
+    plt.plot(total_reward_list)
+    plt.title('Reward PPO2 Over time')
+    plt.ylabel('Reward Accumulated ')
+    plt.xlabel('Episodes')
+    #plt.show()
+    plt.savefig('current_progress2.png',  dpi=300)
    
 print('total_reward_list : ', total_reward_list)
-model.save("PPO2")
+model.save("PPO2_Final_" +'_'+str(total_nodes) +'_node_'+ str(masked_nodes)+'_mask.zip')
 plt.plot(total_reward_list)
-plt.title('Reward PPO2 Over time')
+plt.title('Final Reward PPO2 Over time')
 plt.ylabel('Reward Accumulated ')
-plt.xlabel('Episodes')
-plt.show()
-
-plt.plot([x / (2*Episode_length) for x in total_reward_list])
-plt.title('Throughput PPO2 Over time')
-plt.ylabel('Throughput ')
 plt.xlabel('Episodes')
 plt.show()
