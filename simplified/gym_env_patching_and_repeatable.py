@@ -7,6 +7,8 @@ import numpy as np
 from gym.spaces.box import Box
 from random import shuffle, choice, sample
 import random
+
+
 class Node:
     """[This class serves as framework for definition of Edge Node with properties such as 
     task queue, service_list, cpu processing and  memory]
@@ -18,11 +20,12 @@ class Node:
         self.max_mem = max_mem
     
     def get_current_state_data(self):
-        state = [self.cpu, self.mem, self.max_cpu, self.max_cpu]
+        state = [self.cpu, self.mem, self.max_cpu, self.max_mem]
         return state
     def update_state(self, cpu_val, mem_val):
         self.cpu = self.cpu + cpu_val
         self.mem = self.mem + mem_val
+
 
 class Master:
     """[This class serves as framework for definition of Master Node with properties such as 
@@ -46,40 +49,68 @@ class Master:
         self.observation_space_dims = self.get_master_observation_space().shape
         self.data = data
         self.action_value = 0
+
+
     def set_node_list(self):
-        
+        """ This method is used to set the cpu and memory values of all nodes to a random value within the allowed interval """
         cpu_params= []
         mem_params= []
         max_cpu_params = [ random.choice(self.max_available_cpu_choices) for i in range(self.number_of_nodes)]
         max_mem_params = [ random.choice(self.max_available_mem_choices) for i in range(self.number_of_nodes)]
 
         for i in range(self.number_of_nodes):
-          cpu_params.append(np.random.randint(0,max_cpu_params[i]))
-          mem_params.append(np.random.uniform(0,max_mem_params[i]))
+            cpu_params.append(np.random.randint(0,max_cpu_params[i]))
+            mem_params.append(np.random.uniform(0,max_mem_params[i]))
 
         self.node_list = [Node(cpu = cpu_params[i], mem = mem_params[i], max_cpu=max_cpu_params[i], max_mem=max_mem_params[i]) for i in range(self.number_of_nodes)]
+
 
     def set_incoming_task(self, task):
         self.current_incoming_task = task
         self.req_cpu = task[3]
         self.req_mem = task[4]
         
-    def get_master_observation_space(self, normalised = True):
+
+    def get_master_observation_space(self) -> np.array:
+        """This method is used to get the observation for the model. The observation consists out of the values for available cpu and memory
+        for each node with the shape of (#Node_num, 2). At the end we append the request cpu and memory for the given task, resulting in the shape 
+        of (#Node_num+1, 2) for the observation space
+
+        Returns:
+            np.array: The observation with node and task information
+        """
         master_observation_space = [] 
-        for i, node in  enumerate(self.node_list):
+
+        # Get information of all nodes
+        for _, node in  enumerate(self.node_list):
             state_normalisation = node.get_current_state_data()
-            if normalised:
-                master_observation_space.append((state_normalisation[0], state_normalisation[1]))# , state_normalisation[2], state_normalisation[3]))
-            else:
-                master_observation_space.append((state_normalisation[0], state_normalisation[1]))# , state_normalisation[2], state_normalisation[3]))
+            master_observation_space.append((state_normalisation[0], state_normalisation[1]))# , state_normalisation[2], state_normalisation[3]))
+
+        # Get information of the task
         master_observation_space.append((self.current_incoming_task[3], self.current_incoming_task[4]))#, 0,0))
+
         master_observation_space = np.vstack(master_observation_space)
         return master_observation_space
+    
+
     def get_random_action(self):
         action = np.random.choice(self.action_space, 1)
         return action[0]
-    def execute_action(self, action):
-      
+    
+
+    def execute_action(self, action:int) -> float:
+        """This method is used to determine the reward for a given scheduling decision (action).
+        Currently the reward is based on the amount of free resources. The more free resources (cpu and/or memory) the chose node has,
+        the higher the reward for the model.
+
+        This should result in an agent that favors a somewhat load-balanced approach
+
+        Args:
+            action (int): The number of the node which to schedule the given task to.
+
+        Returns:
+            float: The reward for the agent
+        """
         node_choice = self.node_list[action]
         cpu_list = []
         mem_list = []
@@ -90,117 +121,176 @@ class Master:
             else:
                 cpu_list.append(node.cpu)
                 mem_list.append(node.mem)
+
         cpu_index_max = max(range(len(cpu_list)), key=cpu_list.__getitem__)  
         mem_index_max = max(range(len(mem_list)), key=mem_list.__getitem__)  
         
-        cpu_reward = (node_choice.cpu/ self.req_cpu)
-        mem_reward = (node_choice.mem/ self.req_mem)
+
+        # The more space the node has left, the higher the reward
+        cpu_reward = (node_choice.cpu / self.req_cpu)
+        mem_reward = (node_choice.mem / self.req_mem)
+
+        reward = 0
+
+        if action == cpu_index_max or action == mem_index_max:
+            reward = 1
+        
         '''
         if cpu_reward>=1 and mem_reward>=1:
-          reward = 1
+        reward = 1
         else: 
-          reward = -1 
+        reward = -1 
         '''
         # Proportional Approach
         
-        if cpu_reward>=1 and mem_reward>=1:
-          if cpu_reward<mem_reward:
-              if action ==cpu_index_max:
-                cpu_reward = cpu_reward + 10
+        # if cpu_reward>=1 and mem_reward>=1:
+        #     if cpu_reward<mem_reward:
+        #         if action ==cpu_index_max:
+        #             cpu_reward = cpu_reward + 10
                 
-          elif mem_reward<cpu_reward:
-              if action ==mem_index_max:
-                mem_reward = mem_reward + 10
+        #     elif mem_reward<cpu_reward:
+        #         if action ==mem_index_max:
+        #             mem_reward = mem_reward + 10
 
-        elif cpu_reward<1 and  mem_reward<1:
-          cpu_reward = -abs(cpu_reward)
-          mem_reward = -abs(mem_reward)
-        else:
-          cpu_reward = -5
-          mem_reward = -5
-        reward = cpu_reward  + mem_reward
+        # elif cpu_reward<1 and  mem_reward<1:
+        #     cpu_reward = -abs(cpu_reward)
+        #     mem_reward = -abs(mem_reward)
+        # else:
+        #     cpu_reward = -5
+        #     mem_reward = -5
+            
+        # reward = cpu_reward  + mem_reward
         
+        # reward = min(cpu_reward, mem_reward)
+
         if node_choice.cpu>=self.req_cpu and node_choice.mem >= self.req_mem:
-          
-          node_choice.update_state(cpu_val = - self.req_cpu, mem_val= - self.req_mem)
+            node_choice.update_state(cpu_val = - self.req_cpu, mem_val= - self.req_mem)
         
         return reward 
 
     def reset(self):
-      self.set_node_list()
+        self.set_node_list()
+
 
 class CustomEnv(gym.Env):
-  """Custom Environment that follows gym interface"""
+    """Custom Environment that follows gym interface"""
 
-  def __init__(self, number_of_nodes, mask_nodes, data, train ):
-    super(CustomEnv, self).__init__()
-    self.number_of_nodes=number_of_nodes
-    self.master = Master(number_of_nodes, data, train)
-    self.mask_nodes = mask_nodes
-    self.step_counter = 0
-    self.reset()
-    self.action_space = spaces.Discrete(self.master.action_space)
-
-    self.observation_space = Box(low=0.0, high=4000.0, shape=self.master.observation_space_dims, dtype=np.float32)
-    self.train = train
-    self.reward_list = []
-    
-    self.number_of_masked_nodes = choice([i for i in range(int(self.number_of_nodes/2))])
-    task = self.generate_new_task()
-    self.update_incoming_task(task) 
-    self.data_len = len(self.master.data[0][:])
-
-  def set_train_param(self, param):
-    self.train = param
-    self.master.train = param
-    self.master.set_node_list()
-  
-  def valid_action_mask(self):
-      actions = [i for i in range(self.number_of_nodes)]
-      #mask = sample(actions,  self.mask_nodes)
-      mask = sample(actions,  np.random.randint(0,self.mask_nodes))
-      #print('len(mask) : ', len(mask))
-      self.master.mask_list = [1 if i in mask else 0 for i in range(self.number_of_nodes)]
-      return self.master.mask_list
-  def reset(self):
-    self.master.reset()
-    observation = self.master.get_master_observation_space()
-    task = self.generate_new_task()
-    self.update_incoming_task(task) 
-    return observation 
-  
-  def get_random_action(self):
-      return self.master.get_random_action()
-    
-  
-  def generate_random_task(self):
-    req_cpu = np.random.randint(0, self.master.max_available_cpu/4)
-    req_mem = np.random.uniform(0, self.master.max_available_memory/8)
-    task = [0,0,0, req_cpu, req_mem]
-    return task
-
-  def generate_new_task(self):
-    data = self.master.data
-    task = [data[0][self.step_counter], data[1][self.step_counter], data[2][self.step_counter], data[3][self.step_counter], data[4][self.step_counter]]
-    return task
-  def step(self, action):
-    optimal_action = self.master.action_value
-    reward = self.master.execute_action(action)
-
-    done =False
-    info = {}
-    self.reward_list.append(reward)  
-    self.step_counter = self.step_counter + 1
-    observation_ = self.reset()
-    if self.step_counter == self.data_len -1:
+    def __init__(self, number_of_nodes, mask_nodes, data, train ):
+        super(CustomEnv, self).__init__()
+        self.number_of_nodes=number_of_nodes
+        self.master = Master(number_of_nodes, data, train)
+        self.mask_nodes = mask_nodes
         self.step_counter = 0
-    return observation_, reward, done, info
-    
-  def update_incoming_task(self, task):
-    self.master.set_incoming_task(task)
-    
-  def render(self, mode='human'):
-    pass
-  def close (self):
-    self.master.reset()
+        self.reset()
+        self.action_space = spaces.Discrete(self.master.action_space)
+
+        self.observation_space = Box(low=0.0, high=4000.0, shape=self.master.observation_space_dims, dtype=np.float64)
+        self.train = train
+        self.reward_list = []
+        
+        self.number_of_masked_nodes = choice([i for i in range(int(self.number_of_nodes/2))])
+        task = self.generate_new_task()
+        self.update_incoming_task(task) 
+        self.data_len = len(self.master.data[0][:])
+
+
+    def set_train_param(self, param):
+        self.train = param
+        self.master.train = param
+        self.master.set_node_list()
+
+
+    def valid_action_mask(self):
+        actions = [i for i in range(self.number_of_nodes)]
+        #mask = sample(actions,  self.mask_nodes)
+        mask = sample(actions,  np.random.randint(0,self.mask_nodes))
+        #print('len(mask) : ', len(mask))
+        self.master.mask_list = [1 if i in mask else 0 for i in range(self.number_of_nodes)]
+        return self.master.mask_list
+
+
+    def ordered_valid_action_mask(self) -> np.array:
+        """This method masks nodes like it would happen in the kubernetes cluster, meaning the masked nodes get removed from the end of a list,
+        resulting in a masked array that looks something like this:
+
+        [1, 1, 1, 1, 1, 1, 0, 0, 0]
+
+        where only the last values of the arrays are those nodes that are not available.
+
+        Currently we assume that there is always at least one node available.
+
+        Returns:
+            np.array: The boolean mask of available nodes
+        """
+        valid_mask = np.ones(self.number_of_nodes)
+        masked_node_num = np.random.randint(low=1, high=self.number_of_nodes)
+        valid_mask[-masked_node_num:] = 0
+        self.master.mask_list = valid_mask
+        return valid_mask
+
+
+    def reset(self):
+        """This method is used to reset the state of the environment to a random new one, so each node gets randomly
+        new cpu and memory values assigned and also updates the task information
+
+        Returns:
+            np.array: The observation including information about the nodes and the task.
+        """
+        self.master.reset()
+        observation = self.master.get_master_observation_space()
+        task = self.generate_new_task()
+        self.update_incoming_task(task) 
+        return observation 
+
+
+    def get_random_action(self):
+        return self.master.get_random_action()
+        
+
+    def generate_random_task(self):
+        req_cpu = np.random.randint(0, self.master.max_available_cpu/4)
+        req_mem = np.random.uniform(0, self.master.max_available_memory/8)
+        task = [0,0,0, req_cpu, req_mem]
+        return task
+
+
+    def generate_new_task(self):
+        data = self.master.data
+        task = [data[0][self.step_counter], data[1][self.step_counter], data[2][self.step_counter], data[3][self.step_counter], data[4][self.step_counter]]
+        return task
+
+
+    def step(self, action:int):
+        """ One step in the environment. Takes the action determined by the agent and calculates the reward.
+        The Episode is considered done once we analyzed all datapoints.
+
+        Args:
+            action (int): Number of the node the task should be scheduled to.
+
+        Returns:
+            Tuple: observation, reward, done, info
+        """
+        reward = self.master.execute_action(action)
+
+        done = False
+        info = {}
+        self.reward_list.append(reward)  
+        self.step_counter = self.step_counter + 1
+        observation_ = self.reset()
+        if self.step_counter == self.data_len -1:
+            self.step_counter = 0
+            done = True # done needs to be set to True at some point for the EvalCallback to finish
+        return observation_, reward, done, info
+        
+
+    def update_incoming_task(self, task):
+        self.master.set_incoming_task(task)
+        
+
+    def render(self, mode='human'):
+        pass
+
+
+    def close (self):
+        self.master.reset()
 
