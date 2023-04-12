@@ -50,6 +50,8 @@ class Master:
         self.data = data
         self.action_value = 0
 
+        self.action_distribution = np.zeros(number_of_nodes)
+
 
     def set_node_list(self):
         """ This method is used to set the cpu and memory values of all nodes to a random value within the allowed interval """
@@ -112,6 +114,7 @@ class Master:
             float: The reward for the agent
         """
         node_choice = self.node_list[action]
+        self.action_distribution[action] += 1
         cpu_list = []
         mem_list = []
         for i , node in enumerate(self.node_list):
@@ -132,8 +135,8 @@ class Master:
 
         reward = 0
 
-        if action == cpu_index_max or action == mem_index_max:
-            reward = 1
+        if cpu_reward > 1 and mem_reward > 1:
+            return 1
         
         '''
         if cpu_reward>=1 and mem_reward>=1:

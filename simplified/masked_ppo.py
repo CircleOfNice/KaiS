@@ -10,9 +10,21 @@ from sb3_contrib.ppo_mask import MaskablePPO
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_checker import check_env
+from stable_baselines3.common.callbacks import BaseCallback
 
 #from new_gym_patching import CustomEnv
 from gym_env_patching_and_repeatable import CustomEnv
+
+class CustomCallback(BaseCallback):
+    """ Logs the net change in cash between the beginning and end of each epoch/run. """
+
+    def __init__(self, eval_env:gym.Env, verbose=0):
+        super(CustomCallback, self).__init__(verbose)
+        self.eval_env = eval_env
+
+    def _on_step(self) -> bool:
+        self.logger.record("histogram", self.eval_env.master.action_distribution)
+        return True
 
 
 def mask_fn(env:CustomEnv) -> np.ndarray:
@@ -38,9 +50,10 @@ eval_env = ActionMasker(custom_env, mask_fn)  # Wrap to enable masking
 eval_env = Monitor(eval_env)
 eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_path="logs",
                               eval_freq=10_000, deterministic=True, render=False, n_eval_episodes=1, verbose=False)
+custom_callback = CustomCallback(eval_env=eval_env)
 
 Episode_length = len(result_list[0])#[:5])
-Episodes = 300 #5000
+Episodes = 2 #5000
 # MaskablePPO behaves the same as SB3's PPO unless the env is wrapped
 # with ActionMasker. If the wrapper is detected, the masks are automatically
 # retrieved and used when learning. Note that MaskablePPO does not accept
@@ -48,19 +61,19 @@ Episodes = 300 #5000
 total_reward_list = []
 
 # policy_kwargs = dict(net_arch=[32, 64, 128, 256, 512, 1024])
-# policy_kwargs = dict(net_arch=[32, 32, 32])
-policy_kwargs = None
-model = MaskablePPO(MaskableActorCriticPolicy, custom_env, verbose=0, tensorboard_log="tensorboard_logs", policy_kwargs = policy_kwargs)#, verbose=True)
+policy_kwargs = dict(net_arch=[16, 16])
+# policy_kwargs = None
+model = MaskablePPO(MaskableActorCriticPolicy, custom_env, verbose=0, tensorboard_log="tensorboard_logs", policy_kwargs = policy_kwargs,
+                    learning_rate=0.003)#, verbose=True)
 
 # Simple one shot training 
 custom_env.set_train_param(True)
-model.learn(total_timesteps=(Episode_length-1)*Episodes, progress_bar=True, callback=eval_callback)
+model.learn(total_timesteps=(Episode_length-1)*Episodes, progress_bar=True, callback=[eval_callback, custom_callback])
 print(' len(customenv.reward_list) : ', sum(custom_env.reward_list ), len(custom_env.reward_list))
 sum_reward = sum(custom_env.reward_list )/ len(custom_env.reward_list)
 model.save(os.path.join('models','PPO2', str(sum_reward)))
 
-
-
+# model.logger.record("histogram", eval_env.master.action_distribution)
 # max_reward_model = 0
 # for epi in tqdm(range(Episodes)):
 #     customenv.set_train_param(True)
