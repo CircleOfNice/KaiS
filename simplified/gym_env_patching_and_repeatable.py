@@ -129,14 +129,21 @@ class Master:
         mem_index_max = max(range(len(mem_list)), key=mem_list.__getitem__)  
         
 
+        if node_choice.cpu == 0 or node_choice.mem == 0:
+            reward = -2
+        else:
+            cpu_pct = self.req_cpu / node_choice.cpu
+            mem_pct = self.req_mem / node_choice.mem 
+            reward = - max(cpu_pct, mem_pct)
+
         # The more space the node has left, the higher the reward
-        cpu_reward = (node_choice.cpu / self.req_cpu)
-        mem_reward = (node_choice.mem / self.req_mem)
+        # cpu_reward = (node_choice.cpu / self.req_cpu)
+        # mem_reward = (node_choice.mem / self.req_mem)
 
-        reward = 0
+        # reward = 0
 
-        if cpu_reward > 1 and mem_reward > 1:
-            return 1
+        # if cpu_reward > 1 and mem_reward > 1:
+        #     return 1
         
         '''
         if cpu_reward>=1 and mem_reward>=1:
@@ -226,8 +233,9 @@ class CustomEnv(gym.Env):
             np.array: The boolean mask of available nodes
         """
         valid_mask = np.ones(self.number_of_nodes)
-        masked_node_num = np.random.randint(low=1, high=self.number_of_nodes)
-        valid_mask[-masked_node_num:] = 0
+        masked_node_num = np.random.randint(low=0, high=self.number_of_nodes)
+        if masked_node_num:
+            valid_mask[-masked_node_num:] = 0
         self.master.mask_list = valid_mask
         return valid_mask
 
