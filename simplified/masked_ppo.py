@@ -11,6 +11,9 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.env_util import make_vec_env
+
 from tensorboardX import SummaryWriter
 
 #from new_gym_patching import CustomEnv
@@ -57,6 +60,22 @@ def mask_fn(env:CustomEnv) -> np.ndarray:
     return env.ordered_valid_action_mask()
     # return env.valid_action_mask()
 
+
+def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:list, train:bool=True):
+    """Creator function for custom environments. Needed for stable baselines 3 wrappers
+
+    Args:
+        num_total_nodes (int): Total number of nodes in the system
+        num_max_masked_nodes (int): Maximum allowed number of masked nodes. Could be one less than num_total_nodes.
+        data_list (list): List with the data with tasks from kubernetes
+        train (bool, optional): ?. Defaults to True.
+
+    Returns:
+        gym.Env: Returns an object implementing the gym interface
+    """
+    return CustomEnv(number_of_nodes=num_total_nodes, mask_nodes=num_max_masked_nodes, data=data_list, train=train)
+    
+
 path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
 result_list,_ = get_all_task_kubernetes(path)
 total_nodes = 4
@@ -64,10 +83,13 @@ masked_nodes = 3
 
 eval_freq = 10_000 # Number of timesteps after which to evaluate the models
 
+# env_fn = lambda: CustomEnv(total_nodes, masked_nodes, result_list, True)
+# custom_env = make_vec_env(env_fn, n_envs=8)
+# custom_env = make_vec_env(create_custom_env, n_envs=8, vec_env_kwargs={"args": (total_nodes, masked_nodes, result_list, True)})
 custom_env = CustomEnv(total_nodes, masked_nodes, result_list, True)   # Initialize env
 custom_env = ActionMasker(custom_env, mask_fn)  # Wrap to enable masking
 # custom_env = Monitor(custom_env, filename="monitor.log")
-check_env(custom_env, warn=False)
+check_env(custom_env, warn=True)
 
 # Use evaluation environment to calculate mean reward and find best model
 eval_env = CustomEnv(total_nodes, masked_nodes, result_list, True)   # Initialize env
@@ -92,7 +114,7 @@ model = MaskablePPO(MaskableActorCriticPolicy, custom_env, ent_coef=0.01, verbos
                     learning_rate=0.003)#, verbose=True)
 
 # Simple one shot training 
-custom_env.set_train_param(True)
+# custom_env.set_train_param(True)
 model.learn(total_timesteps=(Episode_length-1)*Episodes, progress_bar=True, callback=[eval_callback, custom_callback])
 print(' len(customenv.reward_list) : ', sum(custom_env.reward_list ), len(custom_env.reward_list))
 sum_reward = sum(custom_env.reward_list )/ len(custom_env.reward_list)
