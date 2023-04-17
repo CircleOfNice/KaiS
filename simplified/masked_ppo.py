@@ -19,28 +19,33 @@ from tensorboardX import SummaryWriter
 #from new_gym_patching import CustomEnv
 from gym_env_patching_and_repeatable import CustomEnv
 
-class CustomCallback(BaseCallback):
+class ActionDistributionCallback(BaseCallback):
     """ Logs the net change in cash between the beginning and end of each epoch/run. """
 
-    def __init__(self, eval_env:gym.Env, verbose, log_freq:int):
-        super(CustomCallback, self).__init__(verbose)
+    def __init__(self, eval_env:gym.Env, verbose, log_freq:int, num_envs:int):
+        super(ActionDistributionCallback, self).__init__(verbose)
         self.eval_env = eval_env
         self.log_freq = log_freq
+        self.num_envs = num_envs
+
 
     def _on_training_start(self) -> None:
         self.writer = SummaryWriter(logdir=self.logger.get_dir())
         self.action_dist_dict = {}
 
-        for idx in range(len(self.eval_env.master.action_distribution)):
+        for idx in range(len(self.eval_env.envs[0].master.action_distribution)):
             self.action_dist_dict["a_" + str(idx)] = None
 
     def _on_step(self) -> bool:
-        if self.num_timesteps % self.log_freq == self.log_freq - 1:
-            action_distribution = self.eval_env.master.action_distribution
+        # Since self.num_timesteps is increased depending on the number of environments, we divide all values here by the num_envs
+        if (self.num_timesteps // self.num_envs) % (self.log_freq // self.num_envs) == self.log_freq // self.num_envs - 1:
+            action_distribution = self.eval_env.envs[0].master.action_distribution
             # print("action_distribution:", action_distribution)
-            for idx, value in enumerate(action_distribution):
-                self.action_dist_dict["a_" + str(idx)] = value / sum(action_distribution)
-            self.writer.add_scalars("norm_action_distribution", self.action_dist_dict, global_step=self.num_timesteps)
+
+            if sum(action_distribution) > 0:
+                for idx, value in enumerate(action_distribution):
+                        self.action_dist_dict["a_" + str(idx)] = value / sum(action_distribution)
+                self.writer.add_scalars("norm_action_distribution", self.action_dist_dict, global_step=self.num_timesteps)
 
 
         return True
@@ -81,23 +86,22 @@ result_list,_ = get_all_task_kubernetes(path)
 total_nodes = 4
 masked_nodes = 3
 
-eval_freq = 10_000 # Number of timesteps after which to evaluate the models
+eval_freq = 30_000 # Number of timesteps after which to evaluate the models
+num_envs = 8
 
-# env_fn = lambda: CustomEnv(total_nodes, masked_nodes, result_list, True)
-# custom_env = make_vec_env(env_fn, n_envs=8)
-# custom_env = make_vec_env(create_custom_env, n_envs=8, vec_env_kwargs={"args": (total_nodes, masked_nodes, result_list, True)})
-custom_env = CustomEnv(total_nodes, masked_nodes, result_list, True)   # Initialize env
-custom_env = ActionMasker(custom_env, mask_fn)  # Wrap to enable masking
-# custom_env = Monitor(custom_env, filename="monitor.log")
-check_env(custom_env, warn=True)
+# Need to first wrap the environment in all needed masks, and only then vectorize it
+env_fn = lambda: ActionMasker(CustomEnv(total_nodes, masked_nodes, result_list, True), mask_fn)
+custom_env = make_vec_env(env_fn, n_envs=num_envs)
 
 # Use evaluation environment to calculate mean reward and find best model
 eval_env = CustomEnv(total_nodes, masked_nodes, result_list, True)   # Initialize env
-eval_env = ActionMasker(custom_env, mask_fn)  # Wrap to enable masking
+eval_env = ActionMasker(eval_env, mask_fn)  # Wrap to enable masking
 eval_env = Monitor(eval_env)
 eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_path="logs",
-                              eval_freq=eval_freq, deterministic=True, render=False, n_eval_episodes=1, verbose=False)
-custom_callback = CustomCallback(eval_env=eval_env, verbose=0, log_freq=eval_freq)
+                              eval_freq=eval_freq//num_envs, deterministic=True, render=False, n_eval_episodes=1, verbose=False)
+
+
+action_dist_callback = ActionDistributionCallback(eval_env=custom_env, verbose=0, log_freq=eval_freq, num_envs=num_envs)
 
 Episode_length = len(result_list[0])#[:5])
 Episodes = 100 #5000
@@ -115,10 +119,11 @@ model = MaskablePPO(MaskableActorCriticPolicy, custom_env, ent_coef=0.01, verbos
 
 # Simple one shot training 
 # custom_env.set_train_param(True)
-model.learn(total_timesteps=(Episode_length-1)*Episodes, progress_bar=True, callback=[eval_callback, custom_callback])
+# model.learn(total_timesteps=(Episode_length-1)*Episodes, progress_bar=True, callback=[eval_callback, custom_callback])
+model.learn(total_timesteps=(Episode_length-1)*Episodes, progress_bar=True, callback=[eval_callback, action_dist_callback])
 print(' len(customenv.reward_list) : ', sum(custom_env.reward_list ), len(custom_env.reward_list))
-sum_reward = sum(custom_env.reward_list )/ len(custom_env.reward_list)
-model.save(os.path.join('models','PPO2', str(sum_reward)))
+# sum_reward = sum(custom_env.reward_list )/ len(custom_env.reward_list)
+model.save(os.path.join('models','PPO2', "final_ppo_model.zip"))
 
 # model.logger.record("histogram", eval_env.master.action_distribution)
 # max_reward_model = 0

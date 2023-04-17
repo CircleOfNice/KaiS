@@ -91,7 +91,7 @@ class Master:
         # Get information of the task
         master_observation_space.append((self.current_incoming_task[3], self.current_incoming_task[4]))#, 0,0))
 
-        master_observation_space = np.vstack(master_observation_space)
+        master_observation_space = np.hstack(master_observation_space)
         return master_observation_space
     
 
@@ -178,7 +178,7 @@ class Master:
         
         return reward 
 
-    def reset(self):
+    def reset_master(self):
         self.set_node_list()
 
 
@@ -194,7 +194,7 @@ class CustomEnv(gym.Env):
         self.reset()
         self.action_space = spaces.Discrete(self.master.action_space)
 
-        self.observation_space = Box(low=0.0, high=4000.0, shape=self.master.observation_space_dims, dtype=np.float64)
+        self.observation_space = Box(low=-np.inf, high=np.inf, shape=self.master.observation_space_dims, dtype=np.float64)
         self.train = train
         self.reward_list = []
         
@@ -251,10 +251,10 @@ class CustomEnv(gym.Env):
         Returns:
             np.array: The observation including information about the nodes and the task.
         """
-        self.master.reset()
+        self.master.reset_master()
         observation = self.master.get_master_observation_space()
         task = self.generate_new_task()
-        self.update_incoming_task(task) 
+        self.update_incoming_task(task)
         return observation 
 
 
@@ -307,5 +307,5 @@ class CustomEnv(gym.Env):
 
 
     def close (self):
-        self.master.reset()
+        self.master.reset_master()
 
