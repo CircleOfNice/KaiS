@@ -53,6 +53,7 @@ def mask_fn(env:CustomEnv) -> np.ndarray:
     # Do whatever you'd like in this function to return the action mask
     # for the current env. In this example, we assume the env has a
     # helpful method we can rely on.
+    # return env.all_valid_action_mask()
     return env.ordered_valid_action_mask()
     # return env.valid_action_mask()
 
@@ -87,7 +88,7 @@ total_reward_list = []
 # policy_kwargs = dict(net_arch=[32, 64, 128, 256, 512, 1024])
 policy_kwargs = dict(net_arch=[16, 16])
 # policy_kwargs = None
-model = MaskablePPO(MaskableActorCriticPolicy, custom_env, verbose=0, tensorboard_log="tensorboard_logs", policy_kwargs = policy_kwargs,
+model = MaskablePPO(MaskableActorCriticPolicy, custom_env, ent_coef=0.01, verbose=0, tensorboard_log="tensorboard_logs", policy_kwargs = policy_kwargs,
                     learning_rate=0.003)#, verbose=True)
 
 # Simple one shot training 

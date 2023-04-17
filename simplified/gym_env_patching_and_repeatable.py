@@ -127,7 +127,7 @@ class Master:
 
         cpu_index_max = max(range(len(cpu_list)), key=cpu_list.__getitem__)  
         mem_index_max = max(range(len(mem_list)), key=mem_list.__getitem__)  
-        
+    
 
         if node_choice.cpu == 0 or node_choice.mem == 0:
             reward = -2
@@ -218,6 +218,10 @@ class CustomEnv(gym.Env):
         self.master.mask_list = [1 if i in mask else 0 for i in range(self.number_of_nodes)]
         return self.master.mask_list
 
+    def all_valid_action_mask(self):
+        """Returns an action mask of all ones for debugging purposes"""
+        valid_mask = np.ones(self.number_of_nodes)
+        return valid_mask
 
     def ordered_valid_action_mask(self) -> np.array:
         """This method masks nodes like it would happen in the kubernetes cluster, meaning the masked nodes get removed from the end of a list,
