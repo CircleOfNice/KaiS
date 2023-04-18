@@ -112,8 +112,8 @@ Episodes = 100 #5000
 total_reward_list = []
 
 # policy_kwargs = dict(net_arch=[32, 64, 128, 256, 512, 1024])
-policy_kwargs = dict(net_arch=[16, 16])
-# policy_kwargs = None
+# policy_kwargs = dict(net_arch=[16, 16])
+policy_kwargs = None
 model = MaskablePPO(MaskableActorCriticPolicy, custom_env, ent_coef=0.01, verbose=0, tensorboard_log="tensorboard_logs", policy_kwargs = policy_kwargs,
                     learning_rate=0.003)#, verbose=True)
 
@@ -121,9 +121,10 @@ model = MaskablePPO(MaskableActorCriticPolicy, custom_env, ent_coef=0.01, verbos
 # custom_env.set_train_param(True)
 # model.learn(total_timesteps=(Episode_length-1)*Episodes, progress_bar=True, callback=[eval_callback, custom_callback])
 model.learn(total_timesteps=(Episode_length-1)*Episodes, progress_bar=True, callback=[eval_callback, action_dist_callback])
-print(' len(customenv.reward_list) : ', sum(custom_env.reward_list ), len(custom_env.reward_list))
-# sum_reward = sum(custom_env.reward_list )/ len(custom_env.reward_list)
 model.save(os.path.join('models','PPO2', "final_ppo_model.zip"))
+# print(' len(customenv.reward_list) : ', sum(custom_env.reward_list ), len(custom_env.reward_list))
+# sum_reward = sum(custom_env.reward_list )/ len(custom_env.reward_list)
+
 
 # model.logger.record("histogram", eval_env.master.action_distribution)
 # max_reward_model = 0
