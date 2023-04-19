@@ -13,17 +13,37 @@ class Node:
     """[This class serves as framework for definition of Edge Node with properties such as 
     task queue, service_list, cpu processing and  memory]
     """
-    def __init__(self, cpu:float, mem:float, max_cpu, max_mem):
+    def __init__(self, cpu:float, mem:float, max_cpu:float, max_mem:float):
+        """Init method for a node
+
+        Args:
+            cpu (float): Current free CPU space for a node. Measured in millicores like kubernetes
+            mem (float): Current free Memory space for a node. Measured in Gigabytes.
+            max_cpu (_type_): Maximum CPU capacity for a node
+            max_mem (_type_): Maximum Memory capacity for a node
+        """
         self.cpu = cpu
         self.mem = mem
         self.max_cpu = max_cpu
         self.max_mem = max_mem
+
+
     def __str__(self):
         return f"(cpu : {self.cpu}, mem: {self.mem})"
+    
+
     def get_current_state_data(self):
         state = [self.cpu, self.mem, self.max_cpu, self.max_mem]
         return state
-    def update_state(self, cpu_val, mem_val):
+    
+
+    def update_state(self, cpu_val:float, mem_val:float):
+        """Method to update the state of a node. 
+
+        Args:
+            cpu_val (float): Adds this value to the free CPU space of this Node.
+            mem_val (float): Adds this value to the free memory space of this Node.
+        """
         self.cpu = self.cpu + cpu_val
         self.mem = self.mem + mem_val
 
@@ -32,27 +52,28 @@ class Master:
     """[This class serves as framework for definition of Master Node with properties such as 
     task queue, cpu processing, memory, done and undone tasks, Kind of tasks done and undone. all task index]
     """
-    def __init__(self, number_of_nodes, data, train = True):
+    def __init__(self, number_of_nodes:int, task_data:list):
         self.number_of_nodes = number_of_nodes
-        self.max_available_cpu_choices = [4000, 2000, 1000, 500]
-        self.max_available_cpu= random.choice(self.max_available_cpu_choices)
-        
-        self.max_available_mem_choices = [2, 1, 0.5]
+        self.max_available_cpu_choices = [100, 50, 30]
+        self.max_available_mem_choices = [1, 0.5, 0.1]
 
-        self.mask_list = [1 for i in range(self.number_of_nodes)]
-        self.max_available_memory = random.choice(self.max_available_mem_choices)
+
+        self.mask_list = [1 for _ in range(self.number_of_nodes)]
+        
         self.current_incoming_task = [0, 0, 0, 0, 0]
-        self.req_cpu = 100
-        self.req_mem = 0.1
-        self.train = train
-        self.set_node_list()
+        self.req_cpu_current_task = 0
+        self.req_mem_current_task = 0
+
+        self.init_node_list()
         self.action_space = len(self.node_list)
         self.observation_space_dims = self.get_master_observation_space().shape
-        self.data = data
+        self.task_data = task_data
         self.action_value = 0
 
+        # Array to count the number of scheduling decisions for each node
         self.action_distribution = np.zeros(number_of_nodes)
-
+        # Counter for how many times the cluster was completely full
+        self.max_capacity_count = 0 
     
     def __str__(self):
         new_str ='\n'
@@ -68,37 +89,82 @@ class Master:
         #a=b
         return new_str
 
-    def set_node_list(self):
-        """ This method is used to set the cpu and memory values of all nodes to a random value within the allowed interval """
+
+    def init_node_list(self, init_random:bool=False):
+        """This method is used to set the cpu and memory values of all nodes to a random value within the allowed interval
+
+        Args:
+            init_random (bool, optional): If True, initializes the cluster with random CPU and Memory usages. If False
+            set current cpu and mem usage for each node to 0. Defaults to False.
+        """
         cpu_params= []
         mem_params= []
-        max_cpu_params = [ random.choice(self.max_available_cpu_choices) for i in range(self.number_of_nodes)]
-        max_mem_params = [ random.choice(self.max_available_mem_choices) for i in range(self.number_of_nodes)]
+        max_cpu_params = [random.choice(self.max_available_cpu_choices) for i in range(self.number_of_nodes)]
+        max_mem_params = [random.choice(self.max_available_mem_choices) for i in range(self.number_of_nodes)]
 
         for i in range(self.number_of_nodes):
-            #cpu_params.append(np.random.randint(0,max_cpu_params[i]))
-            #mem_params.append(np.random.uniform(0,max_mem_params[i]))
-            cpu_params.append(max_cpu_params[i])
-            mem_params.append(max_mem_params[i])
-        try:
-            #print('self.master.req_cpu, self.master.req_mem : ', self.req_cpu, self.req_mem)
-            #print('Before self.node_list : ')
+            if init_random:
+                cpu_params.append(np.random.randint(0,max_cpu_params[i]))
+                mem_params.append(np.random.uniform(0,max_mem_params[i]))
+            else:
+                cpu_params.append(max_cpu_params[i])
+                mem_params.append(max_mem_params[i])
+        # try:
+        #     #print('self.master.req_cpu, self.master.req_mem : ', self.req_cpu, self.req_mem)
+        #     #print('Before self.node_list : ')
             
-            print(self)
-            #print(*(x for x in self.node_list), sep='\n')
-            #print('done')
-        except:
-            pass
+        #     print(self)
+        #     #print(*(x for x in self.node_list), sep='\n')
+        #     #print('done')
+        # except:
+        #     pass
+
         self.node_list = [Node(cpu = cpu_params[i], mem = mem_params[i], max_cpu=max_cpu_params[i], max_mem=max_mem_params[i]) for i in range(self.number_of_nodes)]
         #print('After self.node_list :', )
         #print(self)
         #
         # print(*(x for x in self.node_list), sep='\n')
         #print('done')
+
+
+    def check_remaining_node_space(self) -> bool:
+        """Method to check wether the cluster has still space to execute the next incoming task
+
+        Also respects the masking caused by maskedPPO.
+
+
+        Returns:
+            bool: Returns true if at least one node has enough cpu and memory capacity to execute the task. False otherwise
+        """
+        for idx, node in enumerate(self.node_list):
+            if self.mask_list[idx]:
+                if node.cpu >= self.req_cpu_current_task and node.mem >= self.req_mem_current_task:
+                    return True
+        
+        return False
+    
+
+    def check_node_usage(self) -> bool:
+        """Method to check wether there are nodes who got negative available cpu or memory space.
+
+        If yes, this means the node got a task which it would not be able to process
+
+        Returns:
+            bool: Returns False if there are some Nodes who have negative available space. Returns True otherwise.
+        """
+        for node in self.node_list:
+            if node.cpu < 0:
+                return False
+            if node.mem < 0:
+                return False
+        
+        return True
+    
+
     def set_incoming_task(self, task):
         self.current_incoming_task = task
-        self.req_cpu = task[3]
-        self.req_mem = task[4]
+        self.req_cpu_current_task = task[3]
+        self.req_mem_current_task = task[4]
         
 
     def get_master_observation_space(self) -> np.array:
@@ -143,9 +209,15 @@ class Master:
         """
         node_choice = self.node_list[action]
         self.action_distribution[action] += 1
+        
+        if not self.check_remaining_node_space():
+            self.max_capacity_count += 1
+
         cpu_list = []
         mem_list = []
         for i , node in enumerate(self.node_list):
+
+            # If node is masked, set available cpu and memory space to 0
             if self.mask_list[i]==0:
                 cpu_list.append(0)
                 mem_list.append(0)
@@ -155,18 +227,11 @@ class Master:
 
         cpu_index_max = max(range(len(cpu_list)), key=cpu_list.__getitem__)  
         mem_index_max = max(range(len(mem_list)), key=mem_list.__getitem__)  
-    
-        '''
-        if node_choice.cpu == 0 or node_choice.mem == 0:
-            reward = -2
-        else:
-            cpu_pct = self.req_cpu / node_choice.cpu
-            mem_pct = self.req_mem / node_choice.mem 
-            reward = - max(cpu_pct, mem_pct)
-        '''
+
+
         # The more space the node has left, the higher the reward
-        cpu_reward = (node_choice.cpu / self.req_cpu)
-        mem_reward = (node_choice.mem / self.req_mem)
+        cpu_reward = (node_choice.cpu / self.req_cpu_current_task)
+        mem_reward = (node_choice.mem / self.req_mem_current_task)
 
         # reward = 0
 
@@ -205,22 +270,23 @@ class Master:
         #print('reward :  ', reward)
         #reward = min(cpu_reward, mem_reward)
 
-        if node_choice.cpu>=self.req_cpu and node_choice.mem >= self.req_mem:
-            node_choice.update_state(cpu_val = - self.req_cpu, mem_val= - self.req_mem)
+        # if node_choice.cpu>=self.req_cpu_current_task and node_choice.mem >= self.req_mem_current_task:
+        node_choice.update_state(cpu_val = - self.req_cpu_current_task, mem_val= - self.req_mem_current_task)
+
         #print(reward)
         return reward 
 
     def reset_master(self):
-        self.set_node_list()
+        self.init_node_list()
 
 
 class CustomEnv(gym.Env):
     """Custom Environment that follows gym interface"""
 
-    def __init__(self, number_of_nodes, mask_nodes, data, train ):
+    def __init__(self, number_of_nodes:int, mask_nodes:int, data:list):
         super(CustomEnv, self).__init__()
         self.number_of_nodes=number_of_nodes
-        self.master = Master(number_of_nodes, data, train)
+        self.master = Master(number_of_nodes, data)
         #print('master _ print : ', self.master)
         #a=b
         self.mask_nodes = mask_nodes
@@ -229,19 +295,12 @@ class CustomEnv(gym.Env):
         self.action_space = spaces.Discrete(self.master.action_space)
 
         self.observation_space = Box(low=-np.inf, high=np.inf, shape=self.master.observation_space_dims, dtype=np.float64)
-        self.train = train
         self.reward_list = []
         
         self.number_of_masked_nodes = choice([i for i in range(int(self.number_of_nodes/2))])
-        task = self.generate_new_task()
+        task = self.generate_random_task()
         self.update_incoming_task(task) 
-        self.data_len = len(self.master.data[0][:])
-
-
-    def set_train_param(self, param):
-        self.train = param
-        self.master.train = param
-        #self.master.set_node_list()
+        self.data_len = len(self.master.task_data[0][:])
 
 
     def valid_action_mask(self):
@@ -253,10 +312,12 @@ class CustomEnv(gym.Env):
         self.master.mask_list = self.all_valid_action_mask()
         return self.master.mask_list
 
+
     def all_valid_action_mask(self):
         """Returns an action mask of all ones for debugging purposes"""
         valid_mask = np.ones(self.number_of_nodes)
         return valid_mask
+
 
     def ordered_valid_action_mask(self) -> np.array:
         """This method masks nodes like it would happen in the kubernetes cluster, meaning the masked nodes get removed from the end of a list,
@@ -303,26 +364,44 @@ class CustomEnv(gym.Env):
         
 
     def generate_random_task(self):
-        req_cpu = np.random.randint(0, self.master.max_available_cpu/4)
-        req_mem = np.random.uniform(0, self.master.max_available_memory/8)
+        """ Method that returns a tasks with random required resources.
+        As a result there might be no node, which is able to handle the given task"""
+        req_cpu = np.random.randint(4, max(self.master.max_available_cpu_choices) // 10 )
+        req_mem = np.random.uniform(0.001, max(self.master.max_available_mem_choices) / 10)
         task = [0,0,0, req_cpu, req_mem]
         return task
 
 
     def generate_new_task(self):
-        data = self.master.data
+        data = self.master.task_data
         task = [data[0][self.step_counter], data[1][self.step_counter], data[2][self.step_counter], data[3][self.step_counter], data[4][self.step_counter]]
         return task
 
+
+    def generate_new_simple_task(self):
+        """ Method that returns always the same simple task for debugging purposes"""
+        task = [0, 0, 0, 1, 0.01]
+        return task
+    
+
     def get_done_status(self, observation):
-        done = True
-        for i in range(int(len(observation)/2)-1):
-            cpu_i = 2*i
-            mem_i = 2*i+1 
-            if observation[cpu_i]>=self.master.req_cpu and observation[mem_i]>=self.master.req_mem:
-                #print('done False : ', False)
-                return False
+        done = False
+
+        node_valid_flag = self.master.check_node_usage()
+
+        if not node_valid_flag:
+            done = True
+
+        # done = True
+        # for i in range(int(len(observation)/2)-1):
+        #     cpu_i = 2*i
+        #     mem_i = 2*i+1 
+        #     if observation[cpu_i]>=self.master.req_cpu_current_task and observation[mem_i]>=self.master.req_mem_current_task:
+        #         #print('done False : ', False)
+        #         return False
         return done
+    
+
     def step(self, action:int):
         """ One step in the environment. Takes the action determined by the agent and calculates the reward.
         The Episode is considered done once we analyzed all datapoints.
@@ -340,7 +419,7 @@ class CustomEnv(gym.Env):
         info = {}
         self.reward_list.append(reward)  
         self.step_counter = self.step_counter + 1
-        task = self.generate_new_task()
+        task = self.generate_random_task()
         self.update_incoming_task(task) 
         observation_ = self.master.get_master_observation_space()
         #print('After action : ', action, observation_, self.master.req_cpu, self.master.req_mem)
@@ -348,18 +427,18 @@ class CustomEnv(gym.Env):
         
         #self.step_counter +=1 
         if self.step_counter == self.data_len -1:
-            print('set self.step_counter reset at step count : ', self.step_counter)
+            # print('set self.step_counter reset at step count : ', self.step_counter)
             self.step_counter = 0
-            print('After set self.step_counter to : ', self.step_counter)
+            # print('After set self.step_counter to : ', self.step_counter)
             done = True
             
             #done = True # done needs to be set to True at some point for the EvalCallback to finish
         #a=b
         
-        if done ==True:
-            print('Done true ? : ', done,self.step_counter)
-            print('self.master.req_cpu, self.master.req_mem : ', self.master.req_cpu, self.master.req_mem)
-            print('observation_ : ', observation_)
+        # if done ==True:
+        #     print('Done true ? : ', done,self.step_counter)
+        #     print('self.master.req_cpu, self.master.req_mem : ', self.master.req_cpu_current_task, self.master.req_mem_current_task)
+        #     print('observation_ : ', observation_)
             #a=b
         
         #if self.step_counter ==50:

@@ -19,11 +19,21 @@ from tensorboardX import SummaryWriter
 #from new_gym_patching import CustomEnv
 #from gym_env_patching_and_repeatable import CustomEnv
 from new_gym_with_next_state_fixed import CustomEnv
-class ActionDistributionCallback(BaseCallback):
-    """ Logs the net change in cash between the beginning and end of each epoch/run. """
+
+
+class CustomLoggerCallback(BaseCallback):
+    """Custom callback for logging different values from the environment.
+
+    If we use multiple environments to train in parallel, we only log values of environment 0, assuming that the others will have similar values
+
+    Currently logging the:
+        - Action distribution
+        - Number of invalid scheduling decisions
+        - Number of times the cluster was at max capacity
+    """
 
     def __init__(self, eval_env:gym.Env, verbose, log_freq:int, num_envs:int):
-        super(ActionDistributionCallback, self).__init__(verbose)
+        super(CustomLoggerCallback, self).__init__(verbose)
         self.eval_env = eval_env
         self.log_freq = log_freq
         self.num_envs = num_envs
@@ -32,21 +42,27 @@ class ActionDistributionCallback(BaseCallback):
     def _on_training_start(self) -> None:
         self.writer = SummaryWriter(logdir=self.logger.get_dir())
         self.action_dist_dict = {}
+        self.master = self.eval_env.envs[0].master
 
-        for idx in range(len(self.eval_env.envs[0].master.action_distribution)):
+        for idx in range(len(self.master.action_distribution)):
             self.action_dist_dict["a_" + str(idx)] = None
 
     def _on_step(self) -> bool:
         # Since self.num_timesteps is increased depending on the number of environments, we divide all values here by the num_envs
         if (self.num_timesteps // self.num_envs) % (self.log_freq // self.num_envs) == self.log_freq // self.num_envs - 1:
-            action_distribution = self.eval_env.envs[0].master.action_distribution
-            # print("action_distribution:", action_distribution)
+
+            # Logging the action distribution
+            action_distribution = self.master.action_distribution
 
             if sum(action_distribution) > 0:
                 for idx, value in enumerate(action_distribution):
                         self.action_dist_dict["a_" + str(idx)] = value / sum(action_distribution)
                 self.writer.add_scalars("norm_action_distribution", self.action_dist_dict, global_step=self.num_timesteps)
 
+            # print(self.master.max_capacity_count)
+            # Logging the number of times we brought the cluster to max capacity
+            self.writer.add_scalars("max_capacity_count", {"max_capacity_count": self.master.max_capacity_count}, global_step=self.num_timesteps)
+            self.logger.log(self.master.max_capacity_count)
 
         return True
     
@@ -83,28 +99,28 @@ def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:l
 
 path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
 result_list,_ = get_all_task_kubernetes(path)
-total_nodes = 4
-masked_nodes = 2
+total_nodes = 10
+masked_nodes = total_nodes - 1
 
-eval_freq = 30_000 # Number of timesteps after which to evaluate the models
-num_envs = 1
+eval_freq = 50_000 # Number of timesteps after which to evaluate the models
+num_envs = 16
 
 # Need to first wrap the environment in all needed masks, and only then vectorize it
-env_fn = lambda: ActionMasker(CustomEnv(total_nodes, masked_nodes, result_list, True), mask_fn)
+env_fn = lambda: ActionMasker(CustomEnv(total_nodes, masked_nodes, result_list), mask_fn)
 custom_env = make_vec_env(env_fn, n_envs=num_envs)
 
 # Use evaluation environment to calculate mean reward and find best model
-eval_env = CustomEnv(total_nodes, masked_nodes, result_list, True)   # Initialize env
+eval_env = CustomEnv(total_nodes, masked_nodes, result_list)   # Initialize env
 eval_env = ActionMasker(eval_env, mask_fn)  # Wrap to enable masking
 eval_env = Monitor(eval_env)
 eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_path="logs",
-                              eval_freq=eval_freq//num_envs, deterministic=True, render=False, n_eval_episodes=1, verbose=True)
+                              eval_freq=eval_freq//num_envs, deterministic=True, render=False, n_eval_episodes=3, verbose=False)
 
 
-action_dist_callback = ActionDistributionCallback(eval_env=custom_env, verbose=0, log_freq=eval_freq, num_envs=num_envs)
+action_dist_callback = CustomLoggerCallback(eval_env=custom_env, verbose=0, log_freq=eval_freq, num_envs=num_envs)
 
 Episode_length = len(result_list[0])#[:5])
-Episodes = 5000 #5000
+Episodes = 100 #5000
 # MaskablePPO behaves the same as SB3's PPO unless the env is wrapped
 # with ActionMasker. If the wrapper is detected, the masks are automatically
 # retrieved and used when learning. Note that MaskablePPO does not accept
