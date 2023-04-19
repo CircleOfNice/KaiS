@@ -17,8 +17,8 @@ from stable_baselines3.common.env_util import make_vec_env
 from tensorboardX import SummaryWriter
 
 #from new_gym_patching import CustomEnv
-from gym_env_patching_and_repeatable import CustomEnv
-
+#from gym_env_patching_and_repeatable import CustomEnv
+from new_gym_with_next_state_fixed import CustomEnv
 class ActionDistributionCallback(BaseCallback):
     """ Logs the net change in cash between the beginning and end of each epoch/run. """
 
@@ -84,10 +84,10 @@ def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:l
 path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
 result_list,_ = get_all_task_kubernetes(path)
 total_nodes = 4
-masked_nodes = 3
+masked_nodes = 2
 
 eval_freq = 30_000 # Number of timesteps after which to evaluate the models
-num_envs = 8
+num_envs = 1
 
 # Need to first wrap the environment in all needed masks, and only then vectorize it
 env_fn = lambda: ActionMasker(CustomEnv(total_nodes, masked_nodes, result_list, True), mask_fn)
@@ -98,13 +98,13 @@ eval_env = CustomEnv(total_nodes, masked_nodes, result_list, True)   # Initializ
 eval_env = ActionMasker(eval_env, mask_fn)  # Wrap to enable masking
 eval_env = Monitor(eval_env)
 eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_path="logs",
-                              eval_freq=eval_freq//num_envs, deterministic=True, render=False, n_eval_episodes=1, verbose=False)
+                              eval_freq=eval_freq//num_envs, deterministic=True, render=False, n_eval_episodes=1, verbose=True)
 
 
 action_dist_callback = ActionDistributionCallback(eval_env=custom_env, verbose=0, log_freq=eval_freq, num_envs=num_envs)
 
 Episode_length = len(result_list[0])#[:5])
-Episodes = 100 #5000
+Episodes = 5000 #5000
 # MaskablePPO behaves the same as SB3's PPO unless the env is wrapped
 # with ActionMasker. If the wrapper is detected, the masks are automatically
 # retrieved and used when learning. Note that MaskablePPO does not accept
