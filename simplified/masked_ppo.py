@@ -19,7 +19,7 @@ from tensorboardX import SummaryWriter
 #from new_gym_patching import CustomEnv
 #from gym_env_patching_and_repeatable import CustomEnv
 from new_gym_with_next_state_fixed import CustomEnv
-
+import utils
 
 class CustomLoggerCallback(BaseCallback):
     """Custom callback for logging different values from the environment.
@@ -44,6 +44,8 @@ class CustomLoggerCallback(BaseCallback):
         self.action_dist_dict = {}
         self.master = self.eval_env.envs[0].master
 
+        self.expected_action_distribution = utils.expected_action_distribution(node_num=total_nodes, use_mask=True)
+
         for idx in range(len(self.master.action_distribution)):
             self.action_dist_dict["a_" + str(idx)] = None
 
@@ -59,9 +61,16 @@ class CustomLoggerCallback(BaseCallback):
                         self.action_dist_dict["a_" + str(idx)] = value / sum(action_distribution)
                 self.writer.add_scalars("norm_action_distribution", self.action_dist_dict, global_step=self.num_timesteps)
 
+            # KL div to the ideal load balanced approach
+            kl_div = utils.action_distribution_kl_div(action_distribution, self.expected_action_distribution)
+            self.writer.add_scalars("expected_action_dist_kl_div", {"expected_action_dist_kl_div": kl_div}, global_step=self.num_timesteps)
+
             # print(self.master.max_capacity_count)
-            # Logging the number of times we brought the cluster to max capacity
-            self.writer.add_scalars("max_capacity_count", {"max_capacity_count": self.master.max_capacity_count}, global_step=self.num_timesteps)
+            # Logging the relationship between the number of times the cluster was successfully brought to max capacity
+            # vs the number of times a node get an invalid scheduling decision
+            # Ideally this value should converge to a value close to 0
+            invalid_decision_counter = self.master.max_capacity_count / self.master.invalid_decision_counter
+            self.writer.add_scalars("invalid_decision_counter", {"invalid_decision_counter": invalid_decision_counter}, global_step=self.num_timesteps)
             self.logger.log(self.master.max_capacity_count)
 
         return True
@@ -78,7 +87,7 @@ def mask_fn(env:CustomEnv) -> np.ndarray:
     # for the current env. In this example, we assume the env has a
     # helpful method we can rely on.
     # return env.all_valid_action_mask()
-    return env.ordered_valid_action_mask()
+    return env.get_action_mask()
     # return env.valid_action_mask()
 
 
@@ -104,6 +113,8 @@ masked_nodes = total_nodes - 1
 
 eval_freq = 50_000 # Number of timesteps after which to evaluate the models
 num_envs = 16
+
+
 
 # Need to first wrap the environment in all needed masks, and only then vectorize it
 env_fn = lambda: ActionMasker(CustomEnv(total_nodes, masked_nodes, result_list), mask_fn)

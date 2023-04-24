@@ -74,6 +74,8 @@ class Master:
         self.action_distribution = np.zeros(number_of_nodes)
         # Counter for how many times the cluster was completely full
         self.max_capacity_count = 0 
+        # Counter for how often the environment was reset
+        self.invalid_decision_counter = 0
     
     def __str__(self):
         new_str ='\n'
@@ -303,6 +305,10 @@ class CustomEnv(gym.Env):
         self.data_len = len(self.master.task_data[0][:])
 
 
+    def get_action_mask(self):
+        """Wrapper to call the action mask"""
+        return self.ordered_valid_action_mask()
+    
     def valid_action_mask(self):
         actions = [i for i in range(self.number_of_nodes)]
         #mask = sample(actions,  self.mask_nodes)
@@ -390,6 +396,7 @@ class CustomEnv(gym.Env):
         node_valid_flag = self.master.check_node_usage()
 
         if not node_valid_flag:
+            self.master.invalid_decision_counter += 1
             done = True
 
         # done = True
