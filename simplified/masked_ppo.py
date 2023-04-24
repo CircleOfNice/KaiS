@@ -77,7 +77,7 @@ def mask_fn(env:CustomEnv) -> np.ndarray:
     # Do whatever you'd like in this function to return the action mask
     # for the current env. In this example, we assume the env has a
     # helpful method we can rely on.
-    # return env.all_valid_action_mask()
+    #return env.all_valid_action_mask()
     return env.ordered_valid_action_mask()
     # return env.valid_action_mask()
 
@@ -99,7 +99,7 @@ def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:l
 
 path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
 result_list,_ = get_all_task_kubernetes(path)
-total_nodes = 10
+total_nodes = 4
 masked_nodes = total_nodes - 1
 
 eval_freq = 50_000 # Number of timesteps after which to evaluate the models

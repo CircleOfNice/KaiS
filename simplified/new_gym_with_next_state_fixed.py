@@ -1,3 +1,7 @@
+
+
+
+
 import gym 
 from gym import spaces
 # from components.Master import Master
@@ -15,7 +19,6 @@ class Node:
     """
     def __init__(self, cpu:float, mem:float, max_cpu:float, max_mem:float):
         """Init method for a node
-
         Args:
             cpu (float): Current free CPU space for a node. Measured in millicores like kubernetes
             mem (float): Current free Memory space for a node. Measured in Gigabytes.
@@ -39,7 +42,6 @@ class Node:
 
     def update_state(self, cpu_val:float, mem_val:float):
         """Method to update the state of a node. 
-
         Args:
             cpu_val (float): Adds this value to the free CPU space of this Node.
             mem_val (float): Adds this value to the free memory space of this Node.
@@ -92,7 +94,6 @@ class Master:
 
     def init_node_list(self, init_random:bool=False):
         """This method is used to set the cpu and memory values of all nodes to a random value within the allowed interval
-
         Args:
             init_random (bool, optional): If True, initializes the cluster with random CPU and Memory usages. If False
             set current cpu and mem usage for each node to 0. Defaults to False.
@@ -129,10 +130,7 @@ class Master:
 
     def check_remaining_node_space(self) -> bool:
         """Method to check wether the cluster has still space to execute the next incoming task
-
         Also respects the masking caused by maskedPPO.
-
-
         Returns:
             bool: Returns true if at least one node has enough cpu and memory capacity to execute the task. False otherwise
         """
@@ -146,9 +144,7 @@ class Master:
 
     def check_node_usage(self) -> bool:
         """Method to check wether there are nodes who got negative available cpu or memory space.
-
         If yes, this means the node got a task which it would not be able to process
-
         Returns:
             bool: Returns False if there are some Nodes who have negative available space. Returns True otherwise.
         """
@@ -171,7 +167,6 @@ class Master:
         """This method is used to get the observation for the model. The observation consists out of the values for available cpu and memory
         for each node with the shape of (#Node_num, 2). At the end we append the request cpu and memory for the given task, resulting in the shape 
         of (#Node_num+1, 2) for the observation space
-
         Returns:
             np.array: The observation with node and task information
         """
@@ -180,7 +175,7 @@ class Master:
         # Get information of all nodes
         for _, node in  enumerate(self.node_list):
             state_normalisation = node.get_current_state_data()
-            master_observation_space.append((state_normalisation[0], state_normalisation[1]))# , state_normalisation[2], state_normalisation[3]))
+            master_observation_space.append((state_normalisation[0], state_normalisation[1], state_normalisation[2], state_normalisation[3]))# , state_normalisation[2], state_normalisation[3]))
 
         # Get information of the task
         master_observation_space.append((self.current_incoming_task[3], self.current_incoming_task[4]))#, 0,0))
@@ -198,12 +193,9 @@ class Master:
         """This method is used to determine the reward for a given scheduling decision (action).
         Currently the reward is based on the amount of free resources. The more free resources (cpu and/or memory) the chose node has,
         the higher the reward for the model.
-
         This should result in an agent that favors a somewhat load-balanced approach
-
         Args:
             action (int): The number of the node which to schedule the given task to.
-
         Returns:
             float: The reward for the agent
         """
@@ -269,7 +261,26 @@ class Master:
         reward = cpu_reward  + mem_reward
         #print('reward :  ', reward)
         #reward = min(cpu_reward, mem_reward)
-
+        
+        '''
+        cpu_list = []
+        mem_list = []
+        for i , node in enumerate(self.node_list):
+            # If node is masked, set available cpu and memory space to 0
+            cpu_list.append(node.cpu/node.max_cpu)
+            mem_list.append(node.mem/node.max_mem)
+        
+        std_cpu = np.std(cpu_list, ddof=1)
+        std_mem = np.std(mem_list, ddof=1)
+        load_balancing_reward = np.exp(1/(1 + np.exp(-(std_cpu+ std_mem))))
+        #print(load_balancing_reward)
+        #print('Before : ', reward)
+        
+        if reward>0:
+            reward =  load_balancing_reward
+        else:
+            reward =  -  load_balancing_reward
+        '''
         # if node_choice.cpu>=self.req_cpu_current_task and node_choice.mem >= self.req_mem_current_task:
         node_choice.update_state(cpu_val = - self.req_cpu_current_task, mem_val= - self.req_mem_current_task)
 
@@ -287,8 +298,6 @@ class CustomEnv(gym.Env):
         super(CustomEnv, self).__init__()
         self.number_of_nodes=number_of_nodes
         self.master = Master(number_of_nodes, data)
-        #print('master _ print : ', self.master)
-        #a=b
         self.mask_nodes = mask_nodes
         self.step_counter = 0
         self.reset()
@@ -305,9 +314,7 @@ class CustomEnv(gym.Env):
 
     def valid_action_mask(self):
         actions = [i for i in range(self.number_of_nodes)]
-        #mask = sample(actions,  self.mask_nodes)
         mask = sample(actions,  np.random.randint(0,self.mask_nodes))
-        #print('len(mask) : ', len(mask))
         self.master.mask_list = [1 if i in mask else 0 for i in range(self.number_of_nodes)]
         self.master.mask_list = self.all_valid_action_mask()
         return self.master.mask_list
@@ -322,13 +329,9 @@ class CustomEnv(gym.Env):
     def ordered_valid_action_mask(self) -> np.array:
         """This method masks nodes like it would happen in the kubernetes cluster, meaning the masked nodes get removed from the end of a list,
         resulting in a masked array that looks something like this:
-
         [1, 1, 1, 1, 1, 1, 0, 0, 0]
-
         where only the last values of the arrays are those nodes that are not available.
-
         Currently we assume that there is always at least one node available.
-
         Returns:
             np.array: The boolean mask of available nodes
         """
@@ -343,20 +346,11 @@ class CustomEnv(gym.Env):
     def reset(self):
         """This method is used to reset the state of the environment to a random new one, so each node gets randomly
         new cpu and memory values assigned and also updates the task information
-
         Returns:
             np.array: The observation including information about the nodes and the task.
         """
-        #print('starting reset')
-        
-        #print('Before  Reset self.master.get_master_observation_space() : ', self.master.get_master_observation_space())
-        #task = self.generate_new_task()
-        #self.update_incoming_task(task) 
         self.master.reset_master()
-        #print('reset done')
-        #print()
-        #print()
-        #print('After Reset self.master.get_master_observation_space() : ', self.master.get_master_observation_space())
+        
         return self.master.get_master_observation_space()
 
     def get_random_action(self):
@@ -371,12 +365,27 @@ class CustomEnv(gym.Env):
         task = [0,0,0, req_cpu, req_mem]
         return task
 
+    
+    def sample_task_from_kubernetes_data_set(self):
+        """Samples task from real Kuberenetes choices"""
+        data = self.master.task_data
+        rand_count =  np.random.randint(0, self.data_len )
+        task = [data[0][rand_count], data[1][rand_count], data[2][rand_count], data[3][rand_count], data[4][rand_count]]
+        return task
 
     def generate_new_task(self):
+        
+        """ Method that returns always the same simple task for debugging purposes"""
         data = self.master.task_data
         task = [data[0][self.step_counter], data[1][self.step_counter], data[2][self.step_counter], data[3][self.step_counter], data[4][self.step_counter]]
         return task
 
+    def sample_task_from_kubernetes_data_set(self):
+        """Samples task from real Kuberenetes choices"""
+        data = self.master.task_data
+        rand_count =  np.random.randint(0, self.data_len )
+        task = [data[0][rand_count], data[1][rand_count], data[2][rand_count], data[3][rand_count], data[4][rand_count]]
+        return task
 
     def generate_new_simple_task(self):
         """ Method that returns always the same simple task for debugging purposes"""
@@ -385,6 +394,7 @@ class CustomEnv(gym.Env):
     
 
     def get_done_status(self, observation):
+        """ Method to get boolean as whether the episode has ended"""
         done = False
 
         node_valid_flag = self.master.check_node_usage()
@@ -405,48 +415,32 @@ class CustomEnv(gym.Env):
     def step(self, action:int):
         """ One step in the environment. Takes the action determined by the agent and calculates the reward.
         The Episode is considered done once we analyzed all datapoints.
-
         Args:
             action (int): Number of the node the task should be scheduled to.
-
         Returns:
             Tuple: observation, reward, done, info
         """
-        #print('Before action : ', action, self.master.get_master_observation_space(), self.master.req_cpu, self.master.req_mem)
+        
         reward = self.master.execute_action(action)
 
-        #done = False
         info = {}
         self.reward_list.append(reward)  
         self.step_counter = self.step_counter + 1
         task = self.generate_random_task()
         self.update_incoming_task(task) 
         observation_ = self.master.get_master_observation_space()
-        #print('After action : ', action, observation_, self.master.req_cpu, self.master.req_mem)
+       
         done = self.get_done_status(observation_)
         
-        #self.step_counter +=1 
         if self.step_counter == self.data_len -1:
-            # print('set self.step_counter reset at step count : ', self.step_counter)
             self.step_counter = 0
-            # print('After set self.step_counter to : ', self.step_counter)
             done = True
             
-            #done = True # done needs to be set to True at some point for the EvalCallback to finish
-        #a=b
-        
-        # if done ==True:
-        #     print('Done true ? : ', done,self.step_counter)
-        #     print('self.master.req_cpu, self.master.req_mem : ', self.master.req_cpu_current_task, self.master.req_mem_current_task)
-        #     print('observation_ : ', observation_)
-            #a=b
-        
-        #if self.step_counter ==50:
-        #    a=b
         return observation_, reward, done, info
         
 
     def update_incoming_task(self, task):
+        """ Method to set the current task"""
         self.master.set_incoming_task(task)
         
 
@@ -456,4 +450,3 @@ class CustomEnv(gym.Env):
 
     def close (self):
         self.master.reset_master()
-
