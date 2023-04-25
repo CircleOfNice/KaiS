@@ -376,7 +376,7 @@ class CustomEnv(gym.Env):
         
         if self.step_counter == self.data_len -1:
             self.step_counter = 0
-            done = True
+            # done = True
             
         return observation_, reward, done, info
         
