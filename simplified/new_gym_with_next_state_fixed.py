@@ -201,68 +201,11 @@ class Master:
         """
         node_choice = self.node_list[action]
         self.action_distribution[action] += 1
-        
+        node_choice.update_state(cpu_val = - self.req_cpu_current_task, mem_val= - self.req_mem_current_task)
+
         if not self.check_remaining_node_space():
             self.max_capacity_count += 1
-
-        cpu_list = []
-        mem_list = []
-        for i , node in enumerate(self.node_list):
-
-            # If node is masked, set available cpu and memory space to 0
-            if self.mask_list[i]==0:
-                cpu_list.append(0)
-                mem_list.append(0)
-            else:
-                cpu_list.append(node.cpu)
-                mem_list.append(node.mem)
-
-        cpu_index_max = max(range(len(cpu_list)), key=cpu_list.__getitem__)  
-        mem_index_max = max(range(len(mem_list)), key=mem_list.__getitem__)  
-
-
-        # The more space the node has left, the higher the reward
-        cpu_reward = (node_choice.cpu / self.req_cpu_current_task)
-        mem_reward = (node_choice.mem / self.req_mem_current_task)
-
-        # reward = 0
-
-        # if cpu_reward > 1 and mem_reward > 1:
-        #     return 1
         
-        '''
-        if cpu_reward>=1 and mem_reward>=1:
-            reward = 1
-        else: 
-            reward = -1 
-        '''
-        # Proportional Approach
-        
-        if cpu_reward>=1 and mem_reward>=1:
-            cpu_reward = cpu_reward
-            mem_reward = mem_reward
-            '''
-            if cpu_reward<mem_reward:
-                if action ==cpu_index_max:
-                    cpu_reward = cpu_reward + 10
-                
-            elif mem_reward<cpu_reward:
-                if action ==mem_index_max:
-                    mem_reward = mem_reward + 10
-            '''
-            
-        #elif cpu_reward<1 and  mem_reward<1:
-        #    cpu_reward = -abs(cpu_reward)
-        #    mem_reward = -abs(mem_reward)
-        else:
-            cpu_reward = -cpu_reward
-            mem_reward = -mem_reward
-            
-        reward = cpu_reward  + mem_reward
-        #print('reward :  ', reward)
-        #reward = min(cpu_reward, mem_reward)
-        
-        '''
         cpu_list = []
         mem_list = []
         for i , node in enumerate(self.node_list):
@@ -272,19 +215,11 @@ class Master:
         
         std_cpu = np.std(cpu_list, ddof=1)
         std_mem = np.std(mem_list, ddof=1)
-        load_balancing_reward = np.exp(1/(1 + np.exp(-(std_cpu+ std_mem))))
-        #print(load_balancing_reward)
-        #print('Before : ', reward)
         
-        if reward>0:
-            reward =  load_balancing_reward
-        else:
-            reward =  -  load_balancing_reward
-        '''
-        # if node_choice.cpu>=self.req_cpu_current_task and node_choice.mem >= self.req_mem_current_task:
-        node_choice.update_state(cpu_val = - self.req_cpu_current_task, mem_val= - self.req_mem_current_task)
+        std_mem = np.std([std_cpu, std_mem], ddof=1)
+        reward = np.exp(1/(1 + np.exp(-(std_cpu+ std_mem))))
 
-        #print(reward)
+        
         return reward 
 
     def reset_master(self):
