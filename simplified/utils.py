@@ -1,6 +1,11 @@
 import numpy as np
 import torch.nn.functional as F
 import torch
+import time
+
+from tensorboardX import SummaryWriter
+from typing import Dict, Optional
+
 
 def expected_action_distribution(node_num:int, use_mask:bool=True) -> np.array:
     """Method to calculate the expected action distribution for a random scheduler
@@ -45,5 +50,6 @@ def action_distribution_kl_div(input_dist:np.array, target_dist:np.array) -> flo
     """
     input_dist  = torch.Tensor(input_dist / sum(input_dist))
     target_dist = torch.Tensor(target_dist)
-    div = F.kl_div(np.log(input_dist), np.log(target_dist), reduction="batchmean", log_target=True)
+    div = F.kl_div(F.log_softmax(input_dist, dim=0), F.log_softmax(target_dist, dim=0), reduction="batchmean", log_target=True)
     return div
+

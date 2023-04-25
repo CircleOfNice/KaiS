@@ -71,7 +71,6 @@ class CustomLoggerCallback(BaseCallback):
             # Ideally this value should converge to a value close to 0
             invalid_decision_counter = self.master.max_capacity_count / self.master.invalid_decision_counter
             self.writer.add_scalars("invalid_decision_counter", {"invalid_decision_counter": invalid_decision_counter}, global_step=self.num_timesteps)
-            self.logger.log(self.master.max_capacity_count)
 
         return True
     
@@ -108,7 +107,7 @@ def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:l
 
 path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
 result_list,_ = get_all_task_kubernetes(path)
-total_nodes = 10
+total_nodes = 16
 masked_nodes = total_nodes - 1
 
 eval_freq = 50_000 # Number of timesteps after which to evaluate the models
@@ -142,8 +141,9 @@ total_reward_list = []
 # policy_kwargs = dict(net_arch=[16, 16])
 policy_kwargs = None
 model = MaskablePPO(MaskableActorCriticPolicy, custom_env, ent_coef=0.01, verbose=0, tensorboard_log="tensorboard_logs", policy_kwargs = policy_kwargs,
-                    learning_rate=0.003)#, verbose=True)
+                    learning_rate=0.0003)#, verbose=True)
 
+print(model.policy)
 # Simple one shot training 
 # custom_env.set_train_param(True)
 # model.learn(total_timesteps=(Episode_length-1)*Episodes, progress_bar=True, callback=[eval_callback, custom_callback])
