@@ -70,7 +70,7 @@ class CustomLoggerCallback(BaseCallback):
             # vs the number of times a node get an invalid scheduling decision
             # Ideally this value should converge to a value close to 0
             invalid_decision_counter = self.master.max_capacity_count / self.master.invalid_decision_counter
-            self.writer.add_scalars("invalid_decision_counter", {"invalid_decision_counter": invalid_decision_counter}, global_step=self.num_timesteps)
+            self.writer.add_scalars("max_capacity_pct", {"max_capacity_pct": invalid_decision_counter}, global_step=self.num_timesteps)
 
         return True
     
