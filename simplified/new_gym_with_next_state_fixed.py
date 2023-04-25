@@ -56,8 +56,8 @@ class Master:
     """
     def __init__(self, number_of_nodes:int, task_data:list):
         self.number_of_nodes = number_of_nodes
-        self.max_available_cpu_choices = [100, 50, 30]
-        self.max_available_mem_choices = [1, 0.5, 0.1]
+        self.max_available_cpu_choices = [4000, 8000]
+        self.max_available_mem_choices = [1, 2, 4]
 
 
         self.mask_list = [1 for _ in range(self.number_of_nodes)]
