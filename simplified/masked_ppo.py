@@ -1,4 +1,5 @@
 import gym
+import joblib
 import numpy as np
 import os
 from tqdm import tqdm
@@ -85,8 +86,8 @@ def mask_fn(env:CustomEnv) -> np.ndarray:
     # Do whatever you'd like in this function to return the action mask
     # for the current env. In this example, we assume the env has a
     # helpful method we can rely on.
-    #return env.all_valid_action_mask()
-    return env.ordered_valid_action_mask()
+    return env.all_valid_action_mask()
+    # return env.ordered_valid_action_mask()
     # return env.valid_action_mask()
 
 
@@ -118,11 +119,15 @@ num_envs = 16
 # Need to first wrap the environment in all needed masks, and only then vectorize it
 env_fn = lambda: ActionMasker(CustomEnv(total_nodes, masked_nodes, result_list), mask_fn)
 custom_env = make_vec_env(env_fn, n_envs=num_envs)
+custom_env = VecNormalize(custom_env)
 
 # Use evaluation environment to calculate mean reward and find best model
-eval_env = CustomEnv(total_nodes, masked_nodes, result_list)   # Initialize env
-eval_env = ActionMasker(eval_env, mask_fn)  # Wrap to enable masking
+# eval_env = CustomEnv(total_nodes, masked_nodes, result_list)   # Initialize env
+eval_env = make_vec_env(env_fn, n_envs=1)
 eval_env = Monitor(eval_env)
+eval_env = VecNormalize(eval_env)
+# eval_env = ActionMasker(eval_env, mask_fn)  # Wrap to enable masking
+
 eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_path="logs",
                               eval_freq=eval_freq//num_envs, deterministic=True, render=False, n_eval_episodes=3, verbose=False)
 
@@ -149,6 +154,8 @@ print(model.policy)
 # model.learn(total_timesteps=(Episode_length-1)*Episodes, progress_bar=True, callback=[eval_callback, custom_callback])
 model.learn(total_timesteps=(Episode_length-1)*Episodes, progress_bar=True, callback=[eval_callback, action_dist_callback])
 model.save(os.path.join('models','PPO2', "final_ppo_model.zip"))
+custom_env.save(os.path.join("models", "PPO2", "final_env.zip"))
+
 # print(' len(customenv.reward_list) : ', sum(custom_env.reward_list ), len(custom_env.reward_list))
 # sum_reward = sum(custom_env.reward_list )/ len(custom_env.reward_list)
 

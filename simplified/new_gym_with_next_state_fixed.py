@@ -94,7 +94,7 @@ class Master:
         return new_str
 
 
-    def init_node_list(self, init_random:bool=False):
+    def init_node_list(self, init_random:bool=True):
         """This method is used to set the cpu and memory values of all nodes to a random value within the allowed interval
         Args:
             init_random (bool, optional): If True, initializes the cluster with random CPU and Memory usages. If False
@@ -205,8 +205,8 @@ class Master:
         self.action_distribution[action] += 1
         node_choice.update_state(cpu_val = - self.req_cpu_current_task, mem_val= - self.req_mem_current_task)
 
-        if not self.check_remaining_node_space():
-            self.max_capacity_count += 1
+        # if not selfmax_capa.check_remaining_node_space():
+        #     self.city_count += 1
         
         cpu_list = []
         mem_list = []
@@ -218,9 +218,10 @@ class Master:
         std_cpu = np.std(cpu_list, ddof=1)
         std_mem = np.std(mem_list, ddof=1)
         
-        std_mem = np.std([std_cpu, std_mem], ddof=1)
-        reward = np.exp(1/(1 + np.exp(-(std_cpu+ std_mem))))
+        # std_mem = np.std([std_cpu, std_mem], ddof=1)
+        # reward = np.exp(1/(1 + np.exp(-(std_cpu+ std_mem))))
 
+        reward = np.exp(-1/(1 + np.exp(-(std_cpu + std_mem))))
         
         return reward 
 
@@ -344,6 +345,9 @@ class CustomEnv(gym.Env):
             self.master.invalid_decision_counter += 1
             done = True
 
+            if not self.master.check_remaining_node_space():
+                self.master.max_capacity_count += 1
+            
         # done = True
         # for i in range(int(len(observation)/2)-1):
         #     cpu_i = 2*i
