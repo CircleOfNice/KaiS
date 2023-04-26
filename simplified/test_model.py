@@ -42,18 +42,20 @@ if __name__ == "__main__":
     ENV_PATH = r"models/PPO2/final_env.zip"
 
     env = DummyVecEnv([lambda: CustomEnv(4, 3, [[]])])
-    vec_env = VecNormalize.load(ENV_PATH, env)
-    vec_env.training = False
-    model = sb3_contrib.MaskablePPO.load(MODEL_PATH, env=env)
-    model.set_env(vec_env)
+    # vec_env = VecNormalize.load(ENV_PATH, env)
+    # vec_env.training = False
 
+    # model = sb3_contrib.MaskablePPO.load(MODEL_PATH, env=env)
+    # model.set_env(vec_env)
+
+    model = sb3_contrib.MaskablePPO.load(MODEL_PATH)
     # self.model:sb3_contrib.MaskablePPO = sb3_contrib.MaskablePPO.load(MODEL_SAVE_PATH)
     MAX_NODE_CAPACITY = model.action_space.n
     action_dist = np.zeros(MAX_NODE_CAPACITY)
 
     print(model.policy)
     for _ in range(num_test_runs):
-        obs = np.array(model.get_env().env_method("reset")[0])
+        obs = env.reset()[0]
         pprint_obs(obs)
         pred = pprint_pred(model, obs)
         action_dist[pred] += 1
