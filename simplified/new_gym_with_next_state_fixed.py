@@ -173,6 +173,28 @@ class Master:
         return action[0]
     
 
+    def find_low_resource_nodes(self):
+        """Method to find the index of the node with lowest cpu usage and lowest memory usage, returns as tuple.
+        Respects the mask, does not consider if the current task can currently be executed on said node"""
+        max_cpu = -1
+        max_cpu_index = -1
+
+        max_mem = -1
+        max_mem_index = -1
+
+        for idx, node in enumerate(self.node_list):
+            if self.mask_list[idx]:
+                if node.cpu > max_cpu:
+                    max_cpu = node.cpu
+                    max_cpu_index = idx
+
+                if node.mem > max_mem:
+                    max_mem = node.mem
+                    max_mem_index = idx
+
+        return max_cpu_index, max_mem_index
+    
+
     def execute_action(self, action:int) -> float:
         """This method is used to determine the reward for a given scheduling decision (action).
         Currently the reward is based on the amount of free resources. The more free resources (cpu and/or memory) the chose node has,
@@ -185,6 +207,16 @@ class Master:
         """
         node_choice = self.node_list[action]
         self.action_distribution[action] += 1
+
+        # This calculation needs to happen, _before_ the nodes are updated
+        # reward = 0
+        # max_cpu_index, max_mem_index = self.find_low_resource_nodes()
+
+        # if action == max_cpu_index:
+        #     reward += 1
+        # if action == max_mem_index:
+        #     reward += 1
+
         node_choice.update_state(cpu_val = - self.req_cpu_current_task, mem_val= - self.req_mem_current_task)
 
         # if not selfmax_capa.check_remaining_node_space():
@@ -204,7 +236,7 @@ class Master:
         # reward = np.exp(1/(1 + np.exp(-(std_cpu+ std_mem))))
 
         reward = np.exp(-1/(1 + np.exp(-(std_cpu + std_mem))))
-        
+
         return reward 
 
     def reset_master(self):
@@ -352,7 +384,7 @@ class CustomEnv(gym.Env):
         reward = self.master.execute_action(action)
 
         info = {}
-        self.reward_list.append(reward)  
+        
         self.step_counter = self.step_counter + 1
         task = self.generate_random_task()
         self.update_incoming_task(task) 
@@ -363,7 +395,11 @@ class CustomEnv(gym.Env):
         if self.step_counter == self.data_len -1:
             self.step_counter = 0
             # done = True
-            
+        
+        if done:
+            reward = -1
+
+        self.reward_list.append(reward)      
         return observation_, reward, done, info
         
 
