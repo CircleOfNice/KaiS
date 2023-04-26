@@ -81,16 +81,11 @@ class Master:
     
     def __str__(self):
         new_str ='\n'
-        #new_str = [new_str + str(x) for x in self.node_list ]
-        
+
         for x in self.node_list:
             new_str+=str(x)
             new_str+='\n'
-        #new_str = new_str[-1]
-        #print(new_str[-1])
-        #print(*(x for x in self.node_list))
-        #print('new_str : ', new_str)
-        #a=b
+
         return new_str
 
 
@@ -112,22 +107,9 @@ class Master:
             else:
                 cpu_params.append(max_cpu_params[i])
                 mem_params.append(max_mem_params[i])
-        # try:
-        #     #print('self.master.req_cpu, self.master.req_mem : ', self.req_cpu, self.req_mem)
-        #     #print('Before self.node_list : ')
-            
-        #     print(self)
-        #     #print(*(x for x in self.node_list), sep='\n')
-        #     #print('done')
-        # except:
-        #     pass
+
 
         self.node_list = [Node(cpu = cpu_params[i], mem = mem_params[i], max_cpu=max_cpu_params[i], max_mem=max_mem_params[i]) for i in range(self.number_of_nodes)]
-        #print('After self.node_list :', )
-        #print(self)
-        #
-        # print(*(x for x in self.node_list), sep='\n')
-        #print('done')
 
 
     def check_remaining_node_space(self) -> bool:
@@ -344,13 +326,6 @@ class CustomEnv(gym.Env):
             self.master.invalid_decision_counter += 1
             done = True
 
-        # done = True
-        # for i in range(int(len(observation)/2)-1):
-        #     cpu_i = 2*i
-        #     mem_i = 2*i+1 
-        #     if observation[cpu_i]>=self.master.req_cpu_current_task and observation[mem_i]>=self.master.req_mem_current_task:
-        #         #print('done False : ', False)
-        #         return False
         return done
     
 

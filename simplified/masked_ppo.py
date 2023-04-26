@@ -138,7 +138,7 @@ Episodes = 100 #5000
 total_reward_list = []
 
 # policy_kwargs = dict(net_arch=[32, 64, 128, 256, 512, 1024])
-# policy_kwargs = dict(net_arch=[16, 16])
+#policy_kwargs = dict(net_arch=[16, 16])
 policy_kwargs = None
 model = MaskablePPO(MaskableActorCriticPolicy, custom_env, ent_coef=0.01, verbose=0, tensorboard_log="tensorboard_logs", policy_kwargs = policy_kwargs,
                     learning_rate=0.0003)#, verbose=True)
