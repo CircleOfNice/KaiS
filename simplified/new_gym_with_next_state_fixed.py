@@ -11,8 +11,8 @@ import numpy as np
 from gym.spaces.box import Box
 from random import shuffle, choice, sample
 import random
-
-
+from scipy.stats import entropy 
+from scipy.stats import variation , pearsonr
 class Node:
     """[This class serves as framework for definition of Edge Node with properties such as 
     task queue, service_list, cpu processing and  memory]
@@ -194,7 +194,78 @@ class Master:
 
         return max_cpu_index, max_mem_index
     
-
+    def get_utilisation_ratios(self):
+        cpu_utilisation = []
+        mem_utilisation = []
+        for i , node in enumerate(self.node_list):
+            # If node is masked, set available cpu and memory space to 0
+            cpu_utilisation.append(node.cpu/node.max_cpu)
+            mem_utilisation.append(node.mem/node.max_mem)
+        return cpu_utilisation, mem_utilisation
+    
+    def get_std_deviations(self, cpu_utilisation, mem_utilisation):
+        std_cpu = np.std(cpu_utilisation, ddof=1)
+        std_mem = np.std(mem_utilisation, ddof=1)
+        return std_cpu, std_mem
+    
+    def get_entropy(self, cpu_utilisation, mem_utilisation):
+        entropy_cpu = entropy(cpu_utilisation)
+        entropy_mem = entropy(mem_utilisation)
+        return entropy_cpu, entropy_mem
+    
+    
+    def get_coefficient_of_variation(self, cpu_utilisation, mem_utilisation):
+        coeff_cpu = variation(cpu_utilisation)
+        coeff_mem = variation(mem_utilisation)
+        return coeff_cpu, coeff_mem
+    
+    def get_standard_deviation_reward(self, cpu_utilisation, mem_utilisation):
+        std_cpu, std_mem = self.get_std_deviations(cpu_utilisation, mem_utilisation)
+        
+        std_cpu_reward = 1/(1+std_cpu)
+        std_mem_reward = 1/(1+std_mem)
+        return std_cpu_reward + std_mem_reward
+    
+    def get_entropy_reward(self, cpu_utilisation, mem_utilisation, action):
+        #entropy_cpu, entropy_mem= self.get_entropy(cpu_utilisation, mem_utilisation)
+        #entropy_cpu, entropy_mem= self.get_entropy(cpu_utilisation, mem_utilisation)
+        
+        #entropy_std =  np.std([entropy_cpu, entropy_mem], ddof=1)
+        
+        #entropy_reward = 1/(1+entropy_std)
+        
+        calculated_relative_entropies = []
+        calculated_relative_rewards = []
+        for i in range(len(cpu_utilisation)):
+            ent = entropy([cpu_utilisation[i], mem_utilisation[i]])
+            #print(ent, 1/(1+ent))
+            calculated_relative_entropies.append(ent)
+            calculated_relative_rewards.append(1/(1+ent))
+            
+        #print(calculated_relative_entropies)
+        #print('calculated_relative_rewards : ', calculated_relative_rewards)
+        
+        return calculated_relative_rewards[action]
+    
+    
+    def reward_chat_gpt_sd_entropy(self, cpu_utilisation, mem_utilisation):
+        w1, w2, w3, w4 = [0.20, 0.20, 0.20, 0.20]
+        entropy_cpu, entropy_mem = self.get_entropy(cpu_utilisation, mem_utilisation)
+        std_cpu, std_mem = self.get_std_deviations(cpu_utilisation, mem_utilisation)
+        coeff_cpu, coeff_mem = self.get_coefficient_of_variation( cpu_utilisation, mem_utilisation)
+        
+        corr, pval = pearsonr(cpu_utilisation, mem_utilisation) 
+        #print(corr, pval)
+        #print('entropy_cpu, entropy_mem : ', entropy_cpu, entropy_mem)
+        #print('std_cpu, std_mem : ', std_cpu, std_mem)
+        
+        Load_Balance_Score = w1*entropy_cpu + w2*entropy_mem + w3*std_cpu + w4*std_mem - (1-w1-w2-w3-w4)*coeff_cpu*coeff_mem*(1-abs(corr))
+        
+        #print('Load_Balance_Score : ', Load_Balance_Score)
+        return Load_Balance_Score
+        
+        
+        
     def execute_action(self, action:int) -> float:
         """This method is used to determine the reward for a given scheduling decision (action).
         Currently the reward is based on the amount of free resources. The more free resources (cpu and/or memory) the chose node has,
@@ -222,21 +293,19 @@ class Master:
         # if not selfmax_capa.check_remaining_node_space():
         #     self.city_count += 1
         
-        cpu_list = []
-        mem_list = []
-        for i , node in enumerate(self.node_list):
-            # If node is masked, set available cpu and memory space to 0
-            cpu_list.append(node.cpu/node.max_cpu)
-            mem_list.append(node.mem/node.max_mem)
         
-        std_cpu = np.std(cpu_list, ddof=1)
-        std_mem = np.std(mem_list, ddof=1)
+        cpu_utilisation, mem_utilisation = self.get_utilisation_ratios()
+        #std_cpu = np.std(cpu_utilisation, ddof=1)
+        #std_mem = np.std(mem_utilisation, ddof=1)
         
         # std_mem = np.std([std_cpu, std_mem], ddof=1)
         # reward = np.exp(1/(1 + np.exp(-(std_cpu+ std_mem))))
 
-        reward = np.exp(-1/(1 + np.exp(-(std_cpu + std_mem))))
-
+        #reward = np.exp(-1/(1 + np.exp(-(std_cpu + std_mem))))
+        #std_reward = self.get_standard_deviation_reward(cpu_utilisation, mem_utilisation)
+        #entropy_reward = self.get_entropy_reward( cpu_utilisation, mem_utilisation, action)
+        #reward = entropy_reward + std_reward
+        reward = self.reward_chat_gpt_sd_entropy( cpu_utilisation, mem_utilisation)
         return reward 
 
     def reset_master(self):

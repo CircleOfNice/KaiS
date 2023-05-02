@@ -135,7 +135,7 @@ eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_pa
 action_dist_callback = CustomLoggerCallback(eval_env=custom_env, verbose=0, log_freq=eval_freq, num_envs=num_envs)
 
 Episode_length = len(result_list[0])#[:5])
-Episodes = 100 #5000
+Episodes = 1000#00 #5000
 # MaskablePPO behaves the same as SB3's PPO unless the env is wrapped
 # with ActionMasker. If the wrapper is detected, the masks are automatically
 # retrieved and used when learning. Note that MaskablePPO does not accept
