@@ -41,14 +41,17 @@ if __name__ == "__main__":
     MODEL_PATH = r"models/PPO2/final_ppo_model.zip"
     ENV_PATH = r"models/PPO2/final_env.zip"
 
+    # https://stable-baselines3.readthedocs.io/en/v0.11.1/guide/examples.html#pybullet-normalizing-input-features
+    # Link above shows example of how to load a model with a vecnormalize wrapper
     env = DummyVecEnv([lambda: CustomEnv(4, 3, [[]])])
-    # vec_env = VecNormalize.load(ENV_PATH, env)
-    # vec_env.training = False
+    vec_env = VecNormalize.load(ENV_PATH, env)
+    vec_env.training = False
+    vec_env.norm_reward = False
 
-    # model = sb3_contrib.MaskablePPO.load(MODEL_PATH, env=env)
-    # model.set_env(vec_env)
+    model = sb3_contrib.MaskablePPO.load(MODEL_PATH, env=vec_env)
 
-    model = sb3_contrib.MaskablePPO.load(MODEL_PATH)
+
+    # model = sb3_contrib.MaskablePPO.load(MODEL_PATH)
     # self.model:sb3_contrib.MaskablePPO = sb3_contrib.MaskablePPO.load(MODEL_SAVE_PATH)
     MAX_NODE_CAPACITY = model.action_space.n
     action_dist = np.zeros(MAX_NODE_CAPACITY)
@@ -56,7 +59,11 @@ if __name__ == "__main__":
     print(model.policy)
     for _ in range(num_test_runs):
         obs = env.reset()[0]
+        # env.master.debug_init_node_list()
+        # obs = env.master.get_observation_space()
+
         pprint_obs(obs)
+        obs = vec_env.normalize_obs(obs)
         pred = pprint_pred(model, obs)
         action_dist[pred] += 1
 
