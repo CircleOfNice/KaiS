@@ -280,13 +280,13 @@ class Master:
         self.action_distribution[action] += 1
 
         # This calculation needs to happen, _before_ the nodes are updated
-        # reward = 0
-        # max_cpu_index, max_mem_index = self.find_low_resource_nodes()
+        reward = 0
+        max_cpu_index, max_mem_index = self.find_low_resource_nodes()
 
-        # if action == max_cpu_index:
-        #     reward += 1
-        # if action == max_mem_index:
-        #     reward += 1
+        if action == max_cpu_index:
+            reward += 1
+        if action == max_mem_index:
+            reward += 1
 
         node_choice.update_state(cpu_val = - self.req_cpu_current_task, mem_val= - self.req_mem_current_task)
 
@@ -294,7 +294,7 @@ class Master:
         #     self.city_count += 1
         
         
-        cpu_utilisation, mem_utilisation = self.get_utilisation_ratios()
+        # cpu_utilisation, mem_utilisation = self.get_utilisation_ratios()
         #std_cpu = np.std(cpu_utilisation, ddof=1)
         #std_mem = np.std(mem_utilisation, ddof=1)
         
@@ -305,7 +305,7 @@ class Master:
         #std_reward = self.get_standard_deviation_reward(cpu_utilisation, mem_utilisation)
         #entropy_reward = self.get_entropy_reward( cpu_utilisation, mem_utilisation, action)
         #reward = entropy_reward + std_reward
-        reward = self.reward_chat_gpt_sd_entropy( cpu_utilisation, mem_utilisation)
+        # reward = self.reward_chat_gpt_sd_entropy( cpu_utilisation, mem_utilisation)
         return reward 
 
     def reset_master(self):
@@ -328,7 +328,7 @@ class CustomEnv(gym.Env):
         self.reward_list = []
         
         self.number_of_masked_nodes = choice([i for i in range(int(self.number_of_nodes/2))])
-        task = self.generate_random_task()
+        task = self.generate_task()
         self.update_incoming_task(task) 
         self.data_len = len(self.master.task_data[0][:])
 
@@ -374,13 +374,18 @@ class CustomEnv(gym.Env):
         Returns:
             np.array: The observation including information about the nodes and the task.
         """
-        self.master.reset_master()
+        self.master.init_node_list()
         
         return self.master.get_master_observation_space()
 
     def get_random_action(self):
         return self.master.get_random_action()
         
+
+    def generate_task(self):
+        """ Simple Wrapper for task generation """
+        return self.generate_random_task()
+    
 
     def generate_random_task(self):
         """ Method that returns a tasks with random required resources.
@@ -398,19 +403,12 @@ class CustomEnv(gym.Env):
         task = [data[0][rand_count], data[1][rand_count], data[2][rand_count], data[3][rand_count], data[4][rand_count]]
         return task
 
+
     def generate_new_task(self):
-        
-        """ Method that returns always the same simple task for debugging purposes"""
         data = self.master.task_data
         task = [data[0][self.step_counter], data[1][self.step_counter], data[2][self.step_counter], data[3][self.step_counter], data[4][self.step_counter]]
         return task
 
-    def sample_task_from_kubernetes_data_set(self):
-        """Samples task from real Kuberenetes choices"""
-        data = self.master.task_data
-        rand_count =  np.random.randint(0, self.data_len )
-        task = [data[0][rand_count], data[1][rand_count], data[2][rand_count], data[3][rand_count], data[4][rand_count]]
-        return task
 
     def generate_new_simple_task(self):
         """ Method that returns always the same simple task for debugging purposes"""
@@ -431,13 +429,6 @@ class CustomEnv(gym.Env):
             if not self.master.check_remaining_node_space():
                 self.master.max_capacity_count += 1
             
-        # done = True
-        # for i in range(int(len(observation)/2)-1):
-        #     cpu_i = 2*i
-        #     mem_i = 2*i+1 
-        #     if observation[cpu_i]>=self.master.req_cpu_current_task and observation[mem_i]>=self.master.req_mem_current_task:
-        #         #print('done False : ', False)
-        #         return False
         return done
     
 
@@ -455,7 +446,7 @@ class CustomEnv(gym.Env):
         info = {}
         
         self.step_counter = self.step_counter + 1
-        task = self.generate_random_task()
+        task = self.generate_task()
         self.update_incoming_task(task) 
         observation_ = self.master.get_master_observation_space()
        
