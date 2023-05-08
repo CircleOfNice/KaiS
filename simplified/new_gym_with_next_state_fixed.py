@@ -78,7 +78,19 @@ class Master:
         self.max_capacity_count = 0 
         # Counter for how often the environment was reset
         self.invalid_decision_counter = 0
-    
+        
+        
+        self.avg_mem_utilisation_ratios = []
+        self.avg_cpu_utilisation_ratios = []
+        self.avg_std_cpu = []
+        self.avg_std_mem = []
+        self.avg_ent_cpu = []
+        self.avg_ent_mem = []
+        self.avg_coeff_cpu = []
+        self.avg_coeff_mem = []
+        self.avg_rel_entropy_per_node = []
+        
+        
     def __str__(self):
         new_str ='\n'
 
@@ -213,6 +225,15 @@ class Master:
         entropy_mem = entropy(mem_utilisation)
         return entropy_cpu, entropy_mem
     
+    def get_relative_avg_entropy_per_node(self, cpu_utilisation, mem_utilisation):
+        list_of_entropy = []
+        for i in range(len(cpu_utilisation)):
+            list_of_entropy.append(entropy([cpu_utilisation[i], mem_utilisation[i]]))
+        relative_avg_entropy_per_node = sum(list_of_entropy)/len(list_of_entropy)
+        return relative_avg_entropy_per_node
+            
+    
+    
     
     def get_coefficient_of_variation(self, cpu_utilisation, mem_utilisation):
         coeff_cpu = variation(cpu_utilisation)
@@ -227,12 +248,6 @@ class Master:
         return std_cpu_reward + std_mem_reward
     
     def get_entropy_reward(self, cpu_utilisation, mem_utilisation, action):
-        #entropy_cpu, entropy_mem= self.get_entropy(cpu_utilisation, mem_utilisation)
-        #entropy_cpu, entropy_mem= self.get_entropy(cpu_utilisation, mem_utilisation)
-        
-        #entropy_std =  np.std([entropy_cpu, entropy_mem], ddof=1)
-        
-        #entropy_reward = 1/(1+entropy_std)
         
         calculated_relative_entropies = []
         calculated_relative_rewards = []
@@ -242,9 +257,6 @@ class Master:
             calculated_relative_entropies.append(ent)
             calculated_relative_rewards.append(1/(1+ent))
             
-        #print(calculated_relative_entropies)
-        #print('calculated_relative_rewards : ', calculated_relative_rewards)
-        
         return calculated_relative_rewards[action]
     
     
@@ -255,15 +267,36 @@ class Master:
         coeff_cpu, coeff_mem = self.get_coefficient_of_variation( cpu_utilisation, mem_utilisation)
         
         corr, pval = pearsonr(cpu_utilisation, mem_utilisation) 
-        #print(corr, pval)
-        #print('entropy_cpu, entropy_mem : ', entropy_cpu, entropy_mem)
-        #print('std_cpu, std_mem : ', std_cpu, std_mem)
-        
         Load_Balance_Score = w1*entropy_cpu + w2*entropy_mem + w3*std_cpu + w4*std_mem - (1-w1-w2-w3-w4)*coeff_cpu*coeff_mem*(1-abs(corr))
         
-        #print('Load_Balance_Score : ', Load_Balance_Score)
         return Load_Balance_Score
+    
+    def log_statistical_info(self):        
+        cpu_utilisation, mem_utilisation = self.get_utilisation_ratios()
+        entropy_cpu, entropy_mem = self.get_entropy(cpu_utilisation, mem_utilisation)
+        std_cpu, std_mem= self.get_std_deviations(cpu_utilisation, mem_utilisation)
+        coeff_cpu, coeff_mem = self.get_coefficient_of_variation(cpu_utilisation, mem_utilisation)
         
+        avg_rel_entropy_per_node = self.get_relative_avg_entropy_per_node(cpu_utilisation, mem_utilisation)
+        
+        
+        avg_mem_utilisation_ratio = sum(mem_utilisation)/len(mem_utilisation)
+        avg_cpu_utilisation_ratio = sum(cpu_utilisation)/len(cpu_utilisation)
+        
+        self.avg_mem_utilisation_ratios.append(avg_mem_utilisation_ratio)
+        self.avg_cpu_utilisation_ratios.append(avg_cpu_utilisation_ratio)
+        
+        self.avg_std_cpu.append(std_cpu)
+        self.avg_std_mem.append(std_mem)
+        
+        self.avg_coeff_cpu.append(coeff_cpu)
+        self.avg_coeff_mem.append(coeff_mem)
+        
+        self.avg_ent_cpu.append(entropy_cpu)
+        self.avg_ent_mem.append(entropy_mem)
+        
+        self.avg_rel_entropy_per_node.append(avg_rel_entropy_per_node)
+
         
         
     def execute_action(self, action:int) -> float:
@@ -275,18 +308,18 @@ class Master:
             action (int): The number of the node which to schedule the given task to.
         Returns:
             float: The reward for the agent
-        """
+        """ 
         node_choice = self.node_list[action]
         self.action_distribution[action] += 1
 
         # This calculation needs to happen, _before_ the nodes are updated
-        reward = 0
-        max_cpu_index, max_mem_index = self.find_low_resource_nodes()
+        # reward = 0
+        # max_cpu_index, max_mem_index = self.find_low_resource_nodes()
 
-        if action == max_cpu_index:
-            reward += 1
-        if action == max_mem_index:
-            reward += 1
+        # if action == max_cpu_index:
+        #     reward += 1
+        # if action == max_mem_index:
+        #     reward += 1
 
         node_choice.update_state(cpu_val = - self.req_cpu_current_task, mem_val= - self.req_mem_current_task)
 
@@ -294,18 +327,18 @@ class Master:
         #     self.city_count += 1
         
         
-        # cpu_utilisation, mem_utilisation = self.get_utilisation_ratios()
+        cpu_utilisation, mem_utilisation = self.get_utilisation_ratios()
         #std_cpu = np.std(cpu_utilisation, ddof=1)
         #std_mem = np.std(mem_utilisation, ddof=1)
         
         # std_mem = np.std([std_cpu, std_mem], ddof=1)
         # reward = np.exp(1/(1 + np.exp(-(std_cpu+ std_mem))))
 
-        #reward = np.exp(-1/(1 + np.exp(-(std_cpu + std_mem))))
-        #std_reward = self.get_standard_deviation_reward(cpu_utilisation, mem_utilisation)
+        #reward = np.exp(-1/(1 + np.exp(-(std_cpu + std_mem))))e
+        std_reward = self.get_standard_deviation_reward(cpu_utilisation, mem_utilisation)
         #entropy_reward = self.get_entropy_reward( cpu_utilisation, mem_utilisation, action)
-        #reward = entropy_reward + std_reward
-        # reward = self.reward_chat_gpt_sd_entropy( cpu_utilisation, mem_utilisation)
+        reward = std_reward #+ entropy_reward 
+        #reward = self.reward_chat_gpt_sd_entropy( cpu_utilisation, mem_utilisation)
         return reward 
 
     def reset_master(self):
@@ -328,7 +361,7 @@ class CustomEnv(gym.Env):
         self.reward_list = []
         
         self.number_of_masked_nodes = choice([i for i in range(int(self.number_of_nodes/2))])
-        task = self.generate_task()
+        task = self.generate_random_task()
         self.update_incoming_task(task) 
         self.data_len = len(self.master.task_data[0][:])
 
@@ -374,18 +407,13 @@ class CustomEnv(gym.Env):
         Returns:
             np.array: The observation including information about the nodes and the task.
         """
-        self.master.init_node_list()
+        self.master.reset_master()
         
         return self.master.get_master_observation_space()
 
     def get_random_action(self):
         return self.master.get_random_action()
         
-
-    def generate_task(self):
-        """ Simple Wrapper for task generation """
-        return self.generate_random_task()
-    
 
     def generate_random_task(self):
         """ Method that returns a tasks with random required resources.
@@ -403,12 +431,19 @@ class CustomEnv(gym.Env):
         task = [data[0][rand_count], data[1][rand_count], data[2][rand_count], data[3][rand_count], data[4][rand_count]]
         return task
 
-
     def generate_new_task(self):
+        
+        """ Method that returns always the same simple task for debugging purposes"""
         data = self.master.task_data
         task = [data[0][self.step_counter], data[1][self.step_counter], data[2][self.step_counter], data[3][self.step_counter], data[4][self.step_counter]]
         return task
 
+    def sample_task_from_kubernetes_data_set(self):
+        """Samples task from real Kuberenetes choices"""
+        data = self.master.task_data
+        rand_count =  np.random.randint(0, self.data_len )
+        task = [data[0][rand_count], data[1][rand_count], data[2][rand_count], data[3][rand_count], data[4][rand_count]]
+        return task
 
     def generate_new_simple_task(self):
         """ Method that returns always the same simple task for debugging purposes"""
@@ -429,6 +464,13 @@ class CustomEnv(gym.Env):
             if not self.master.check_remaining_node_space():
                 self.master.max_capacity_count += 1
             
+        # done = True
+        # for i in range(int(len(observation)/2)-1):
+        #     cpu_i = 2*i
+        #     mem_i = 2*i+1 
+        #     if observation[cpu_i]>=self.master.req_cpu_current_task and observation[mem_i]>=self.master.req_mem_current_task:
+        #         #print('done False : ', False)
+        #         return False
         return done
     
 
@@ -446,7 +488,7 @@ class CustomEnv(gym.Env):
         info = {}
         
         self.step_counter = self.step_counter + 1
-        task = self.generate_task()
+        task = self.generate_random_task()
         self.update_incoming_task(task) 
         observation_ = self.master.get_master_observation_space()
        
@@ -458,7 +500,8 @@ class CustomEnv(gym.Env):
         
         if done:
             reward = -1
-
+        if not done:
+            self.master.log_statistical_info()
         self.reward_list.append(reward)      
         return observation_, reward, done, info
         
