@@ -1,7 +1,3 @@
-
-
-
-
 import gym 
 from gym import spaces
 # from components.Master import Master
@@ -458,7 +454,7 @@ class CustomEnv(gym.Env):
         self.reward_list = []
         
         self.number_of_masked_nodes = choice([i for i in range(int(self.number_of_nodes/2))])
-        task = self.generate_random_task()
+        task = self.generate_task()
         self.update_incoming_task(task) 
         self.data_len = len(self.master.task_data[0][:])
 
@@ -545,7 +541,8 @@ class CustomEnv(gym.Env):
     def sample_task_from_kubernetes_data_set(self):
         """Samples task from real Kuberenetes choices"""
         data = self.master.task_data
-        rand_count =  np.random.randint(0, self.data_len )
+        data_len = len(data[0])
+        rand_count =  np.random.randint(0, data_len)
         task = [data[0][rand_count], data[1][rand_count], data[2][rand_count], data[3][rand_count], data[4][rand_count]]
         return task
 
@@ -592,7 +589,7 @@ class CustomEnv(gym.Env):
         info = {}
         
         self.step_counter = self.step_counter + 1
-        task = self.generate_random_task()
+        task = self.generate_task()
         self.update_incoming_task(task) 
         observation_ = self.master.get_master_observation_space()
        
