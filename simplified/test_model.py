@@ -81,6 +81,7 @@ if __name__ == "__main__":
     remaining_cpu_list = []
     remaining_mem_list = []
 
+    print("Testing on empty cluster")
     episode_length = 0
     while not done:
         action_mask = np.ones(MAX_NODE_CAPACITY) # TODO action mask set to all ones currently
@@ -93,14 +94,19 @@ if __name__ == "__main__":
         remaining_cpu_list.append(obs[::4][:-1])
         remaining_mem_list.append(obs[1::4][:-1])
 
+    label_list = ["Node_" + str(i) for i in range(1, MAX_NODE_CAPACITY+1)]
+    print(f"Episode length: {episode_length}")
+    print(f"Cluster max achieved? {env.master.max_capacity_count}")
     plt.figure()
-    plt.plot(remaining_cpu_list)
+    plt.plot(remaining_cpu_list, label=label_list)
     plt.title("Remaining CPU")
+    plt.legend()
     plt.savefig("remaining_cpu.png")
 
     plt.figure()
-    plt.plot(remaining_mem_list)
+    plt.plot(remaining_mem_list, label=label_list)
     plt.title("Remaining Memory")
+    plt.legend()
     plt.savefig("remaining_mem.png")
 
     action_dist, counts = np.unique(action_list, return_counts=True)
