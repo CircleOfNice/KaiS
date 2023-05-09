@@ -3,8 +3,9 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 import sb3_contrib
 from new_gym_with_next_state_fixed import CustomEnv
 import numpy as np
+import os
 np.set_printoptions(precision=2, suppress=True)
-
+from env_run import get_all_task_kubernetes
 
 def pprint_obs(obs:np.array, precision=2):
 
@@ -41,9 +42,12 @@ if __name__ == "__main__":
     MODEL_PATH = r"models/PPO2/final_ppo_model.zip"
     ENV_PATH = r"models/PPO2/final_env.zip"
 
+    path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
+    result_list,_ = get_all_task_kubernetes(path)
+
     # https://stable-baselines3.readthedocs.io/en/v0.11.1/guide/examples.html#pybullet-normalizing-input-features
     # Link above shows example of how to load a model with a vecnormalize wrapper
-    env = DummyVecEnv([lambda: CustomEnv(4, 3, [[]])])
+    env = DummyVecEnv([lambda: CustomEnv(4, 3, result_list, normalize_obs=True)])
     vec_env = VecNormalize.load(ENV_PATH, env)
     vec_env.training = False
     vec_env.norm_reward = False
@@ -59,11 +63,12 @@ if __name__ == "__main__":
     print(model.policy)
     for _ in range(num_test_runs):
         obs = env.reset()[0]
+
         # env.master.debug_init_node_list()
         # obs = env.master.get_observation_space()
 
         pprint_obs(obs)
-        obs = vec_env.normalize_obs(obs)
+        # obs = vec_env.normalize_obs(obs)
         pred = pprint_pred(model, obs)
         action_dist[pred] += 1
 
