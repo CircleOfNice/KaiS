@@ -4,6 +4,8 @@ import sb3_contrib
 from new_gym_with_next_state_fixed import CustomEnv
 import numpy as np
 import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+
 from env_run import get_all_task_kubernetes
 import matplotlib.pyplot as plt
 

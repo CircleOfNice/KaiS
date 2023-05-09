@@ -333,8 +333,8 @@ class Master:
         
         std_cpu, std_mem = self.get_std_deviations(cpu_utilisation, mem_utilisation)
         
-        std_cpu_reward = 1/(1+std_cpu)
-        std_mem_reward = 1/(1+std_mem)
+        std_cpu_reward = np.exp((1/(1+std_cpu))-0.5)-1
+        std_mem_reward = np.exp((1/(1+std_mem))-0.5)-1
         std_reward = std_cpu_reward + std_mem_reward
         return std_reward
     
