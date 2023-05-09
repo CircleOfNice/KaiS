@@ -50,7 +50,7 @@ class Master:
     """[This class serves as framework for definition of Master Node with properties such as 
     task queue, cpu processing, memory, done and undone tasks, Kind of tasks done and undone. all task index]
     """
-    def __init__(self, number_of_nodes:int, task_data:list, normalize_obs=False):
+    def __init__(self, number_of_nodes:int, task_data:list, normalize_obs=False, init_random=True):
         self.number_of_nodes = number_of_nodes
         self.max_available_cpu_choices = [1000, 2000, 4000, 8000]
         self.max_available_mem_choices = [1, 2, 4, 8, 16, 33.4916444]
@@ -65,6 +65,7 @@ class Master:
         self.req_cpu_current_task = 0
         self.req_mem_current_task = 0
 
+        self.init_random = init_random
         self.init_node_list()
         self.action_space = len(self.node_list)
         self.observation_space_dims = self.get_master_observation_space().shape
@@ -100,7 +101,7 @@ class Master:
         return new_str
 
 
-    def init_node_list(self, init_random:bool=True):
+    def init_node_list(self):
         """This method is used to set the cpu and memory values of all nodes to a random value within the allowed interval
         Args:
             init_random (bool, optional): If True, initializes the cluster with random CPU and Memory usages. If False
@@ -112,7 +113,7 @@ class Master:
         max_mem_params = [random.choice(self.max_available_mem_choices) for i in range(self.number_of_nodes)]
 
         for i in range(self.number_of_nodes):
-            if init_random:
+            if self.init_random:
                 cpu_params.append(np.random.randint(0,max_cpu_params[i]))
                 mem_params.append(np.random.uniform(0,max_mem_params[i]))
             else:
@@ -461,10 +462,19 @@ class Master:
 class CustomEnv(gym.Env):
     """Custom Environment that follows gym interface"""
 
-    def __init__(self, number_of_nodes:int, mask_nodes:int, data:list, normalize_obs:bool):
+    def __init__(self, number_of_nodes:int, mask_nodes:int, data:list, normalize_obs:bool, init_random:bool=True):
+        """Custom environment representing a kubernetes cluster with multiple nodes
+
+        Args:
+            number_of_nodes (int): Number of nodes in the cluster
+            mask_nodes (int): Maximum number of masked nodes (used to simulate node-outage)
+            data (list): List of tasks to potentially sample from
+            normalize_obs (bool): 
+            init_random (bool, optional): _description_. Defaults to True.
+        """
         super(CustomEnv, self).__init__()
         self.number_of_nodes=number_of_nodes
-        self.master = Master(number_of_nodes, data, normalize_obs=normalize_obs)
+        self.master = Master(number_of_nodes, data, normalize_obs=normalize_obs, init_random=init_random)
         self.mask_nodes = mask_nodes
         self.step_counter = 0
         self.reset()
