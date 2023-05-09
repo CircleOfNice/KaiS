@@ -4,8 +4,11 @@ import sb3_contrib
 from new_gym_with_next_state_fixed import CustomEnv
 import numpy as np
 import os
-np.set_printoptions(precision=2, suppress=True)
 from env_run import get_all_task_kubernetes
+import matplotlib.pyplot as plt
+
+np.set_printoptions(precision=2, suppress=True)
+
 
 def pprint_obs(obs:np.array, precision=2):
 
@@ -37,7 +40,7 @@ def pprint_pred(model, obs):
 
 if __name__ == "__main__":
 
-    num_test_runs = 10_000
+    num_test_runs = 1
 
     MODEL_PATH = r"models/PPO2/final_ppo_model.zip"
     ENV_PATH = r"models/PPO2/final_env.zip"
@@ -47,12 +50,8 @@ if __name__ == "__main__":
 
     # https://stable-baselines3.readthedocs.io/en/v0.11.1/guide/examples.html#pybullet-normalizing-input-features
     # Link above shows example of how to load a model with a vecnormalize wrapper
-    env = DummyVecEnv([lambda: CustomEnv(4, 3, result_list, normalize_obs=True)])
-    vec_env = VecNormalize.load(ENV_PATH, env)
-    vec_env.training = False
-    vec_env.norm_reward = False
-
-    model = sb3_contrib.MaskablePPO.load(MODEL_PATH, env=vec_env)
+    env = CustomEnv(4, 3, result_list, normalize_obs=True, init_random=False)
+    model = sb3_contrib.MaskablePPO.load(MODEL_PATH)
 
 
     # model = sb3_contrib.MaskablePPO.load(MODEL_PATH)
@@ -62,7 +61,7 @@ if __name__ == "__main__":
 
     print(model.policy)
     for _ in range(num_test_runs):
-        obs = env.reset()[0]
+        obs = env.reset()
 
         # env.master.debug_init_node_list()
         # obs = env.master.get_observation_space()
@@ -75,6 +74,38 @@ if __name__ == "__main__":
 
     print(f"Action distribution: {action_dist}")
     print(f"Action distribution normalized: {action_dist / np.sum(action_dist)}")
+
+    done = False
+
+    action_list = []
+    remaining_cpu_list = []
+    remaining_mem_list = []
+
+    episode_length = 0
+    while not done:
+        action_mask = np.ones(MAX_NODE_CAPACITY) # TODO action mask set to all ones currently
+        action,_ = model.predict(obs, deterministic=True, action_masks=action_mask)
+        action = action.item()
+        obs, reward, done, info = env.step(action)
+
+        episode_length += 1
+        action_list.append(action)
+        remaining_cpu_list.append(obs[::4][:-1])
+        remaining_mem_list.append(obs[1::4][:-1])
+
+    plt.figure()
+    plt.plot(remaining_cpu_list)
+    plt.title("Remaining CPU")
+    plt.savefig("remaining_cpu.png")
+
+    plt.figure()
+    plt.plot(remaining_mem_list)
+    plt.title("Remaining Memory")
+    plt.savefig("remaining_mem.png")
+
+    action_dist, counts = np.unique(action_list, return_counts=True)
+    print(f"Action distribution: {counts}")
+
 
 
     
