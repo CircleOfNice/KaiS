@@ -119,15 +119,23 @@ masked_nodes = total_nodes - 1
 eval_freq = 50_000 # Number of timesteps after which to evaluate the models
 num_envs = 16
 
+USE_NORMALIZED_ENVS = False
 
 # Need to first wrap the environment in all needed masks, and only then vectorize it
-env_fn = lambda: ActionMasker(CustomEnv(total_nodes, masked_nodes, result_list), mask_fn)
+env_fn = lambda: ActionMasker(CustomEnv(total_nodes, masked_nodes, result_list, normalize_obs=True), mask_fn)
 custom_env = make_vec_env(env_fn, n_envs=num_envs)
-custom_env = VecNormalize(custom_env)
 
-eval_env = make_vec_env(env_fn, n_envs=1)
+if USE_NORMALIZED_ENVS:
+    custom_env = VecNormalize(custom_env)
+    eval_env = make_vec_env(env_fn, n_envs=1)
+else:
+    eval_env = CustomEnv(total_nodes, masked_nodes, result_list, normalize_obs=True)
+    eval_env = ActionMasker(eval_env, mask_fn)
+
 eval_env = Monitor(eval_env)
-eval_env = VecNormalize(eval_env)
+
+if USE_NORMALIZED_ENVS:
+    eval_env = VecNormalize(eval_env)
 
 eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_path="logs",
                               eval_freq=eval_freq//num_envs, deterministic=True, render=False, n_eval_episodes=5, verbose=False)
@@ -136,7 +144,7 @@ eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_pa
 action_dist_callback = CustomLoggerCallback(eval_env=custom_env, verbose=0, log_freq=eval_freq, num_envs=num_envs)
 
 episode_length = len(result_list[0])
-num_episodes = 200
+num_episodes = 1000
 
 total_reward_list = []
 
@@ -151,7 +159,8 @@ model = MaskablePPO(MaskableActorCriticPolicy, custom_env, ent_coef=enf_coef, ve
 print(model.policy)
 model.learn(total_timesteps=(episode_length-1)*num_episodes, progress_bar=True, callback=[eval_callback, action_dist_callback])
 model.save(os.path.join('models','PPO2', "final_ppo_model.zip"))
-custom_env.save(os.path.join("models", "PPO2", "final_env.zip"))
+if USE_NORMALIZED_ENVS:
+    custom_env.save(os.path.join("models", "PPO2", "final_env.zip"))
 
 # Logging hyperparameters
 # Metric dict must not be empty

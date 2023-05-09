@@ -54,11 +54,14 @@ class Master:
     """[This class serves as framework for definition of Master Node with properties such as 
     task queue, cpu processing, memory, done and undone tasks, Kind of tasks done and undone. all task index]
     """
-    def __init__(self, number_of_nodes:int, task_data:list):
+    def __init__(self, number_of_nodes:int, task_data:list, normalize_obs=False):
         self.number_of_nodes = number_of_nodes
-        self.max_available_cpu_choices = [4000, 8000]
-        self.max_available_mem_choices = [1, 2, 4]
+        self.max_available_cpu_choices = [1000, 2000, 4000, 8000]
+        self.max_available_mem_choices = [1, 2, 4, 8, 16, 33.4916444]
 
+        self.max_cpu_value = max(self.max_available_cpu_choices)
+        self.max_mem_value = max(self.max_available_mem_choices)
+        self.normalize_obs = normalize_obs
 
         self.mask_list = [1 for _ in range(self.number_of_nodes)]
         
@@ -165,6 +168,13 @@ class Master:
         master_observation_space.append((self.current_incoming_task[3], self.current_incoming_task[4]))#, 0,0))
 
         master_observation_space = np.hstack(master_observation_space)
+
+        # This normalization relies on the fact that every 2nd entry in the array describes some cpu value, and every other value
+        # describes a memory value
+        if self.normalize_obs:
+            master_observation_space[::2] = master_observation_space[::2] / self.max_cpu_value
+            master_observation_space[1::2] = master_observation_space[1::2] / self.max_mem_value
+
         return master_observation_space
     
 
@@ -315,10 +325,10 @@ class Master:
 class CustomEnv(gym.Env):
     """Custom Environment that follows gym interface"""
 
-    def __init__(self, number_of_nodes:int, mask_nodes:int, data:list):
+    def __init__(self, number_of_nodes:int, mask_nodes:int, data:list, normalize_obs:bool):
         super(CustomEnv, self).__init__()
         self.number_of_nodes=number_of_nodes
-        self.master = Master(number_of_nodes, data)
+        self.master = Master(number_of_nodes, data, normalize_obs=normalize_obs)
         self.mask_nodes = mask_nodes
         self.step_counter = 0
         self.reset()
@@ -384,7 +394,8 @@ class CustomEnv(gym.Env):
 
     def generate_task(self):
         """ Simple Wrapper for task generation """
-        return self.generate_random_task()
+        return self.sample_task_from_kubernetes_data_set()
+        # return self.generate_random_task()
     
 
     def generate_random_task(self):
@@ -399,7 +410,8 @@ class CustomEnv(gym.Env):
     def sample_task_from_kubernetes_data_set(self):
         """Samples task from real Kuberenetes choices"""
         data = self.master.task_data
-        rand_count =  np.random.randint(0, self.data_len )
+        data_len = len(data[0])
+        rand_count =  np.random.randint(0, data_len)
         task = [data[0][rand_count], data[1][rand_count], data[2][rand_count], data[3][rand_count], data[4][rand_count]]
         return task
 
