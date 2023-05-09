@@ -67,6 +67,30 @@ class CustomLoggerCallback(BaseCallback):
             kl_div = utils.action_distribution_kl_div(action_distribution, self.expected_action_distribution)
             self.writer.add_scalars("expected_action_dist_kl_div", {"expected_action_dist_kl_div": kl_div}, global_step=self.num_timesteps)
 
+            avg_mem_utilisation_ratios = sum(self.master.avg_mem_utilisation_ratios)/len(self.master.avg_mem_utilisation_ratios)
+            avg_cpu_utilisation_ratios = sum(self.master.avg_cpu_utilisation_ratios)/len(self.master.avg_cpu_utilisation_ratios)
+            avg_std_cpu = sum(self.master.avg_std_cpu)/len(self.master.avg_std_cpu)
+            avg_std_mem = sum(self.master.avg_std_mem)/len(self.master.avg_std_mem)
+            avg_ent_cpu = sum(self.master.avg_ent_cpu)/len(self.master.avg_ent_cpu)
+            avg_ent_mem = sum(self.master.avg_ent_mem)/len(self.master.avg_ent_mem)
+            avg_rel_entropy_per_node= sum(self.master.avg_rel_entropy_per_node)/len(self.master.avg_rel_entropy_per_node)
+            avg_coeff_cpu = sum(self.master.avg_coeff_cpu)/len(self.master.avg_coeff_cpu)
+            avg_coeff_mem = sum(self.master.avg_coeff_mem)/len(self.master.avg_coeff_mem)
+              
+            
+            self.writer.add_scalars("Utilisation Ratio/Average Memory Utilisation Ratio", {"avg_mem_utilisation_ratios": avg_mem_utilisation_ratios}, global_step=self.num_timesteps)
+            self.writer.add_scalars("Utilisation Ratio/Average CPU Utilisation Ratio", {"avg_cpu_utilisation_ratios": avg_cpu_utilisation_ratios}, global_step=self.num_timesteps)
+            
+            self.writer.add_scalars("Standard Deviation/Average Standard Deviation of CPU Usage", {"avg_std_cpu": avg_std_cpu}, global_step=self.num_timesteps)
+            self.writer.add_scalars("Standard Deviation/Average Standard Deviation of Memory Usage", {"avg_std_mem": avg_std_mem}, global_step=self.num_timesteps)
+            
+            self.writer.add_scalars("Entropy/Average Entropy of CPU Usage", {"avg_ent_cpu": avg_ent_cpu}, global_step=self.num_timesteps)
+            self.writer.add_scalars("Entropy/Average Entropy of Memory Usage", {"avg_ent_mem": avg_ent_mem}, global_step=self.num_timesteps)
+            self.writer.add_scalars("Entropy/avg_rel_entropy_per_node", {"avg_rel_entropy_per_node": avg_rel_entropy_per_node}, global_step=self.num_timesteps)
+            
+            self.writer.add_scalars("Coefficient of Variation/Average Coefficient of Variation for CPU Usage", {"avg_coeff_cpu": avg_coeff_cpu}, global_step=self.num_timesteps)
+            self.writer.add_scalars("Coefficient of Variation/Average Coefficient of Variation for Memory Usage", {"avg_coeff_mem": avg_coeff_mem}, global_step=self.num_timesteps)
+
             # print(self.master.max_capacity_count)
             # Logging the relationship between the number of times the cluster was successfully brought to max capacity
             # vs the number of times a node get an invalid scheduling decision
