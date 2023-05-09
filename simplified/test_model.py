@@ -9,7 +9,7 @@ from env_run import get_all_task_kubernetes
 
 def pprint_obs(obs:np.array, precision=2):
 
-    obs = np.round(obs, 2)
+    obs = np.round(obs, 20)
     num_nodes = (obs.shape[0] - 2) // 4
 
     print()
