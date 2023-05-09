@@ -77,28 +77,7 @@ class CustomLoggerCallback(BaseCallback):
             avg_coeff_cpu = sum(self.master.avg_coeff_cpu)/len(self.master.avg_coeff_cpu)
             avg_coeff_mem = sum(self.master.avg_coeff_mem)/len(self.master.avg_coeff_mem)
             
-            # statistics_dict = {"avg_mem_utilisation_ratios": avg_mem_utilisation_ratios, "avg_cpu_utilisation_ratios": avg_cpu_utilisation_ratios,
-            #                    "avg_std_cpu": avg_std_cpu, "avg_std_mem": avg_std_mem,
-            #                    "avg_ent_cpu": avg_ent_cpu, "avg_ent_mem": avg_ent_mem,
-            #                    "avg_coeff_cpu": avg_coeff_cpu, "avg_coeff_mem": avg_coeff_mem,
-            #                    "avg_rel_entropy_per_node": avg_rel_entropy_per_node
-            #                    }
-            # self.writer.add_scalars("Statistics", statistics_dict, global_step=self.num_timesteps)
-            # # self.writer.add_scalars("avg_cpu_utilisation_ratios", {"avg_cpu_utilisation_ratios": avg_cpu_utilisation_ratios}, global_step=self.num_timesteps)
-            # # self.writer.add_scalars("avg_std_cpu", {"avg_std_cpu": avg_std_cpu}, global_step=self.num_timesteps)
-            # # self.writer.add_scalars("avg_std_mem", {"avg_std_mem": avg_std_mem}, global_step=self.num_timesteps)
-            # # self.writer.add_scalars("avg_ent_cpu", {"avg_ent_cpu": avg_ent_cpu}, global_step=self.num_timesteps)
-            # # self.writer.add_scalars("avg_ent_mem", {"avg_ent_mem": avg_ent_mem}, global_step=self.num_timesteps)
-            # # self.writer.add_scalars("avg_rel_entropy_per_node", {"avg_rel_entropy_per_node": avg_rel_entropy_per_node}, global_step=self.num_timesteps)
-            
-            
-            # statistics_dict = {"avg_mem_utilisation_ratios": avg_mem_utilisation_ratios, "avg_cpu_utilisation_ratios": avg_cpu_utilisation_ratios,
-            #                    "avg_std_cpu": avg_std_cpu, "avg_std_mem": avg_std_mem,
-            #                    "avg_ent_cpu": avg_ent_cpu, "avg_ent_mem": avg_ent_mem,
-            #                    "avg_coeff_cpu": avg_coeff_cpu, "avg_coeff_mem": avg_coeff_mem,
-            #                    "avg_rel_entropy_per_node": avg_rel_entropy_per_node
-            #                    }
-            
+
             
             self.writer.add_scalars("Utilisation Ratio/Average Memory Utilisation Ratio", {"avg_mem_utilisation_ratios": avg_mem_utilisation_ratios}, global_step=self.num_timesteps)
             self.writer.add_scalars("Utilisation Ratio/Average CPU Utilisation Ratio", {"avg_cpu_utilisation_ratios": avg_cpu_utilisation_ratios}, global_step=self.num_timesteps)
@@ -185,7 +164,7 @@ eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_pa
 action_dist_callback = CustomLoggerCallback(eval_env=custom_env, verbose=0, log_freq=eval_freq, num_envs=num_envs)
 
 episode_length = len(result_list[0])
-num_episodes = 100
+num_episodes = 200
 
 total_reward_list = []
 

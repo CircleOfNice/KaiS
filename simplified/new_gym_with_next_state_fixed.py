@@ -154,6 +154,11 @@ class Master:
     
 
     def set_incoming_task(self, task):
+        """Method to set appropriate tasks as requirements
+
+        Args:
+            task (list): list containing the data for next incoming data
+        """
         self.current_incoming_task = task
         self.req_cpu_current_task = task[3]
         self.req_mem_current_task = task[4]
@@ -181,6 +186,11 @@ class Master:
     
 
     def get_random_action(self):
+        """Method to get random action out of action spaces
+
+        Returns:
+            action: action as an integer
+        """
         action = np.random.choice(self.action_space, 1)
         return action[0]
     
@@ -207,6 +217,12 @@ class Master:
         return max_cpu_index, max_mem_index
     
     def get_utilisation_ratios(self):
+        """Method to calculate Utilisation Ratios of CPU and Memory
+
+        Returns:
+            cpu_utilisation: CPU Utilisation Ratio
+            mem_utilisation: Memory Utilisation Ratio
+        """
         cpu_utilisation = []
         mem_utilisation = []
         for i , node in enumerate(self.node_list):
@@ -216,51 +232,119 @@ class Master:
         return cpu_utilisation, mem_utilisation
     
     def get_std_deviations(self, cpu_utilisation, mem_utilisation):
+        """Method to calculate standard deviations across CPU and Memory Utilisation
+
+        Args:
+            cpu_utilisation: CPU Utilisation Ratio
+            mem_utilisation: Memory Utilisation Ratio
+
+        Returns:
+            std_cpu: Standard Deviation across CPU utilsation ratios
+            std_mem: Standard Deviation across Memory utilsation ratios
+        """
         std_cpu = np.std(cpu_utilisation, ddof=1)
         std_mem = np.std(mem_utilisation, ddof=1)
         return std_cpu, std_mem
     
     def get_entropy(self, cpu_utilisation, mem_utilisation):
+        """Method to calculate entropy across CPU and Memory Utilisation
+
+        Args:
+            cpu_utilisation: CPU Utilisation Ratio
+            mem_utilisation: Memory Utilisation Ratio
+
+        Returns:
+            entropy_cpu: Entropy across CPU utilsation ratios
+            entropy_mem: Entropy across Memory utilsation ratios
+        """
         entropy_cpu = entropy(cpu_utilisation)
         entropy_mem = entropy(mem_utilisation)
         return entropy_cpu, entropy_mem
     
     def get_relative_avg_entropy_per_node(self, cpu_utilisation, mem_utilisation):
+        
+        """Method to calculate average entropy across each node for its CPU and Memory Utilisation
+
+        Args:
+            cpu_utilisation: CPU Utilisation Ratio
+            mem_utilisation: Memory Utilisation Ratio
+
+        Returns:
+            relative_avg_entropy_per_node: Relative Average Entropy per Node
+        """
+        
         list_of_entropy = []
         for i in range(len(cpu_utilisation)):
             list_of_entropy.append(entropy([cpu_utilisation[i], mem_utilisation[i]]))
         relative_avg_entropy_per_node = sum(list_of_entropy)/len(list_of_entropy)
         return relative_avg_entropy_per_node
-            
-    
-    
     
     def get_coefficient_of_variation(self, cpu_utilisation, mem_utilisation):
+        """Method to calculate coefficient of variation across CPU and Memory Utilisation ratios
+
+        Args:
+            cpu_utilisation: CPU Utilisation Ratio
+            mem_utilisation: Memory Utilisation Ratio
+
+        Returns:
+            coeff_cpu: Coefficient of variation  across CPU utilsation ratios
+            coeff_mem: Coefficient of variation  across Memory utilsation ratios
+        """
         coeff_cpu = variation(cpu_utilisation)
         coeff_mem = variation(mem_utilisation)
         return coeff_cpu, coeff_mem
     
     def get_standard_deviation_reward(self, cpu_utilisation, mem_utilisation):
+        """Method to calculate reward based on standard deviation of CPU Utilisation and Memory Utilisation ratio
+
+        Args:
+            cpu_utilisation: CPU Utilisation Ratio
+            mem_utilisation: Memory Utilisation Ratio
+
+        Returns:
+            std_reward: calculated standard deviation based reward
+        """
+        
         std_cpu, std_mem = self.get_std_deviations(cpu_utilisation, mem_utilisation)
         
         std_cpu_reward = 1/(1+std_cpu)
         std_mem_reward = 1/(1+std_mem)
-        return std_cpu_reward + std_mem_reward
+        std_reward = std_cpu_reward + std_mem_reward
+        return std_reward
     
-    def get_entropy_reward(self, cpu_utilisation, mem_utilisation, action):
-        
-        calculated_relative_entropies = []
+    def get_entropy_reward(self, cpu_utilisation, mem_utilisation):
+        """Method to calculate reward based on Entropy of CPU Utilisation and Memory Utilisation ratio
+
+        Args:
+            cpu_utilisation: CPU Utilisation Ratio
+            mem_utilisation: Memory Utilisation Ratio
+
+        Returns:
+            entropy_reward: calculated Entropy based reward
+        """
         calculated_relative_rewards = []
         for i in range(len(cpu_utilisation)):
             ent = entropy([cpu_utilisation[i], mem_utilisation[i]])
-            #print(ent, 1/(1+ent))
-            calculated_relative_entropies.append(ent)
             calculated_relative_rewards.append(1/(1+ent))
-            
-        return calculated_relative_rewards[action]
+        entropy_reward = sum(calculated_relative_rewards)/len(calculated_relative_rewards)    
+        return entropy_reward
     
     
     def reward_chat_gpt_sd_entropy(self, cpu_utilisation, mem_utilisation):
+        """Method to calculate suggested chatgpt reward 
+
+        Args:
+            cpu_utilisation: CPU Utilisation Ratio
+            mem_utilisation: Memory Utilisation Ratio
+
+        Returns:
+            Load_Balance_Score: calculated suggested chatgpt reward
+        """
+        calculated_relative_rewards = []
+        for i in range(len(cpu_utilisation)):
+            ent = entropy([cpu_utilisation[i], mem_utilisation[i]])
+            calculated_relative_rewards.append(1/(1+ent))
+        entropy_reward = sum(calculated_relative_rewards)/len(calculated_relative_rewards)  
         w1, w2, w3, w4 = [0.20, 0.20, 0.20, 0.20]
         entropy_cpu, entropy_mem = self.get_entropy(cpu_utilisation, mem_utilisation)
         std_cpu, std_mem = self.get_std_deviations(cpu_utilisation, mem_utilisation)
@@ -271,7 +355,10 @@ class Master:
         
         return Load_Balance_Score
     
-    def log_statistical_info(self):        
+    def log_statistical_info(self):  
+        """
+        Method to log statistical information regarding the usage of CPU and Memory.
+        """      
         cpu_utilisation, mem_utilisation = self.get_utilisation_ratios()
         entropy_cpu, entropy_mem = self.get_entropy(cpu_utilisation, mem_utilisation)
         std_cpu, std_mem= self.get_std_deviations(cpu_utilisation, mem_utilisation)
@@ -336,8 +423,8 @@ class Master:
 
         #reward = np.exp(-1/(1 + np.exp(-(std_cpu + std_mem))))e
         std_reward = self.get_standard_deviation_reward(cpu_utilisation, mem_utilisation)
-        #entropy_reward = self.get_entropy_reward( cpu_utilisation, mem_utilisation, action)
-        reward = std_reward #+ entropy_reward 
+        entropy_reward = self.get_entropy_reward( cpu_utilisation, mem_utilisation)
+        reward = std_reward + entropy_reward 
         #reward = self.reward_chat_gpt_sd_entropy( cpu_utilisation, mem_utilisation)
         return reward 
 
@@ -499,7 +586,7 @@ class CustomEnv(gym.Env):
             # done = True
         
         if done:
-            reward = -1
+            reward = -10
         if not done:
             self.master.log_statistical_info()
         self.reward_list.append(reward)      

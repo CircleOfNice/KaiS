@@ -136,7 +136,7 @@ eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_pa
 action_dist_callback = CustomLoggerCallback(eval_env=custom_env, verbose=0, log_freq=eval_freq, num_envs=num_envs)
 
 episode_length = len(result_list[0])
-num_episodes = 200
+num_episodes = 100
 
 total_reward_list = []
 
