@@ -301,6 +301,25 @@ class Master:
         coeff_mem = variation(mem_utilisation)
         return coeff_cpu, coeff_mem
     
+    def get_coefficient_of_variation_reward(self, cpu_utilisation, mem_utilisation):
+        """Method to calculate reward based on coefficient of variation of CPU Utilisation and Memory Utilisation ratio
+
+        Args:
+            cpu_utilisation: CPU Utilisation Ratio
+            mem_utilisation: Memory Utilisation Ratio
+
+        Returns:
+            coff_reward: calculated coefficient of variation based reward
+        """
+        
+        coeff_cpu, coeff_mem= self.get_coefficient_of_variation(cpu_utilisation, mem_utilisation)
+        
+        coeff_cpu_reward = 1/(1+coeff_cpu)
+        coeff_mem_reward = 1/(1+coeff_mem)
+        coff_reward = coeff_cpu_reward + coeff_mem_reward
+        return coff_reward
+    
+    
     def get_standard_deviation_reward(self, cpu_utilisation, mem_utilisation):
         """Method to calculate reward based on standard deviation of CPU Utilisation and Memory Utilisation ratio
 
@@ -314,8 +333,8 @@ class Master:
         
         std_cpu, std_mem = self.get_std_deviations(cpu_utilisation, mem_utilisation)
         
-        std_cpu_reward = 1/(1+std_cpu)
-        std_mem_reward = 1/(1+std_mem)
+        std_cpu_reward = np.exp((1/(1+std_cpu))-0.5)-1
+        std_mem_reward = np.exp((1/(1+std_mem))-0.5)-1
         std_reward = std_cpu_reward + std_mem_reward
         return std_reward
     
@@ -431,7 +450,8 @@ class Master:
         #reward = np.exp(-1/(1 + np.exp(-(std_cpu + std_mem))))e
         std_reward = self.get_standard_deviation_reward(cpu_utilisation, mem_utilisation)
         entropy_reward = self.get_entropy_reward( cpu_utilisation, mem_utilisation)
-        reward = std_reward + entropy_reward 
+        coeff_reward = self.get_coefficient_of_variation_reward( cpu_utilisation, mem_utilisation)
+        reward = std_reward # + entropy_reward  + coeff_reward
         #reward = self.reward_chat_gpt_sd_entropy( cpu_utilisation, mem_utilisation)
         return reward 
 
