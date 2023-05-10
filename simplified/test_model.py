@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
     num_test_runs = 1
 
-    MODEL_PATH = r"models/PPO2/final_ppo_model.zip"
+    MODEL_PATH = r"models/PPO2/2023-05-10_06-13-50_ppo_model.zip"
     ENV_PATH = r"models/PPO2/final_env.zip"
 
     path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
@@ -52,9 +52,8 @@ if __name__ == "__main__":
 
     # https://stable-baselines3.readthedocs.io/en/v0.11.1/guide/examples.html#pybullet-normalizing-input-features
     # Link above shows example of how to load a model with a vecnormalize wrapper
-    env = CustomEnv(4, 3, result_list, normalize_obs=True, init_random=False)
+    env = CustomEnv(4, 3, result_list, normalize_obs=True, init_random=False, init_uniform=True)
     model = sb3_contrib.MaskablePPO.load(MODEL_PATH)
-
 
     # model = sb3_contrib.MaskablePPO.load(MODEL_PATH)
     # self.model:sb3_contrib.MaskablePPO = sb3_contrib.MaskablePPO.load(MODEL_SAVE_PATH)
@@ -96,7 +95,11 @@ if __name__ == "__main__":
         remaining_cpu_list.append(obs[::4][:-1])
         remaining_mem_list.append(obs[1::4][:-1])
 
-    label_list = ["Node_" + str(i) for i in range(1, MAX_NODE_CAPACITY+1)]
+    print(f"Last incoming task: req_cpu: {env.master.req_cpu_current_task}, req_mem: {env.master.req_mem_current_task}")
+    print("Node usage at the end:")
+    for idx, node in enumerate(env.master.node_list):
+        print(f"Node {idx}: " + str(node))
+    label_list = ["Node_" + str(i) for i in range(0, MAX_NODE_CAPACITY)]
     print(f"Episode length: {episode_length}")
     print(f"Cluster max achieved? {env.master.max_capacity_count}")
     plt.figure()
@@ -113,12 +116,3 @@ if __name__ == "__main__":
 
     action_dist, counts = np.unique(action_list, return_counts=True)
     print(f"Action distribution: {counts}")
-
-
-
-    
-
-
-
-
-
