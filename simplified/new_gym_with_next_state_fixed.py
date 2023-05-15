@@ -324,7 +324,7 @@ class Master:
         """Method to calculate reward based on standard deviation of CPU Utilisation and Memory Utilisation ratio
 
         Args:
-            cpu_utilisation: CPU Utilisation Ratio
+            cpu_utilisation: CPU Utilisation Ratioe
             mem_utilisation: Memory Utilisation Ratio
 
         Returns:
@@ -333,9 +333,15 @@ class Master:
         
         std_cpu, std_mem = self.get_std_deviations(cpu_utilisation, mem_utilisation)
         
-        std_cpu_reward = np.exp((1/(1+std_cpu))-0.5)-1
-        std_mem_reward = np.exp((1/(1+std_mem))-0.5)-1
-        std_reward = std_cpu_reward + std_mem_reward
+        #std_cpu_reward = np.exp((1/(1+std_cpu))-0.5)-1
+        #std_mem_reward = np.exp((1/(1+std_mem))-0.5)-1
+        
+        std_cpu_reward = np.power(10, (1/(1+std_cpu))-0.5)-1
+        std_mem_reward = np.power(10, (1/(1+std_mem))-0.5)-1
+        
+        #std_reward = std_cpu_reward + std_mem_reward
+        std_reward = np.std([std_cpu_reward , std_mem_reward], ddof=1)
+        std_reward = np.power(10, (1/(1+std_reward))-0.5)-1
         return std_reward
     
     def get_entropy_reward(self, cpu_utilisation, mem_utilisation):
