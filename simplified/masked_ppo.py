@@ -5,6 +5,7 @@ import os
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from env_run import get_all_task_kubernetes
+from datetime import datetime
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 from sb3_contrib.common.wrappers import ActionMasker
 from sb3_contrib.ppo_mask import MaskablePPO
@@ -135,6 +136,8 @@ def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:l
     return CustomEnv(number_of_nodes=num_total_nodes, mask_nodes=num_max_masked_nodes, data=data_list, train=train)
     
 
+MODEL_PATH = os.path.join(os.getcwd(), 'models', 'PPO2', '2023-05-10_06-13-50_ppo_model.zip')
+# MODEL_PATH = ""
 path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
 result_list,_ = get_all_task_kubernetes(path)
 total_nodes = 4
@@ -168,7 +171,7 @@ eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_pa
 action_dist_callback = CustomLoggerCallback(eval_env=custom_env, verbose=0, log_freq=eval_freq, num_envs=num_envs)
 
 episode_length = len(result_list[0])
-num_episodes = 5000
+num_episodes = 100
 
 total_reward_list = []
 
@@ -177,12 +180,21 @@ total_reward_list = []
 policy_kwargs = None
 lr = 0.0003
 enf_coef = 0.01
-model = MaskablePPO(MaskableActorCriticPolicy, custom_env, ent_coef=enf_coef, verbose=0, tensorboard_log="tensorboard_logs", policy_kwargs = policy_kwargs,
+
+if MODEL_PATH:
+    print(f"Loading existing model from: {MODEL_PATH}")
+    model = MaskablePPO.load(MODEL_PATH, env=custom_env)
+    reset_num_timesteps = False
+else:
+    print(f"Training new model from scratch")
+    model = MaskablePPO(MaskableActorCriticPolicy, custom_env, ent_coef=enf_coef, verbose=0, tensorboard_log="tensorboard_logs", policy_kwargs = policy_kwargs,
                     learning_rate=lr)#, verbose=True)
+    reset_num_timesteps = False
 
 print(model.policy)
-model.learn(total_timesteps=(episode_length-1)*num_episodes, progress_bar=True, callback=[eval_callback, action_dist_callback])
-model.save(os.path.join('models','PPO2', "final_ppo_model.zip"))
+model.learn(total_timesteps=(episode_length-1)*num_episodes, progress_bar=True, callback=[eval_callback, action_dist_callback], reset_num_timesteps=True)
+curr_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+model.save(os.path.join('models','PPO2', curr_time + "_ppo_model.zip"))
 if USE_NORMALIZED_ENVS:
     custom_env.save(os.path.join("models", "PPO2", "final_env.zip"))
 

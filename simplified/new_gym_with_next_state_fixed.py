@@ -50,7 +50,16 @@ class Master:
     """[This class serves as framework for definition of Master Node with properties such as 
     task queue, cpu processing, memory, done and undone tasks, Kind of tasks done and undone. all task index]
     """
-    def __init__(self, number_of_nodes:int, task_data:list, normalize_obs=False, init_random=True):
+    def __init__(self, number_of_nodes:int, task_data:list, normalize_obs=False, init_random=True, init_uniform=False):
+        """_summary_
+
+        Args:
+            number_of_nodes (int): Number of nodes in the cluster
+            task_data (list): List of tasks to generate sample tasks from
+            normalize_obs (bool, optional): Wether to normalize observations. Defaults to False.
+            init_random (bool, optional): Wether to give nodes random initial values. Defaults to True.
+            init_uniform (bool, optional): Wether to give all nodes in the cluster same resources. Defaults to False.
+        """
         self.number_of_nodes = number_of_nodes
         self.max_available_cpu_choices = [1000, 2000, 4000, 8000]
         self.max_available_mem_choices = [1, 2, 4, 8, 16, 33.4916444]
@@ -66,6 +75,8 @@ class Master:
         self.req_mem_current_task = 0
 
         self.init_random = init_random
+        self.init_uniform = init_uniform
+
         self.init_node_list()
         self.action_space = len(self.node_list)
         self.observation_space_dims = self.get_master_observation_space().shape
@@ -109,17 +120,27 @@ class Master:
         """
         cpu_params= []
         mem_params= []
-        max_cpu_params = [random.choice(self.max_available_cpu_choices) for i in range(self.number_of_nodes)]
-        max_mem_params = [random.choice(self.max_available_mem_choices) for i in range(self.number_of_nodes)]
+
+        if self.init_uniform:
+            # Gives all nodes same max cpu and memory resources
+            cpu_size = random.choice(self.max_available_cpu_choices)
+            mem_size = random.choice(self.max_available_mem_choices)
+            max_cpu_params = [cpu_size for _ in range(self.number_of_nodes)]
+            max_mem_params = [mem_size for _ in range(self.number_of_nodes)]
+        else:
+            # Gives all nodes random max cpu and memory resources
+            max_cpu_params = [random.choice(self.max_available_cpu_choices) for i in range(self.number_of_nodes)]
+            max_mem_params = [random.choice(self.max_available_mem_choices) for i in range(self.number_of_nodes)]
 
         for i in range(self.number_of_nodes):
             if self.init_random:
+                # Initialize nodes with random cpu and memory usage
                 cpu_params.append(np.random.randint(0,max_cpu_params[i]))
                 mem_params.append(np.random.uniform(0,max_mem_params[i]))
             else:
+                # Initialize empty nodes
                 cpu_params.append(max_cpu_params[i])
                 mem_params.append(max_mem_params[i])
-
 
         self.node_list = [Node(cpu = cpu_params[i], mem = mem_params[i], max_cpu=max_cpu_params[i], max_mem=max_mem_params[i]) for i in range(self.number_of_nodes)]
 
@@ -238,6 +259,25 @@ class Master:
             mem_utilisation.append(node.mem/node.max_mem)
         return cpu_utilisation, mem_utilisation
     
+
+    def get_normalized_utilization_ratios(self):
+        """Method to return the cpu utilization ratios for each resource (CPU, Memory), divided by the sum of the respective
+        resource.
+
+        Returns:
+            Tuple: cpu_utilisation_array, memory_utilisation_array
+        """
+        node_num = len(self.node_list)
+        cpu_utilisation_arr = np.zeros(node_num)
+        mem_utilisation_arr = np.zeros(node_num)
+        for idx , node in enumerate(self.node_list):
+            cpu_utilisation_arr[idx] = node.cpu
+            mem_utilisation_arr[idx] = node.mem
+
+        cpu_utilisation_arr = cpu_utilisation_arr / np.sum(cpu_utilisation_arr)
+        mem_utilisation_arr = mem_utilisation_arr / np.sum(mem_utilisation_arr)
+        return cpu_utilisation_arr, mem_utilisation_arr
+
     def get_std_deviations(self, cpu_utilisation, mem_utilisation):
         """Method to calculate standard deviations across CPU and Memory Utilisation
 
@@ -447,6 +487,7 @@ class Master:
         
         
         cpu_utilisation, mem_utilisation = self.get_utilisation_ratios()
+        # cpu_utilisation, mem_utilisation = self.get_normalized_utilization_ratios()
         #std_cpu = np.std(cpu_utilisation, ddof=1)
         #std_mem = np.std(mem_utilisation, ddof=1)
         
@@ -468,7 +509,7 @@ class Master:
 class CustomEnv(gym.Env):
     """Custom Environment that follows gym interface"""
 
-    def __init__(self, number_of_nodes:int, mask_nodes:int, data:list, normalize_obs:bool, init_random:bool=True):
+    def __init__(self, number_of_nodes:int, mask_nodes:int, data:list, normalize_obs:bool, init_random:bool=True, init_uniform:bool=False):
         """Custom environment representing a kubernetes cluster with multiple nodes
 
         Args:
@@ -476,11 +517,12 @@ class CustomEnv(gym.Env):
             mask_nodes (int): Maximum number of masked nodes (used to simulate node-outage)
             data (list): List of tasks to potentially sample from
             normalize_obs (bool): 
-            init_random (bool, optional): _description_. Defaults to True.
+            init_random (bool, optional): Gives nodes random starting cpu and memory usage. Defaults to True.
+            init_uniform(bool, optional): Initializes max cpu and memory values of all nodes uniform
         """
         super(CustomEnv, self).__init__()
         self.number_of_nodes=number_of_nodes
-        self.master = Master(number_of_nodes, data, normalize_obs=normalize_obs, init_random=init_random)
+        self.master = Master(number_of_nodes, data, normalize_obs=normalize_obs, init_random=init_random, init_uniform=init_uniform)
         self.mask_nodes = mask_nodes
         self.step_counter = 0
         self.reset()
@@ -546,8 +588,8 @@ class CustomEnv(gym.Env):
 
     def generate_task(self):
         """ Simple Wrapper for task generation """
-        return self.sample_task_from_kubernetes_data_set()
-        # return self.generate_random_task()
+        # return self.sample_task_from_kubernetes_data_set()
+        return self.generate_random_task()
     
 
     def generate_random_task(self):
