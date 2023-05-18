@@ -136,11 +136,11 @@ def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:l
     return CustomEnv(number_of_nodes=num_total_nodes, mask_nodes=num_max_masked_nodes, data=data_list, train=train)
     
 
-MODEL_PATH = os.path.join(os.getcwd(), 'models', 'PPO2', '2023-05-10_06-13-50_ppo_model.zip')
-# MODEL_PATH = ""
+#MODEL_PATH = os.path.join(os.getcwd(), 'models', 'PPO2', '2023-05-15_10-38-19_ppo_model')
+MODEL_PATH = ""
 path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
 result_list,_ = get_all_task_kubernetes(path)
-total_nodes = 4
+total_nodes =10
 masked_nodes = total_nodes - 1
 
 eval_freq = 50_000 # Number of timesteps after which to evaluate the models
@@ -171,13 +171,13 @@ eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_pa
 action_dist_callback = CustomLoggerCallback(eval_env=custom_env, verbose=0, log_freq=eval_freq, num_envs=num_envs)
 
 episode_length = len(result_list[0])
-num_episodes = 100
+num_episodes = 1000
 
 total_reward_list = []
 
-# policy_kwargs = dict(net_arch=[32, 64, 128, 256, 512, 1024])
+policy_kwargs = dict(net_arch=[32, 64, 128, 256])
 # policy_kwargs = dict(net_arch=[32, 32])
-policy_kwargs = None
+# policy_kwargs = None
 lr = 0.0003
 enf_coef = 0.01
 

@@ -9,6 +9,7 @@ from random import shuffle, choice, sample
 import random
 from scipy.stats import entropy 
 from scipy.stats import variation , pearsonr
+from scipy.stats import truncnorm
 class Node:
     """[This class serves as framework for definition of Edge Node with properties such as 
     task queue, service_list, cpu processing and  memory]
@@ -376,12 +377,19 @@ class Master:
         #std_cpu_reward = np.exp((1/(1+std_cpu))-0.5)-1
         #std_mem_reward = np.exp((1/(1+std_mem))-0.5)-1
         
-        std_cpu_reward = np.power(10, (1/(1+std_cpu))-0.5)-1
-        std_mem_reward = np.power(10, (1/(1+std_mem))-0.5)-1
+        #std_cpu_reward = np.power(10, (1/(1+std_cpu))-0.5)-1
+        #std_mem_reward = np.power(10, (1/(1+std_mem))-0.5)-1
         
-        #std_reward = std_cpu_reward + std_mem_reward
-        std_reward = np.std([std_cpu_reward , std_mem_reward], ddof=1)
-        std_reward = np.power(10, (1/(1+std_reward))-0.5)-1
+        std_cpu_reward = np.power(10, np.power(10, (1/(1+std_cpu))-0.5)-1)-1
+        std_mem_reward = np.power(10, np.power(10, (1/(1+std_mem))-0.5)-1)-1
+        #TODO reward variations needed to be tried
+        std_reward = std_cpu_reward + std_mem_reward
+        
+        #scaling_factor = (np.power(power, np.power(power, (1/(1))-0.5)-1)-1)
+        #std_reward = (std_cpu_reward/scaling_factor) + (std_mem_reward / scaling_factor)
+        #std_reward = min(std_cpu_reward, std_mem_reward)
+        #std_reward = np.std([std_cpu_reward , std_mem_reward], ddof=1)
+        #std_reward = np.power(10, (1/(1+std_reward))-0.5)-1
         return std_reward
     
     def get_entropy_reward(self, cpu_utilisation, mem_utilisation):
@@ -544,7 +552,7 @@ class CustomEnv(gym.Env):
     def valid_action_mask(self):
         actions = [i for i in range(self.number_of_nodes)]
         mask = sample(actions,  np.random.randint(0,self.mask_nodes))
-        self.master.mask_list = [1 if i in mask else 0 for i in range(self.number_of_nodes)]
+        #self.master.mask_list = [1 if i in mask else 0 for i in range(self.number_of_nodes)]
         self.master.mask_list = self.all_valid_action_mask()
         return self.master.mask_list
 
@@ -583,20 +591,75 @@ class CustomEnv(gym.Env):
         return self.master.get_master_observation_space()
 
     def get_random_action(self):
+        """Method to sample a random action
+
+        Returns:
+            action: integer value for the action
+        """
         return self.master.get_random_action()
         
 
     def generate_task(self):
         """ Simple Wrapper for task generation """
         # return self.sample_task_from_kubernetes_data_set()
+        
         return self.generate_random_task()
     
+    
 
-    def generate_random_task(self):
+    def get_truncated_normal(self, mean=0, sd=1, low=0, upper=10):
+        """Generates a scipy sample for sampling purposes
+
+        Args:
+            mean (int, optional): mean for the sampler object. Defaults to 0.
+            sd (int, optional): standard deviation for the sampler object. Defaults to 1.
+            low (int, optional): lowest possible value that can be sampled. Defaults to 0.
+            upper (int, optional): highest possible value that can be sampled. Defaults to 10.
+
+        Returns:
+            Scipy sammpler: Scipy sampler object 
+        """
+        return truncnorm(
+            (low - mean) / sd, (upper - mean) / sd, loc=mean, scale=sd)
+
+    def get_truncated_norm_cpu_mem_data(self, mean_cpu, std_cpu, mean_mem, std_mem, max_factor = 7, datapoints =1):
+        
+        """Generates a sample for cpu and memory value resembling the tasks in the kubernetes data
+        Args:
+            mean_cpu (int, optional): mean cpu for the sampler object. Defaults to 0.
+            std_cpu (int, optional): standard deviation for cpu for the sampler object. Defaults to 0.
+            mean_mem (int, optional): mean mem for the sampler object. Defaults to 0.
+            std_mem (int, optional): standard deviation for mem for the sampler object. Defaults to 0.
+            max_factor (int, optional): number of standard deviations to account for the maximum value. Defaults to 10.
+            
+        Returns:
+            cpu_samples: sampled cpu data
+            mem_samples: sampled mem data
+        """
+        cpu_sampler = self.get_truncated_normal(mean_cpu, std_cpu, low = 0, upper = mean_cpu + max_factor * std_cpu)
+        mem_sampler = self.get_truncated_normal(mean_mem, std_mem, low = 0, upper = mean_mem + max_factor * std_mem)
+        cpu_samples = cpu_sampler.rvs(datapoints)
+        mem_samples = mem_sampler.rvs(datapoints)
+        return cpu_samples, mem_samples
+        
+
+    def generate_random_task(self, uniform = True):
         """ Method that returns a tasks with random required resources.
         As a result there might be no node, which is able to handle the given task"""
-        req_cpu = np.random.randint(4, max(self.master.max_available_cpu_choices) // 10 )
-        req_mem = np.random.uniform(0.001, max(self.master.max_available_mem_choices) / 10)
+        
+        if uniform:
+            req_cpu = np.random.randint(4, max(self.master.max_available_cpu_choices) // 10 )
+            req_mem = np.random.uniform(0.001, max(self.master.max_available_mem_choices) / 10)
+        else: 
+            mean_cpu = 38.31644473313847
+            mean_mem = 0.04445434537338971
+            
+            std_cpu = 14.824416377146973
+            std_mem =  0.017403803968774088
+            
+            max_factor = 7 # number of standard deviations to consider for upper limit of data 
+            req_cpu, req_mem = self.get_truncated_norm_cpu_mem_data(self, mean_cpu, std_cpu, mean_mem, std_mem, max_factor = max_factor, datapoints =100)
+            req_cpu, req_mem = req_cpu[0], req_mem[0] 
         task = [0,0,0, req_cpu, req_mem]
         return task
 

@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
     num_test_runs = 1
 
-    MODEL_PATH = r"models/PPO2/2023-05-10_06-13-50_ppo_model.zip"
+    MODEL_PATH = r"models/PPO2/2023-05-15_10-38-19_ppo_model.zip"
     ENV_PATH = r"models/PPO2/final_env.zip"
 
     path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
