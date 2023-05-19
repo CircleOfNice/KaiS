@@ -380,9 +380,12 @@ class Master:
         #std_cpu_reward = np.power(10, (1/(1+std_cpu))-0.5)-1
         #std_mem_reward = np.power(10, (1/(1+std_mem))-0.5)-1
         
-        std_cpu_reward = np.power(10, np.power(10, (1/(1+std_cpu))-0.5)-1)-1
-        std_mem_reward = np.power(10, np.power(10, (1/(1+std_mem))-0.5)-1)-1
+        #std_cpu_reward = np.power(10, np.power(10, (1/(1+std_cpu))-0.5)-1)-1
+        #std_mem_reward = np.power(10, np.power(10, (1/(1+std_mem))-0.5)-1)-1
         #TODO reward variations needed to be tried
+        
+        std_cpu_reward =  (np.exp(np.exp((1/(1+std_cpu))-0.5)-1)-1) / (np.exp(np.exp((1/(1))-0.5)-1)-1 )
+        std_mem_reward = (np.exp(np.exp((1/(1+std_mem))-0.5)-1)-1) / (np.exp(np.exp((1/(1))-0.5)-1)-1 )
         std_reward = std_cpu_reward + std_mem_reward
         
         #scaling_factor = (np.power(power, np.power(power, (1/(1))-0.5)-1)-1)
@@ -741,7 +744,7 @@ class CustomEnv(gym.Env):
             # done = True
         
         if done:
-            reward = -10
+            reward = -1
         if not done:
             self.master.log_statistical_info()
         self.reward_list.append(reward)      

@@ -140,7 +140,7 @@ def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:l
 MODEL_PATH = ""
 path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
 result_list,_ = get_all_task_kubernetes(path)
-total_nodes =10
+total_nodes =100
 masked_nodes = total_nodes - 1
 
 eval_freq = 50_000 # Number of timesteps after which to evaluate the models
@@ -175,9 +175,10 @@ num_episodes = 1000
 
 total_reward_list = []
 
-policy_kwargs = dict(net_arch=[32, 64, 128, 256])
-# policy_kwargs = dict(net_arch=[32, 32])
-# policy_kwargs = None
+#policy_kwargs = dict(net_arch=[32, 64, 128, 256])
+policy_kwargs = dict(net_arch=[256, 128, 64, 32])
+#policy_kwargs = dict(net_arch=[32, 32])
+policy_kwargs = None
 lr = 0.0003
 enf_coef = 0.01
 
