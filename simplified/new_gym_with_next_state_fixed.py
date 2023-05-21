@@ -248,7 +248,7 @@ class Master:
 
         return max_cpu_index, max_mem_index
     
-    def get_utilisation_ratios(self):
+    def get_utilisation_ratios(self, masking =True):
         """Method to calculate Utilisation Ratios of CPU and Memory
 
         Returns:
@@ -259,8 +259,14 @@ class Master:
         mem_utilisation = []
         for i , node in enumerate(self.node_list):
             # If node is masked, set available cpu and memory space to 0
-            mask_info = self.mask_list[i]
-            if mask_info==1:
+            if masking:
+                mask_info = self.mask_list[i]
+                #print("i, mask_info : ", i, mask_info)
+                if mask_info==1:
+                    cpu_utilisation.append(node.cpu/node.max_cpu)
+                    mem_utilisation.append(node.mem/node.max_mem)
+                    
+            else:
                 cpu_utilisation.append(node.cpu/node.max_cpu)
                 mem_utilisation.append(node.mem/node.max_mem)
         return cpu_utilisation, mem_utilisation
@@ -455,7 +461,7 @@ class Master:
         """
         Method to log statistical information regarding the usage of CPU and Memory.
         """      
-        cpu_utilisation, mem_utilisation = self.get_utilisation_ratios()
+        cpu_utilisation, mem_utilisation = self.get_utilisation_ratios(masking=False)
         entropy_cpu, entropy_mem = self.get_entropy(cpu_utilisation, mem_utilisation)
         std_cpu, std_mem= self.get_std_deviations(cpu_utilisation, mem_utilisation)
         coeff_cpu, coeff_mem = self.get_coefficient_of_variation(cpu_utilisation, mem_utilisation)
@@ -568,9 +574,12 @@ class CustomEnv(gym.Env):
     
     def valid_action_mask(self):
         actions = [i for i in range(self.number_of_nodes)]
-        mask = sample(actions,  np.random.randint(0,self.mask_nodes))
+        mask = sample(actions,  np.random.randint(2,self.mask_nodes)) #chaning masked nodes for stability purposes
+        #print("mask : ", mask)
+        #TODO add this minimum masking information to environment as a variable
         self.master.mask_list = [1 if i in mask else 0 for i in range(self.number_of_nodes)]
         #self.master.mask_list = self.all_valid_action_mask()
+        #print("self.master.mask_list : ", self.master.mask_list)
         return self.master.mask_list
 
 
