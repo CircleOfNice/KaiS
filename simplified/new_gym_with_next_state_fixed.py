@@ -196,10 +196,13 @@ class Master:
         master_observation_space = [] 
 
         # Get information of all nodes
-        for _, node in  enumerate(self.node_list):
+        for i, node in  enumerate(self.node_list):
+            
             state_normalisation = node.get_current_state_data()
-            master_observation_space.append((state_normalisation[0], state_normalisation[1], state_normalisation[2], state_normalisation[3]))# , state_normalisation[2], state_normalisation[3]))
-
+            #master_observation_space.append((state_normalisation[0], state_normalisation[1], state_normalisation[2], state_normalisation[3]))# , state_normalisation[2], state_normalisation[3]))
+            #TODO check where Exactly where masking of output nodes is happening
+            mask_info = self.mask_list[i]
+            master_observation_space.append((state_normalisation[0]*mask_info, state_normalisation[1]*mask_info, state_normalisation[2], state_normalisation[3]))
         # Get information of the task
         master_observation_space.append((self.current_incoming_task[3], self.current_incoming_task[4]))#, 0,0))
 
@@ -256,8 +259,10 @@ class Master:
         mem_utilisation = []
         for i , node in enumerate(self.node_list):
             # If node is masked, set available cpu and memory space to 0
-            cpu_utilisation.append(node.cpu/node.max_cpu)
-            mem_utilisation.append(node.mem/node.max_mem)
+            mask_info = self.mask_list[i]
+            if mask_info==1:
+                cpu_utilisation.append(node.cpu/node.max_cpu)
+                mem_utilisation.append(node.mem/node.max_mem)
         return cpu_utilisation, mem_utilisation
     
 
@@ -272,8 +277,10 @@ class Master:
         cpu_utilisation_arr = np.zeros(node_num)
         mem_utilisation_arr = np.zeros(node_num)
         for idx , node in enumerate(self.node_list):
-            cpu_utilisation_arr[idx] = node.cpu
-            mem_utilisation_arr[idx] = node.mem
+            #TODO Check it here for state update
+            if self.mask_list==1:
+                cpu_utilisation_arr[idx] = node.cpu
+                mem_utilisation_arr[idx] = node.mem
 
         cpu_utilisation_arr = cpu_utilisation_arr / np.sum(cpu_utilisation_arr)
         mem_utilisation_arr = mem_utilisation_arr / np.sum(mem_utilisation_arr)
@@ -355,8 +362,11 @@ class Master:
         
         coeff_cpu, coeff_mem= self.get_coefficient_of_variation(cpu_utilisation, mem_utilisation)
         
-        coeff_cpu_reward = 1/(1+coeff_cpu)
-        coeff_mem_reward = 1/(1+coeff_mem)
+        #coeff_cpu_reward = 1/(1+coeff_cpu)
+        #coeff_mem_reward = 1/(1+coeff_mem)
+        
+        coeff_cpu_reward =  (np.exp(np.exp((1/(1+coeff_cpu))-0.5)-1)-1) / (np.exp(np.exp((1/(1))-0.5)-1)-1 )
+        coeff_mem_reward = (np.exp(np.exp((1/(1+coeff_mem))-0.5)-1)-1) / (np.exp(np.exp((1/(1))-0.5)-1)-1 )
         coff_reward = coeff_cpu_reward + coeff_mem_reward
         return coff_reward
     
@@ -408,7 +418,10 @@ class Master:
         calculated_relative_rewards = []
         for i in range(len(cpu_utilisation)):
             ent = entropy([cpu_utilisation[i], mem_utilisation[i]])
-            calculated_relative_rewards.append(1/(1+ent))
+            normalised_ent_reward = (np.exp(np.exp((1/(1+ent))-0.5)-1)-1) / (np.exp(np.exp((1/(1))-0.5)-1)-1 )
+            calculated_relative_rewards.append(1/(1+normalised_ent_reward))
+            
+            #calculated_relative_rewards.append(1/(1+ent))
         entropy_reward = sum(calculated_relative_rewards)/len(calculated_relative_rewards)    
         return entropy_reward
     
@@ -509,7 +522,8 @@ class Master:
         std_reward = self.get_standard_deviation_reward(cpu_utilisation, mem_utilisation)
         entropy_reward = self.get_entropy_reward( cpu_utilisation, mem_utilisation)
         coeff_reward = self.get_coefficient_of_variation_reward( cpu_utilisation, mem_utilisation)
-        reward = std_reward # + entropy_reward  + coeff_reward
+        reward_list = [std_reward , entropy_reward , coeff_reward]
+        reward = sum(reward_list)/len(reward_list)#std_reward  + entropy_reward  + coeff_reward
         #reward = self.reward_chat_gpt_sd_entropy( cpu_utilisation, mem_utilisation)
         return reward 
 
@@ -555,8 +569,8 @@ class CustomEnv(gym.Env):
     def valid_action_mask(self):
         actions = [i for i in range(self.number_of_nodes)]
         mask = sample(actions,  np.random.randint(0,self.mask_nodes))
-        #self.master.mask_list = [1 if i in mask else 0 for i in range(self.number_of_nodes)]
-        self.master.mask_list = self.all_valid_action_mask()
+        self.master.mask_list = [1 if i in mask else 0 for i in range(self.number_of_nodes)]
+        #self.master.mask_list = self.all_valid_action_mask()
         return self.master.mask_list
 
 
