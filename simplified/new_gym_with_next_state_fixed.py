@@ -566,7 +566,8 @@ class CustomEnv(gym.Env):
         task = self.generate_task()
         self.update_incoming_task(task) 
         self.data_len = len(self.master.task_data[0][:])
-
+        self.initial_standard_mask()
+        #print("Done initialising")
 
     def get_action_mask(self):
         """Wrapper to call the action mask"""
@@ -582,12 +583,36 @@ class CustomEnv(gym.Env):
         #print("self.master.mask_list : ", self.master.mask_list)
         return self.master.mask_list
 
+    
+    def initial_standard_mask(self, no_mask_prob= 0.5):
+        
+        valid_mask = np.ones(self.number_of_nodes)
+        test_condition = random.random()
+        if no_mask_prob < test_condition:
+            masked_node_num = np.random.randint(low=0, high=self.mask_nodes)
+            
+            if masked_node_num:
+                valid_mask[-masked_node_num:] = 0
+        self.master.mask_list = valid_mask
 
     def all_valid_action_mask(self):
         """Returns an action mask of all ones for debugging purposes"""
         valid_mask = np.ones(self.number_of_nodes)
         return valid_mask
 
+    def repeatable_ordered_valid_action_mask(self) -> np.array:
+        """This method masks nodes like it would happen in the kubernetes cluster, meaning the masked nodes get removed from the end of a list,
+        resulting in a masked array that looks something like this:
+        [1, 1, 1, 1, 1, 1, 0, 0, 0]
+        where only the last values of the arrays are those nodes that are not available.
+        Currently we assume that there is always at least one node available.
+        Returns:
+            np.array: The boolean mask of available nodes
+        """
+        #print(self.master.mask_list)
+        return self.master.mask_list
+    
+    
 
     def ordered_valid_action_mask(self) -> np.array:
         """This method masks nodes like it would happen in the kubernetes cluster, meaning the masked nodes get removed from the end of a list,
