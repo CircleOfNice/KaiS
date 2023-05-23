@@ -457,6 +457,7 @@ class Master:
         
         return Load_Balance_Score
     
+
     def log_statistical_info(self):  
         """
         Method to log statistical information regarding the usage of CPU and Memory.
@@ -558,7 +559,7 @@ class CustomEnv(gym.Env):
         self.master = Master(number_of_nodes, data, normalize_obs=normalize_obs, init_random=init_random, init_uniform=init_uniform)
         self.mask_nodes = mask_nodes
         self.step_counter = 0
-        self.reset()
+        # self.reset()
         self.action_space = spaces.Discrete(self.master.action_space)
 
         self.observation_space = Box(low=-np.inf, high=np.inf, shape=self.master.observation_space_dims, dtype=np.float64)
@@ -657,7 +658,6 @@ class CustomEnv(gym.Env):
     def generate_task(self):
         """ Simple Wrapper for task generation """
         # return self.sample_task_from_kubernetes_data_set()
-        
         return self.generate_random_task()
     
     
