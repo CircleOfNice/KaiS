@@ -526,9 +526,9 @@ class Master:
 
         #reward = np.exp(-1/(1 + np.exp(-(std_cpu + std_mem))))e
         std_reward = self.get_standard_deviation_reward(cpu_utilisation, mem_utilisation)
-        entropy_reward = self.get_entropy_reward( cpu_utilisation, mem_utilisation)
-        coeff_reward = self.get_coefficient_of_variation_reward( cpu_utilisation, mem_utilisation)
-        reward_list = [std_reward , entropy_reward , coeff_reward]
+        # entropy_reward = self.get_entropy_reward( cpu_utilisation, mem_utilisation)
+        # coeff_reward = self.get_coefficient_of_variation_reward( cpu_utilisation, mem_utilisation)
+        reward_list = [std_reward]
         reward = sum(reward_list)/len(reward_list)#std_reward  + entropy_reward  + coeff_reward
         #reward = self.reward_chat_gpt_sd_entropy( cpu_utilisation, mem_utilisation)
         return reward 
@@ -540,7 +540,8 @@ class Master:
 class CustomEnv(gym.Env):
     """Custom Environment that follows gym interface"""
 
-    def __init__(self, number_of_nodes:int, mask_nodes:int, data:list, normalize_obs:bool, init_random:bool=True, init_uniform:bool=False):
+    def __init__(self, number_of_nodes:int, mask_nodes:int, data:list, normalize_obs:bool, init_random:bool=True, init_uniform:bool=False,
+                 no_masking_prob=1):
         """Custom environment representing a kubernetes cluster with multiple nodes
 
         Args:
@@ -550,9 +551,10 @@ class CustomEnv(gym.Env):
             normalize_obs (bool): 
             init_random (bool, optional): Gives nodes random starting cpu and memory usage. Defaults to True.
             init_uniform(bool, optional): Initializes max cpu and memory values of all nodes uniform
+            masking_prob(bool, optional): Probability of applying no masking at the start of an episode, leaving all nodes available (from 0 to 1)
         """
         super(CustomEnv, self).__init__()
-        self.number_of_nodes=number_of_nodes
+        self.number_of_nodes = number_of_nodes
         self.master = Master(number_of_nodes, data, normalize_obs=normalize_obs, init_random=init_random, init_uniform=init_uniform)
         self.mask_nodes = mask_nodes
         self.step_counter = 0
@@ -566,7 +568,8 @@ class CustomEnv(gym.Env):
         task = self.generate_task()
         self.update_incoming_task(task) 
         self.data_len = len(self.master.task_data[0][:])
-        self.initial_standard_mask()
+        self.no_masking_prob = no_masking_prob
+        self.initial_standard_mask(no_mask_prob=self.no_masking_prob)
         #print("Done initialising")
 
     def get_action_mask(self):
@@ -584,7 +587,7 @@ class CustomEnv(gym.Env):
         return self.master.mask_list
 
     
-    def initial_standard_mask(self, no_mask_prob= 0.5):
+    def initial_standard_mask(self, no_mask_prob=1):
         
         valid_mask = np.ones(self.number_of_nodes)
         test_condition = random.random()
@@ -637,6 +640,7 @@ class CustomEnv(gym.Env):
         Returns:
             np.array: The observation including information about the nodes and the task.
         """
+        self.initial_standard_mask(no_mask_prob=self.no_masking_prob)
         self.master.reset_master()
         
         return self.master.get_master_observation_space()
