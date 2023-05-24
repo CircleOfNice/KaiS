@@ -141,23 +141,35 @@ def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:l
 MODEL_PATH = ""
 path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
 result_list,_ = get_all_task_kubernetes(path)
-total_nodes =10
+total_nodes = 10
 masked_nodes = total_nodes - 2
 
 eval_freq = 50_000 # Number of timesteps after which to evaluate the models
 num_envs = 64
 
+episode_length = len(result_list[0])
+num_episodes = 10
+
+no_masking_prob = 1
+
+#policy_kwargs = dict(net_arch=[32, 64, 128, 256])
+#policy_kwargs = dict(net_arch=[256, 256, 256, 256])
+#policy_kwargs = dict(net_arch=[32, 32])
+policy_kwargs = None
+lr = 0.0003
+enf_coef = 0.01
+
 USE_NORMALIZED_ENVS = False
 
 # Need to first wrap the environment in all needed masks, and only then vectorize it
-env_fn = lambda: ActionMasker(CustomEnv(total_nodes, masked_nodes, result_list, normalize_obs=True), mask_fn)
+env_fn = lambda: ActionMasker(CustomEnv(total_nodes, masked_nodes, result_list, normalize_obs=True, no_masking_prob=no_masking_prob), mask_fn)
 custom_env = make_vec_env(env_fn, n_envs=num_envs)
 
 if USE_NORMALIZED_ENVS:
     custom_env = VecNormalize(custom_env)
     eval_env = make_vec_env(env_fn, n_envs=1)
 else:
-    eval_env = CustomEnv(total_nodes, masked_nodes, result_list, normalize_obs=True)
+    eval_env = CustomEnv(total_nodes, masked_nodes, result_list, normalize_obs=True, no_masking_prob=no_masking_prob)
     eval_env = ActionMasker(eval_env, mask_fn)
 
 eval_env = Monitor(eval_env)
@@ -167,21 +179,7 @@ if USE_NORMALIZED_ENVS:
 
 eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_path="logs",
                               eval_freq=eval_freq//num_envs, deterministic=True, render=False, n_eval_episodes=5, verbose=False)
-
-
 action_dist_callback = CustomLoggerCallback(eval_env=custom_env, verbose=0, log_freq=eval_freq, num_envs=num_envs)
-
-episode_length = len(result_list[0])
-num_episodes = 1000
-
-total_reward_list = []
-
-#policy_kwargs = dict(net_arch=[32, 64, 128, 256])
-#policy_kwargs = dict(net_arch=[256, 256, 256, 256])
-#policy_kwargs = dict(net_arch=[32, 32])
-policy_kwargs = None
-lr = 0.0003
-enf_coef = 0.01
 
 if MODEL_PATH:
     print(f"Loading existing model from: {MODEL_PATH}")
@@ -193,7 +191,6 @@ else:
                     learning_rate=lr)#, verbose=True)
     reset_num_timesteps = False
 
-print(model.policy)
 model.learn(total_timesteps=(episode_length-1)*num_episodes, progress_bar=True, callback=[eval_callback, action_dist_callback], reset_num_timesteps=True)
 curr_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 model.save(os.path.join('models','PPO2', curr_time + "_ppo_model.zip"))

@@ -10,6 +10,8 @@ import random
 from scipy.stats import entropy 
 from scipy.stats import variation , pearsonr
 from scipy.stats import truncnorm
+
+
 class Node:
     """[This class serves as framework for definition of Edge Node with properties such as 
     task queue, service_list, cpu processing and  memory]
