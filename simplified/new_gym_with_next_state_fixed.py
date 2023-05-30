@@ -513,6 +513,10 @@ class Master:
         # if action == max_mem_index:
         #     reward += 1
 
+        # cpu_reward = node_choice.cpu / max(self.max_available_cpu_choices)
+        # mem_reward = node_choice.mem / max(self.max_available_mem_choices)
+        # reward = (cpu_reward + mem_reward) * 2
+
         node_choice.update_state(cpu_val = - self.req_cpu_current_task, mem_val= - self.req_mem_current_task)
 
         # if not selfmax_capa.check_remaining_node_space():
@@ -520,6 +524,10 @@ class Master:
         
         
         cpu_utilisation, mem_utilisation = self.get_utilisation_ratios()
+        std_reward = self.get_standard_deviation_reward(cpu_utilisation, mem_utilisation)
+        reward_list = [std_reward]
+        reward = sum(reward_list)/len(reward_list)#std_reward  + entropy_reward  + coeff_reward
+
         # cpu_utilisation, mem_utilisation = self.get_normalized_utilization_ratios()
         #std_cpu = np.std(cpu_utilisation, ddof=1)
         #std_mem = np.std(mem_utilisation, ddof=1)
@@ -528,11 +536,10 @@ class Master:
         # reward = np.exp(1/(1 + np.exp(-(std_cpu+ std_mem))))
 
         #reward = np.exp(-1/(1 + np.exp(-(std_cpu + std_mem))))e
-        std_reward = self.get_standard_deviation_reward(cpu_utilisation, mem_utilisation)
+
         # entropy_reward = self.get_entropy_reward( cpu_utilisation, mem_utilisation)
         # coeff_reward = self.get_coefficient_of_variation_reward( cpu_utilisation, mem_utilisation)
-        reward_list = [std_reward]
-        reward = sum(reward_list)/len(reward_list)#std_reward  + entropy_reward  + coeff_reward
+
         #reward = self.reward_chat_gpt_sd_entropy( cpu_utilisation, mem_utilisation)
         return reward 
 
@@ -659,8 +666,11 @@ class CustomEnv(gym.Env):
 
     def generate_task(self):
         """ Simple Wrapper for task generation """
-        # return self.sample_task_from_kubernetes_data_set()
-        return self.generate_random_task()
+        # if random.random() > 0.5:
+        #     task = self.sample_task_from_kubernetes_data_set()
+        # else:
+        task = self.generate_random_task()
+        return task
     
     
 

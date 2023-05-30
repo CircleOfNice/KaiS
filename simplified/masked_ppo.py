@@ -116,10 +116,10 @@ def mask_fn(env:CustomEnv) -> np.ndarray:
     # Do whatever you'd like in this function to return the action mask
     # for the current env. In this example, we assume the env has a
     # helpful method we can rely on.
-    # return env.all_valid_action_mask()
+    return env.all_valid_action_mask()
     # return env.ordered_valid_action_mask()
     # return env.valid_action_mask()
-    return env.repeatable_ordered_valid_action_mask()
+    # return env.repeatable_ordered_valid_action_mask()
 
 
 def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:list, train:bool=True):
@@ -137,26 +137,26 @@ def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:l
     return CustomEnv(number_of_nodes=num_total_nodes, mask_nodes=num_max_masked_nodes, data=data_list, train=train)
     
 
-#MODEL_PATH = os.path.join(os.getcwd(), 'models', 'PPO2', '2023-05-15_10-38-19_ppo_model')
+# MODEL_PATH = os.path.join(os.getcwd(), 'models', 'PPO2', "2023-05-30_11-00-26_ppo_model.zip")
 MODEL_PATH = ""
 path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
 result_list,_ = get_all_task_kubernetes(path)
-total_nodes = 10
+total_nodes = 16
 masked_nodes = total_nodes - 2
 
 eval_freq = 50_000 # Number of timesteps after which to evaluate the models
 num_envs = 64
 
 episode_length = len(result_list[0])
-num_episodes = 10
+num_episodes = 400
 
 no_masking_prob = 1
 
-#policy_kwargs = dict(net_arch=[32, 64, 128, 256])
-#policy_kwargs = dict(net_arch=[256, 256, 256, 256])
-#policy_kwargs = dict(net_arch=[32, 32])
+# policy_kwargs = dict(net_arch=[32, 64, 128, 256])
+# policy_kwargs = dict(net_arch=[256, 256, 256, 256])
+# policy_kwargs = dict(net_arch=[128, 128, 64])
 policy_kwargs = None
-lr = 0.0003
+lr = 0.00003
 enf_coef = 0.01
 
 USE_NORMALIZED_ENVS = False
