@@ -526,10 +526,10 @@ class Master:
 
         #reward = np.exp(-1/(1 + np.exp(-(std_cpu + std_mem))))e
         std_reward = self.get_standard_deviation_reward(cpu_utilisation, mem_utilisation)
-        entropy_reward = self.get_entropy_reward( cpu_utilisation, mem_utilisation)
-        coeff_reward = self.get_coefficient_of_variation_reward( cpu_utilisation, mem_utilisation)
-        reward_list = [std_reward , entropy_reward , coeff_reward]
-        reward = sum(reward_list)/len(reward_list)#std_reward  + entropy_reward  + coeff_reward
+        #entropy_reward = self.get_entropy_reward( cpu_utilisation, mem_utilisation)
+        #coeff_reward = self.get_coefficient_of_variation_reward( cpu_utilisation, mem_utilisation)
+        reward_list = [std_reward]# , entropy_reward ]#, coeff_reward]
+        reward = sum(reward_list)/(2*len(reward_list))#std_reward  + entropy_reward  + coeff_reward
         #reward = self.reward_chat_gpt_sd_entropy( cpu_utilisation, mem_utilisation)
         return reward 
 
@@ -587,12 +587,14 @@ class CustomEnv(gym.Env):
     def initial_standard_mask(self, no_mask_prob= 0.5):
         
         valid_mask = np.ones(self.number_of_nodes)
+        """
         test_condition = random.random()
         if no_mask_prob < test_condition:
             masked_node_num = np.random.randint(low=0, high=self.mask_nodes)
             
             if masked_node_num:
                 valid_mask[-masked_node_num:] = 0
+        """
         self.master.mask_list = valid_mask
 
     def all_valid_action_mask(self):

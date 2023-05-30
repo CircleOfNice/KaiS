@@ -116,10 +116,10 @@ def mask_fn(env:CustomEnv) -> np.ndarray:
     # Do whatever you'd like in this function to return the action mask
     # for the current env. In this example, we assume the env has a
     # helpful method we can rely on.
-    # return env.all_valid_action_mask()
+    return env.all_valid_action_mask()
     # return env.ordered_valid_action_mask()
     # return env.valid_action_mask()
-    return env.repeatable_ordered_valid_action_mask()
+    #return env.repeatable_ordered_valid_action_mask()
 
 
 def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:list, train:bool=True):
@@ -141,7 +141,7 @@ def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:l
 MODEL_PATH = ""
 path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
 result_list,_ = get_all_task_kubernetes(path)
-total_nodes =10
+total_nodes =4
 masked_nodes = total_nodes - 2
 
 eval_freq = 50_000 # Number of timesteps after which to evaluate the models
@@ -172,7 +172,7 @@ eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_pa
 action_dist_callback = CustomLoggerCallback(eval_env=custom_env, verbose=0, log_freq=eval_freq, num_envs=num_envs)
 
 episode_length = len(result_list[0])
-num_episodes = 1000
+num_episodes =300
 
 total_reward_list = []
 
@@ -197,8 +197,8 @@ print(model.policy)
 model.learn(total_timesteps=(episode_length-1)*num_episodes, progress_bar=True, callback=[eval_callback, action_dist_callback], reset_num_timesteps=True)
 curr_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 model.save(os.path.join('models','PPO2', curr_time + "_ppo_model.zip"))
-if USE_NORMALIZED_ENVS:
-    custom_env.save(os.path.join("models", "PPO2", "final_env.zip"))
+#if USE_NORMALIZED_ENVS:
+#custom_env.save(os.path.join("models", "PPO2", "final_env.zip"))
 
 # Logging hyperparameters
 # Metric dict must not be empty
