@@ -605,12 +605,14 @@ class CustomEnv(gym.Env):
     def initial_standard_mask(self, no_mask_prob=1):
         
         valid_mask = np.ones(self.number_of_nodes)
+        """
         test_condition = random.random()
         if no_mask_prob < test_condition:
             masked_node_num = np.random.randint(low=0, high=self.mask_nodes)
             
             if masked_node_num:
                 valid_mask[-masked_node_num:] = 0
+        """
         self.master.mask_list = valid_mask
 
     def all_valid_action_mask(self):

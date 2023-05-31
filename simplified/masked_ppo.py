@@ -117,6 +117,7 @@ def mask_fn(env:CustomEnv) -> np.ndarray:
     # for the current env. In this example, we assume the env has a
     # helpful method we can rely on.
     return env.all_valid_action_mask()
+    return env.all_valid_action_mask()
     # return env.ordered_valid_action_mask()
     # return env.valid_action_mask()
     # return env.repeatable_ordered_valid_action_mask()
@@ -181,6 +182,18 @@ eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_pa
                               eval_freq=eval_freq//num_envs, deterministic=True, render=False, n_eval_episodes=5, verbose=False)
 action_dist_callback = CustomLoggerCallback(eval_env=custom_env, verbose=0, log_freq=eval_freq, num_envs=num_envs)
 
+episode_length = len(result_list[0])
+num_episodes =300
+
+total_reward_list = []
+
+#policy_kwargs = dict(net_arch=[32, 64, 128, 256])
+#policy_kwargs = dict(net_arch=[256, 256, 256, 256])
+#policy_kwargs = dict(net_arch=[32, 32])
+policy_kwargs = None
+lr = 0.0003
+enf_coef = 0.01
+
 if MODEL_PATH:
     print(f"Loading existing model from: {MODEL_PATH}")
     model = MaskablePPO.load(MODEL_PATH, env=custom_env)
@@ -194,8 +207,8 @@ else:
 model.learn(total_timesteps=(episode_length-1)*num_episodes, progress_bar=True, callback=[eval_callback, action_dist_callback], reset_num_timesteps=True)
 curr_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 model.save(os.path.join('models','PPO2', curr_time + "_ppo_model.zip"))
-if USE_NORMALIZED_ENVS:
-    custom_env.save(os.path.join("models", "PPO2", "final_env.zip"))
+#if USE_NORMALIZED_ENVS:
+#custom_env.save(os.path.join("models", "PPO2", "final_env.zip"))
 
 # Logging hyperparameters
 # Metric dict must not be empty

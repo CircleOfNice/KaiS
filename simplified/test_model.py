@@ -52,7 +52,7 @@ if __name__ == "__main__":
 
     # https://stable-baselines3.readthedocs.io/en/v0.11.1/guide/examples.html#pybullet-normalizing-input-features
     # Link above shows example of how to load a model with a vecnormalize wrapper
-    env = CustomEnv(16, 14, result_list, normalize_obs=True, init_random=False, init_uniform=False, no_masking_prob=1)
+    env = CustomEnv(4, 3, result_list, normalize_obs=True, init_random=False, init_uniform=True)
     model = sb3_contrib.MaskablePPO.load(MODEL_PATH)
 
     # model = sb3_contrib.MaskablePPO.load(MODEL_PATH)
