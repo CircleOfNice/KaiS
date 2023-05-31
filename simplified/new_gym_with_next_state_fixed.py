@@ -74,6 +74,9 @@ class Master:
         self.mask_list = [1 for _ in range(self.number_of_nodes)]
         
         self.current_incoming_task = [0, 0, 0, 0, 0]
+
+        self.req_cpu_last_task = 0 # For logging purposes
+        self.req_mem_last_task = 0 # For logging purposes
         self.req_cpu_current_task = 0
         self.req_mem_current_task = 0
 
@@ -156,7 +159,7 @@ class Master:
         """
         for idx, node in enumerate(self.node_list):
             if self.mask_list[idx]:
-                if node.cpu >= self.req_cpu_current_task and node.mem >= self.req_mem_current_task:
+                if node.cpu >= self.req_cpu_last_task and node.mem >= self.req_mem_last_task:
                     return True
         
         return False
@@ -184,6 +187,8 @@ class Master:
             task (list): list containing the data for next incoming data
         """
         self.current_incoming_task = task
+        self.req_cpu_last_task = self.req_cpu_current_task
+        self.req_mem_last_task = self.req_mem_current_task
         self.req_cpu_current_task = task[3]
         self.req_mem_current_task = task[4]
         
@@ -668,8 +673,9 @@ class CustomEnv(gym.Env):
         """ Simple Wrapper for task generation """
         # if random.random() > 0.5:
         #     task = self.sample_task_from_kubernetes_data_set()
-        # else:
-        task = self.generate_random_task()
+        # else: 
+        task = self.sample_task_from_kubernetes_data_set()
+        # task = self.generate_random_task()
         return task
     
     

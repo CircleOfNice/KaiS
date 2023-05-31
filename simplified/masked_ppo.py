@@ -137,18 +137,18 @@ def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:l
     return CustomEnv(number_of_nodes=num_total_nodes, mask_nodes=num_max_masked_nodes, data=data_list, train=train)
     
 
-# MODEL_PATH = os.path.join(os.getcwd(), 'models', 'PPO2', "2023-05-30_11-00-26_ppo_model.zip")
+# MODEL_PATH = os.path.join(os.getcwd(), 'models', 'PPO2', "2023-05-30_15-23-08_ppo_model.zip")
 MODEL_PATH = ""
 path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
 result_list,_ = get_all_task_kubernetes(path)
-total_nodes = 16
+total_nodes = 32
 masked_nodes = total_nodes - 2
 
 eval_freq = 50_000 # Number of timesteps after which to evaluate the models
-num_envs = 64
+num_envs = 16
 
 episode_length = len(result_list[0])
-num_episodes = 400
+num_episodes = 5000
 
 no_masking_prob = 1
 
@@ -159,14 +159,14 @@ policy_kwargs = None
 lr = 0.00003
 enf_coef = 0.01
 
-USE_NORMALIZED_ENVS = False
+USE_NORMALIZED_ENVS = True
 
 # Need to first wrap the environment in all needed masks, and only then vectorize it
 env_fn = lambda: ActionMasker(CustomEnv(total_nodes, masked_nodes, result_list, normalize_obs=True, no_masking_prob=no_masking_prob), mask_fn)
 custom_env = make_vec_env(env_fn, n_envs=num_envs)
 
 if USE_NORMALIZED_ENVS:
-    custom_env = VecNormalize(custom_env)
+    custom_env = VecNormalize(custom_env, norm_obs=False)
     eval_env = make_vec_env(env_fn, n_envs=1)
 else:
     eval_env = CustomEnv(total_nodes, masked_nodes, result_list, normalize_obs=True, no_masking_prob=no_masking_prob)
@@ -175,7 +175,7 @@ else:
 eval_env = Monitor(eval_env)
 
 if USE_NORMALIZED_ENVS:
-    eval_env = VecNormalize(eval_env)
+    eval_env = VecNormalize(eval_env, norm_obs=False)
 
 eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_path="logs",
                               eval_freq=eval_freq//num_envs, deterministic=True, render=False, n_eval_episodes=5, verbose=False)

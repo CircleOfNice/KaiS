@@ -4,7 +4,6 @@ import sb3_contrib
 from new_gym_with_next_state_fixed import CustomEnv
 import numpy as np
 import os
-os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 from env_run import get_all_task_kubernetes
 import matplotlib.pyplot as plt
@@ -44,7 +43,7 @@ if __name__ == "__main__":
 
     num_test_runs = 1
 
-    MODEL_PATH = r"models/PPO2/2023-05-30_12-21-20_ppo_model.zip"
+    MODEL_PATH = r"models/PPO2/2023-05-31_12-34-01_ppo_model.zip"
     ENV_PATH = r"models/PPO2/final_env.zip"
 
     path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
@@ -53,7 +52,7 @@ if __name__ == "__main__":
 
     # https://stable-baselines3.readthedocs.io/en/v0.11.1/guide/examples.html#pybullet-normalizing-input-features
     # Link above shows example of how to load a model with a vecnormalize wrapper
-    env = CustomEnv(8, 6, result_list, normalize_obs=True, init_random=False, init_uniform=True, no_masking_prob=1)
+    env = CustomEnv(16, 14, result_list, normalize_obs=True, init_random=False, init_uniform=False, no_masking_prob=1)
     model = sb3_contrib.MaskablePPO.load(MODEL_PATH)
 
     # model = sb3_contrib.MaskablePPO.load(MODEL_PATH)
@@ -87,8 +86,11 @@ if __name__ == "__main__":
     episode_length = 0
     while not done:
         action_mask = np.ones(MAX_NODE_CAPACITY) # TODO action mask set to all ones currently
+        # action_mask[-14:] = 0
+        env.master.mask_list = action_mask
         action,_ = model.predict(obs, deterministic=True, action_masks=action_mask)
         action = action.item()
+
         obs, reward, done, info = env.step(action)
 
         episode_length += 1
@@ -96,7 +98,7 @@ if __name__ == "__main__":
         remaining_cpu_list.append(obs[::4][:-1])
         remaining_mem_list.append(obs[1::4][:-1])
 
-    print(f"Last incoming task: req_cpu: {env.master.req_cpu_current_task}, req_mem: {env.master.req_mem_current_task}")
+    print(f"Last incoming task: req_cpu: {env.master.req_cpu_last_task}, req_mem: {env.master.req_mem_last_task}")
     print("Node usage at the end:")
     for idx, node in enumerate(env.master.node_list):
         print(f"Node {idx}: " + str(node))
