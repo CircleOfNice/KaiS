@@ -15,11 +15,10 @@ from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from stable_baselines3.common.env_util import make_vec_env
-
+import argparse
 from tensorboardX import SummaryWriter
 
-#from new_gym_patching import CustomEnv
-#from gym_env_patching_and_repeatable import CustomEnv
+
 from new_gym_with_next_state_fixed import CustomEnv
 import utils
 
@@ -34,11 +33,12 @@ class CustomLoggerCallback(BaseCallback):
         - Number of times the cluster was at max capacity
     """
 
-    def __init__(self, eval_env:gym.Env, verbose, log_freq:int, num_envs:int):
+    def __init__(self, eval_env:gym.Env, total_nodes:int, verbose, log_freq:int, num_envs:int):
         super(CustomLoggerCallback, self).__init__(verbose)
         self.eval_env = eval_env
         self.log_freq = log_freq
         self.num_envs = num_envs
+        self.total_nodes = total_nodes
 
 
     def _on_training_start(self) -> None:
@@ -47,7 +47,7 @@ class CustomLoggerCallback(BaseCallback):
         self.master = self.eval_env.envs[0].master
 
 
-        self.expected_action_distribution = utils.expected_action_distribution(node_num=total_nodes, use_mask=True)
+        self.expected_action_distribution = utils.expected_action_distribution(node_num=self.total_nodes, use_mask=True)
 
         for idx in range(len(self.master.action_distribution)):
             self.action_dist_dict["a_" + str(idx)] = None
@@ -117,7 +117,6 @@ def mask_fn(env:CustomEnv) -> np.ndarray:
     # for the current env. In this example, we assume the env has a
     # helpful method we can rely on.
     return env.all_valid_action_mask()
-    return env.all_valid_action_mask()
     # return env.ordered_valid_action_mask()
     # return env.valid_action_mask()
     # return env.repeatable_ordered_valid_action_mask()
@@ -138,91 +137,100 @@ def create_custom_env(num_total_nodes:int, num_max_masked_nodes:int, data_list:l
     return CustomEnv(number_of_nodes=num_total_nodes, mask_nodes=num_max_masked_nodes, data=data_list, train=train)
     
 
-# MODEL_PATH = os.path.join(os.getcwd(), 'models', 'PPO2', "2023-05-30_15-23-08_ppo_model.zip")
-MODEL_PATH = ""
-path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
-result_list,_ = get_all_task_kubernetes(path)
-total_nodes = 32
-masked_nodes = total_nodes - 2
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-e", "--num_episodes", type=int, default=1000)
+    parser.add_argument("-n", "--num_nodes", type=int, default=32)
+    parser.add_argument("-v", "--num_envs", type=int, default=32)
+    parser.add_argument("-p", "--policy_arch", nargs="*", default=None)
+    parser.add_argument("-l", "--lr", type=float, default=0.00003)
+    parser.add_argument("-c", "--entropy_c", type=float, default=0.01)
+    parser.add_argument("-m", "--model_path", type=str, default=None)
+    args = parser.parse_args()
+    return args
 
-eval_freq = 50_000 # Number of timesteps after which to evaluate the models
-num_envs = 16
 
-episode_length = len(result_list[0])
-num_episodes = 5000
+def main(args):
 
-no_masking_prob = 1
+    MODEL_PATH = args.model_path
 
-# policy_kwargs = dict(net_arch=[32, 64, 128, 256])
-# policy_kwargs = dict(net_arch=[256, 256, 256, 256])
-# policy_kwargs = dict(net_arch=[128, 128, 64])
-policy_kwargs = None
-lr = 0.00003
-enf_coef = 0.01
+    total_nodes = args.num_nodes
+    masked_nodes = total_nodes - 2
 
-USE_NORMALIZED_ENVS = True
+    eval_freq = 50_000 # Number of timesteps after which to evaluate the models
+    num_envs = args.num_envs
 
-# Need to first wrap the environment in all needed masks, and only then vectorize it
-env_fn = lambda: ActionMasker(CustomEnv(total_nodes, masked_nodes, result_list, normalize_obs=True, no_masking_prob=no_masking_prob), mask_fn)
-custom_env = make_vec_env(env_fn, n_envs=num_envs)
+    num_episodes = args.num_episodes
 
-if USE_NORMALIZED_ENVS:
-    custom_env = VecNormalize(custom_env, norm_obs=False)
-    eval_env = make_vec_env(env_fn, n_envs=1)
-else:
-    eval_env = CustomEnv(total_nodes, masked_nodes, result_list, normalize_obs=True, no_masking_prob=no_masking_prob)
-    eval_env = ActionMasker(eval_env, mask_fn)
+    no_masking_prob = 1
 
-eval_env = Monitor(eval_env)
+    lr = args.lr
+    enf_coef = args.entropy_c
+    policy_kwargs = args.policy_arch
+    if policy_kwargs:
+        policy_kwargs = [int(hidden_num) for hidden_num in policy_kwargs]
 
-if USE_NORMALIZED_ENVS:
-    eval_env = VecNormalize(eval_env, norm_obs=False)
 
-eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_path="logs",
-                              eval_freq=eval_freq//num_envs, deterministic=True, render=False, n_eval_episodes=5, verbose=False)
-action_dist_callback = CustomLoggerCallback(eval_env=custom_env, verbose=0, log_freq=eval_freq, num_envs=num_envs)
+    path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
+    result_list,_ = get_all_task_kubernetes(path)
+    episode_length = len(result_list[0])
 
-episode_length = len(result_list[0])
-num_episodes =300
+    for key, value in vars(args).items():
+        print(key, ":", value)
+    
+    USE_NORMALIZED_ENVS = True
 
-total_reward_list = []
+    # Creating the training and evaluation environments
+    env_fn = lambda: ActionMasker(CustomEnv(total_nodes, masked_nodes, result_list, normalize_obs=True, no_masking_prob=no_masking_prob), mask_fn)
+    custom_env = make_vec_env(env_fn, n_envs=num_envs)
 
-#policy_kwargs = dict(net_arch=[32, 64, 128, 256])
-#policy_kwargs = dict(net_arch=[256, 256, 256, 256])
-#policy_kwargs = dict(net_arch=[32, 32])
-policy_kwargs = None
-lr = 0.0003
-enf_coef = 0.01
+    if USE_NORMALIZED_ENVS:
+        custom_env = VecNormalize(custom_env, norm_obs=False)
+        eval_env = make_vec_env(env_fn, n_envs=1)
+    else:
+        eval_env = CustomEnv(total_nodes, masked_nodes, result_list, normalize_obs=True, no_masking_prob=no_masking_prob)
+        eval_env = ActionMasker(eval_env, mask_fn)
 
-if MODEL_PATH:
-    print(f"Loading existing model from: {MODEL_PATH}")
-    model = MaskablePPO.load(MODEL_PATH, env=custom_env)
-    reset_num_timesteps = False
-else:
-    print(f"Training new model from scratch")
-    model = MaskablePPO(MaskableActorCriticPolicy, custom_env, ent_coef=enf_coef, verbose=0, tensorboard_log="tensorboard_logs", policy_kwargs = policy_kwargs,
-                    learning_rate=lr)#, verbose=True)
-    reset_num_timesteps = False
+    eval_env = Monitor(eval_env)
 
-model.learn(total_timesteps=(episode_length-1)*num_episodes, progress_bar=True, callback=[eval_callback, action_dist_callback], reset_num_timesteps=True)
-curr_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-model.save(os.path.join('models','PPO2', curr_time + "_ppo_model.zip"))
-#if USE_NORMALIZED_ENVS:
-#custom_env.save(os.path.join("models", "PPO2", "final_env.zip"))
+    if USE_NORMALIZED_ENVS:
+        eval_env = VecNormalize(eval_env, norm_obs=False)
 
-# Logging hyperparameters
-# Metric dict must not be empty
-hparams = {
-    "num_episodes": num_episodes,
-    "episode_length": episode_length,
-    "num_nodes": total_nodes,
-    "num_masked_nodes": masked_nodes,
-    "num_envs": num_envs,
-}
-if policy_kwargs:
-    for idx, layer_n in enumerate(policy_kwargs["net_arch"]):
-        hparams["layer_" + str(idx)] = layer_n
+    eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_path="logs",
+                                eval_freq=eval_freq//num_envs, deterministic=True, render=False, n_eval_episodes=5, verbose=False)
+    action_dist_callback = CustomLoggerCallback(eval_env=custom_env, total_nodes=total_nodes, verbose=0, log_freq=eval_freq, num_envs=num_envs)
 
-writer = SummaryWriter(logdir=action_dist_callback.logger.get_dir())
-# Metric dict must not be empty
-writer.add_hparams(hparam_dict=hparams, metric_dict={"empty": 1})
+    if MODEL_PATH:
+        print(f"Loading existing model from: {MODEL_PATH}")
+        model = MaskablePPO.load(MODEL_PATH, env=custom_env)
+    else:
+        print(f"Training new model from scratch")
+        model = MaskablePPO(MaskableActorCriticPolicy, custom_env, ent_coef=enf_coef, verbose=0, tensorboard_log="tensorboard_logs", policy_kwargs = policy_kwargs,
+                        learning_rate=lr)#, verbose=True)
+
+    model.learn(total_timesteps=(episode_length-1)*num_episodes, progress_bar=True, callback=[eval_callback, action_dist_callback], reset_num_timesteps=True)
+    curr_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    model.save(os.path.join('models','PPO2', curr_time + "_ppo_model.zip"))
+
+    # Logging hyperparameters
+    # Metric dict must not be empty
+    hparams = {
+        "num_episodes": num_episodes,
+        "episode_length": episode_length,
+        "num_nodes": total_nodes,
+        "num_masked_nodes": masked_nodes,
+        "num_envs": num_envs,
+    }
+
+    if policy_kwargs:
+        for idx, layer_n in enumerate(policy_kwargs["net_arch"]):
+            hparams["layer_" + str(idx)] = layer_n
+
+    writer = SummaryWriter(logdir=action_dist_callback.logger.get_dir())
+    # Metric dict must not be empty
+    writer.add_hparams(hparam_dict=hparams, metric_dict={"empty": 1})
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    main(args)

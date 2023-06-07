@@ -676,8 +676,8 @@ class CustomEnv(gym.Env):
         # if random.random() > 0.5:
         #     task = self.sample_task_from_kubernetes_data_set()
         # else: 
-        task = self.sample_task_from_kubernetes_data_set()
-        # task = self.generate_random_task()
+        # task = self.sample_task_from_kubernetes_data_set()
+        task = self.generate_random_task()
         return task
     
     
