@@ -13,6 +13,7 @@ RUN pip install -r requirements.txt
 RUN pip freeze
 
 COPY simplified/ simplified/
+COPY Data/ Data/
 
 CMD ["simplified/masked_ppo.py"]
 ENTRYPOINT ["python"]

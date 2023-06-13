@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
     num_test_runs = 1
 
-    MODEL_PATH = r"models/PPO2/2023-05-31_12-34-01_ppo_model.zip"
+    MODEL_PATH = r"models/PPO2/2023-06-07_07-54-15_ppo_model.zip"
     ENV_PATH = r"models/PPO2/final_env.zip"
 
     path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
@@ -52,7 +52,7 @@ if __name__ == "__main__":
 
     # https://stable-baselines3.readthedocs.io/en/v0.11.1/guide/examples.html#pybullet-normalizing-input-features
     # Link above shows example of how to load a model with a vecnormalize wrapper
-    env = CustomEnv(4, 3, result_list, normalize_obs=True, init_random=False, init_uniform=True)
+    env = CustomEnv(32, 30, result_list, normalize_obs=True, init_random=False, init_uniform=True)
     model = sb3_contrib.MaskablePPO.load(MODEL_PATH)
 
     # model = sb3_contrib.MaskablePPO.load(MODEL_PATH)
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     episode_length = 0
     while not done:
         action_mask = np.ones(MAX_NODE_CAPACITY) # TODO action mask set to all ones currently
-        # action_mask[-14:] = 0
+        # action_mask[-30:] = 0
         env.master.mask_list = action_mask
         action,_ = model.predict(obs, deterministic=True, action_masks=action_mask)
         action = action.item()

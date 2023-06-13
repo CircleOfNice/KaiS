@@ -1,9 +1,5 @@
-import gym
-import joblib
 import numpy as np
 import os
-from tqdm import tqdm
-import matplotlib.pyplot as plt
 from env_run import get_all_task_kubernetes
 from datetime import datetime
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
@@ -18,9 +14,9 @@ from stable_baselines3.common.env_util import make_vec_env
 import argparse
 from tensorboardX import SummaryWriter
 
-
 from new_gym_with_next_state_fixed import CustomEnv
 import utils
+
 
 class CustomLoggerCallback(BaseCallback):
     """Custom callback for logging different values from the environment.
@@ -33,7 +29,7 @@ class CustomLoggerCallback(BaseCallback):
         - Number of times the cluster was at max capacity
     """
 
-    def __init__(self, eval_env:gym.Env, total_nodes:int, verbose, log_freq:int, num_envs:int):
+    def __init__(self, eval_env, total_nodes:int, verbose, log_freq:int, num_envs:int):
         super(CustomLoggerCallback, self).__init__(verbose)
         self.eval_env = eval_env
         self.log_freq = log_freq
@@ -146,6 +142,8 @@ def parse_args():
     parser.add_argument("-l", "--lr", type=float, default=0.00003)
     parser.add_argument("-c", "--entropy_c", type=float, default=0.01)
     parser.add_argument("-m", "--model_path", type=str, default=None)
+    parser.add_argument("-o", "--output_path", type=str, default="tensorboard_logs")
+    parser.add_argument("-w", "--verbose", type=int, default=0)
     args = parser.parse_args()
     return args
 
@@ -169,15 +167,20 @@ def main(args):
     policy_kwargs = args.policy_arch
     if policy_kwargs:
         policy_kwargs = [int(hidden_num) for hidden_num in policy_kwargs]
-
+        policy_kwargs = dict(net_arch=policy_kwargs)
 
     path = os.path.join(os.getcwd(), 'Data', '2023_02_06_data', 'data_2.json')
     result_list,_ = get_all_task_kubernetes(path)
     episode_length = len(result_list[0])
 
+    output_path = args.output_path
+    verbose = args.verbose
+
+    print("Arguments:")
     for key, value in vars(args).items():
         print(key, ":", value)
-    
+    print()
+
     USE_NORMALIZED_ENVS = True
 
     # Creating the training and evaluation environments
@@ -196,8 +199,8 @@ def main(args):
     if USE_NORMALIZED_ENVS:
         eval_env = VecNormalize(eval_env, norm_obs=False)
 
-    eval_callback = EvalCallback(eval_env, best_model_save_path="best_model", log_path="logs",
-                                eval_freq=eval_freq//num_envs, deterministic=True, render=False, n_eval_episodes=5, verbose=False)
+    eval_callback = EvalCallback(eval_env, best_model_save_path=output_path, log_path="logs",
+                                eval_freq=eval_freq//num_envs, deterministic=True, render=False, n_eval_episodes=50, verbose=verbose)
     action_dist_callback = CustomLoggerCallback(eval_env=custom_env, total_nodes=total_nodes, verbose=0, log_freq=eval_freq, num_envs=num_envs)
 
     if MODEL_PATH:
@@ -205,12 +208,14 @@ def main(args):
         model = MaskablePPO.load(MODEL_PATH, env=custom_env)
     else:
         print(f"Training new model from scratch")
-        model = MaskablePPO(MaskableActorCriticPolicy, custom_env, ent_coef=enf_coef, verbose=0, tensorboard_log="tensorboard_logs", policy_kwargs = policy_kwargs,
-                        learning_rate=lr)#, verbose=True)
+        model = MaskablePPO(MaskableActorCriticPolicy, custom_env, ent_coef=enf_coef, verbose=verbose, tensorboard_log=output_path, policy_kwargs = policy_kwargs,
+                        learning_rate=lr, device="cuda")
 
-    model.learn(total_timesteps=(episode_length-1)*num_episodes, progress_bar=True, callback=[eval_callback, action_dist_callback], reset_num_timesteps=True)
+    model.learn(total_timesteps=(episode_length-1)*num_episodes, progress_bar=not verbose, callback=[eval_callback, action_dist_callback], reset_num_timesteps=True)
     curr_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    model.save(os.path.join('models','PPO2', curr_time + "_ppo_model.zip"))
+
+    print("Finished training, saving model and hyperparameters ...")
+    model.save(os.path.join(output_path, curr_time + "_ppo_model.zip"))
 
     # Logging hyperparameters
     # Metric dict must not be empty
@@ -229,7 +234,7 @@ def main(args):
     writer = SummaryWriter(logdir=action_dist_callback.logger.get_dir())
     # Metric dict must not be empty
     writer.add_hparams(hparam_dict=hparams, metric_dict={"empty": 1})
-
+    print("Done")
 
 if __name__ == "__main__":
     args = parse_args()
